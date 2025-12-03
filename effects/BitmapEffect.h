@@ -1,4 +1,4 @@
-static bool LogicEffectBitmap(LogicEngineRenderer& r)
+static bool LogicEffectBitmap(LogicEngineRenderer &r)
 {
     return false;
     if (r.hasEffectChanged())
@@ -13,7 +13,7 @@ static bool LogicEffectBitmap(LogicEngineRenderer& r)
     {
         for (unsigned x = 0; x < w; x++)
         {
-            r.setPixelRGB(x, y, leds[x+y*w]);
+            r.setPixelRGB(x, y, leds[x + y * w]);
         }
     }
     return true;
