@@ -19,6 +19,11 @@
 #define USE_LEDLIB 0
 #endif
 
+// Prevent conflicts with FastLED's RMT driver on ESP32 (also set in platformio.ini)
+#ifndef ESP32_ARDUINO_NO_RGB_BUILTIN
+#define ESP32_ARDUINO_NO_RGB_BUILTIN
+#endif
+
 // Define USE_I2C_ADDRESS to enable slave mode. This will disable servo support
 // #define USE_I2C_ADDRESS 0x0a
 #define USE_DEBUG // Define to enable debug diagnostic
@@ -285,28 +290,28 @@ HoloLights topHolo(PIN_TOP_HOLO, HoloLights::kRGB, 3);
 // These values will be configurable through the WiFi interface and stored in the preferences.
 const ServoSettings servoSettings[] PROGMEM = {
 #ifndef USE_I2C_ADDRESS
-    // First PCA9685 controller
-    {1, 800, 2200, PANEL_GROUP_4 | SMALL_PANEL},  /* 0: door 4 */
-    {2, 800, 2200, PANEL_GROUP_3 | SMALL_PANEL},  /* 1: door 3 */
-    {3, 800, 2200, PANEL_GROUP_2 | SMALL_PANEL},  /* 2: door 2 */
-    {4, 800, 2200, PANEL_GROUP_1 | SMALL_PANEL},  /* 3: door 1 */
-    {5, 800, 2200, PANEL_GROUP_5 | MEDIUM_PANEL}, /* 4: door 5 */
-    {6, 800, 2200, PANEL_GROUP_6 | BIG_PANEL},    /* 5: door 9 */
-    {7, 800, 2200, MINI_PANEL},                   /* 6: mini door 2 */
-    {8, 800, 2200, MINI_PANEL},                   /* 7: mini front psi door */
-    {9, 800, 2200, PANEL_GROUP_10 | PIE_PANEL},   /* 8: pie panel 1 */
-    {10, 800, 2200, PANEL_GROUP_9 | PIE_PANEL},   /* 9: pie panel 2 */
-    {11, 800, 2200, PANEL_GROUP_8 | PIE_PANEL},   /* 10: pie panel 3 */
-    {12, 800, 2200, PANEL_GROUP_7 | PIE_PANEL},   /* 11: pie panel 4 */
-    {13, 800, 2200, TOP_PIE_PANEL},               /* 12: dome top panel */
+    // First PCA9685 controller - CORRECTED to match wiring diagram
+    {1, 800, 2200, PANEL_GROUP_1 | SMALL_PANEL},  /* 0: Small Panel 1 */
+    {2, 800, 2200, PANEL_GROUP_2 | SMALL_PANEL},  /* 1: Small Panel 2 */
+    {3, 800, 2200, PANEL_GROUP_3 | SMALL_PANEL},  /* 2: Small Panel 3 */
+    {4, 800, 2200, PANEL_GROUP_4 | SMALL_PANEL},  /* 3: Small Panel 4 */
+    {5, 800, 2200, PANEL_GROUP_5 | MEDIUM_PANEL}, /* 4: Medium Panel 5 */
+    {6, 800, 2200, PANEL_GROUP_6 | BIG_PANEL},    /* 5: Large Panel 6 */
+    {7, 800, 2200, MINI_PANEL},                   /* 6: Mini Panel A */
+    {8, 800, 2200, MINI_PANEL},                   /* 7: Mini Panel B */
+    {9, 800, 2200, PANEL_GROUP_7 | PIE_PANEL},    /* 8: Pie Panel 7 */
+    {10, 800, 2200, PANEL_GROUP_8 | PIE_PANEL},   /* 9: Pie Panel 8 */
+    {11, 800, 2200, PANEL_GROUP_9 | PIE_PANEL},   /* 10: Pie Panel 9 */
+    {12, 800, 2200, PANEL_GROUP_10 | PIE_PANEL},  /* 11: Pie Panel 10 */
+    {13, 800, 2200, TOP_PIE_PANEL},               /* 12: Top Center Panel */
 
-    // Second PCA9685 controller
-    {16, 800, 2200, HOLO_HSERVO}, /* 13: horizontal front holo */
-    {17, 800, 2200, HOLO_VSERVO}, /* 14: vertical front holo */
-    {18, 800, 2200, HOLO_HSERVO}, /* 15: horizontal top holo */
-    {19, 800, 2200, HOLO_VSERVO}, /* 16: vertical top holo */
-    {20, 800, 2200, HOLO_VSERVO}, /* 17: vertical rear holo */
-    {21, 800, 2200, HOLO_HSERVO}, /* 18: horizontal rear holo */
+    // Second PCA9685 controller - Verify holo assignments match diagram
+    {16, 800, 2200, HOLO_HSERVO}, /* 13: Front Holo Horizontal */
+    {17, 800, 2200, HOLO_VSERVO}, /* 14: Front Holo Vertical */
+    {18, 800, 2200, HOLO_HSERVO}, /* 15: Top Holo Horizontal */
+    {19, 800, 2200, HOLO_VSERVO}, /* 16: Top Holo Vertical */
+    {20, 800, 2200, HOLO_VSERVO}, /* 17: Rear Holo Vertical */
+    {21, 800, 2200, HOLO_HSERVO}, /* 18: Rear Holo Horizontal */
 #endif
 };
 
@@ -350,15 +355,16 @@ enum
 
 ////////////////////////////////
 // Standard LogicEngine sequences are in the range 0-99. Custom sequences start at 100
+static const LogicEffect sCustomLogicEffects[] = {
+    LogicEffectBitmap,
+    LogicEffectPlasma,
+    LogicEffectMetaBalls,
+    LogicEffectFractal,
+    LogicEffectFadeAndScroll};
+
 LogicEffect CustomLogicEffectSelector(unsigned selectSequence)
 {
-    static const LogicEffect sCustomLogicEffects[] = {
-        LogicEffectBitmap,
-        LogicEffectPlasma,
-        LogicEffectMetaBalls,
-        LogicEffectFractal,
-        LogicEffectFadeAndScroll};
-    if (selectSequence >= 100 && selectSequence - 100 <= SizeOfArray(sCustomLogicEffects))
+    if (selectSequence >= 100 && selectSequence - 100 < SizeOfArray(sCustomLogicEffects))
     {
         return LogicEffect(sCustomLogicEffects[selectSequence - 100]);
     }
@@ -533,6 +539,7 @@ static SMQAddress sRemoteAddress;
 void scan_i2c()
 {
     unsigned nDevices = 0;
+    Serial.println("Scanning I2C addresses 0x01-0x7E...");
     for (byte address = 1; address < 127; address++)
     {
         String name = "<unknown>";
@@ -545,8 +552,13 @@ void scan_i2c()
         }
         if (address == 0x40)
         {
-            // Adafruit PCA9685
-            name = "PCA9685";
+            // Adafruit PCA9685 - Panels Controller
+            name = "PCA9685 (Panels)";
+        }
+        if (address == 0x41)
+        {
+            // Adafruit PCA9685 - Holos Controller
+            name = "PCA9685 (Holos)";
         }
         if (address == 0x14)
         {
@@ -647,10 +659,6 @@ void setup()
         }
         sMarcSound.setVolume(preferences.getInt(PREFERENCE_MARCSOUND_VOLUME, MARC_SOUND_VOLUME) / 1000.0);
     }
-
-    RLD.selectScrollTextLeft("... AstroPixels ....", LogicEngineRenderer::kBlue, 0, 15);
-    FLD.selectScrollTextLeft("... R2D2 ...", LogicEngineRenderer::kRed, 0, 15);
-
     // Assign servos to holo projectors
     frontHolo.assignServos(&servoDispatch, 13, 14);
     // Second PCA9685 controller
@@ -664,6 +672,16 @@ void setup()
     rearHolo.assignServos(&servoDispatch, 17, 18);
     // { 20, 800, 2200, HOLO_VSERVO },                /* 17: vertical rear holo */
     // { 21, 800, 2200, HOLO_HSERVO },                /* 18: horizontal rear holo */
+
+    // CREDENDA FORK IMPROVEMENT: Enhanced startup text display
+    // Shows "STAR WARS" on RLD and "R2D2" on FLD during boot
+    // Initialize LED effects before WiFi starts
+    RLD.selectScrollTextLeft("... STAR WARS ....", LogicEngineRenderer::kBlue, 0, 15);
+    FLD.selectScrollTextLeft("... R2D2 ...", LogicEngineRenderer::kRed, 0, 15);
+    RLD.setLogicEffectSelector(CustomLogicEffectSelector);
+    FLD.setLogicEffectSelector(CustomLogicEffectSelector);
+    frontPSI.setLogicEffectSelector(CustomLogicEffectSelector);
+    rearPSI.setLogicEffectSelector(CustomLogicEffectSelector);
 
 #ifdef USE_WIFI
     if (remoteEnabled)
@@ -768,6 +786,12 @@ void setup()
             preferences.getString(PREFERENCE_WIFI_PASS, WIFI_AP_PASSPHRASE),
             preferences.getBool(PREFERENCE_WIFI_AP, WIFI_ACCESS_POINT),
             preferences.getBool(PREFERENCE_WIFI_ENABLED, WIFI_ENABLED));
+        // CRITICAL: setNetworkCredentials changes WiFi mode to STA
+        // If remote is enabled, we need APSTA mode for ESP-NOW, so override it here
+        if (remoteEnabled)
+        {
+            WiFi.mode(WIFI_MODE_APSTA);
+        }
 #ifdef USE_WIFI_MARCDUINO
         wifiMarcduinoReceiver.setEnabled(preferences.getBool(PREFERENCE_MARCWIFI_ENABLED, MARC_WIFI_ENABLED));
         if (wifiMarcduinoReceiver.enabled())
@@ -794,14 +818,11 @@ void setup()
                                                String hostName = mac.substring(mac.length() - 5, mac.length());
                                                hostName.remove(2, 1);
                                                hostName = String(WIFI_AP_NAME) + String("-") + hostName;
-                                               if (webServer.enabled())
+                                               Serial.print("Host name: ");
+                                               Serial.println(hostName);
+                                               if (!MDNS.begin(hostName.c_str()))
                                                {
-                                                   Serial.print("Host name: ");
-                                                   Serial.println(hostName);
-                                                   if (!MDNS.begin(hostName.c_str()))
-                                                   {
-                                                       DEBUG_PRINTLN("Error setting up MDNS responder!");
-                                                   }
+                                                   DEBUG_PRINTLN("Error setting up MDNS responder!");
                                                }
                                            }
 #endif
@@ -844,15 +865,11 @@ void setup()
     webServer.setConnect([]()
                          {
                              // Callback for each connected web client
-                             // DEBUG_PRINTLN("Hello");
                          });
 #endif
 
-    RLD.setLogicEffectSelector(CustomLogicEffectSelector);
-    FLD.setLogicEffectSelector(CustomLogicEffectSelector);
-    frontPSI.setLogicEffectSelector(CustomLogicEffectSelector);
-    rearPSI.setLogicEffectSelector(CustomLogicEffectSelector);
-
+    // DEBUG TEMP: Deferring web server creation until WiFi connected
+    // Logic effect selectors initialized after WiFi connects (see callback above)
 #ifdef USE_WIFI
     xTaskCreatePinnedToCore(
         eventLoopTask,
@@ -1116,7 +1133,6 @@ void mainLoop()
         }
     }
 }
-
 ////////////////
 
 #ifdef USE_WIFI
