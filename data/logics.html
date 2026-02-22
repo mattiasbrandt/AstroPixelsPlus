@@ -96,49 +96,38 @@
   <div class="card">
     <h3>PSI Indicators</h3>
     <div class="desc">Process State Indicators (front and rear)</div>
-    <div class="table-wrap">
-    <table style="width:100%; border-collapse:collapse; font-size:0.85em; margin-top:8px;">
-      <tr style="color:var(--text-dim);">
-        <td style="padding:4px;">Target</td>
-        <td style="padding:4px;">Normal</td>
-        <td style="padding:4px;">Flash</td>
-        <td style="padding:4px;">Alarm</td>
-        <td style="padding:4px;">Fail</td>
-        <td style="padding:4px;">Scream</td>
-        <td style="padding:4px;">Leia</td>
-        <td style="padding:4px;">March</td>
-      </tr>
-      <tr>
-        <td style="padding:4px; color:var(--text-dim);">Both</td>
-        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@0P1')">N</button></td>
-        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@0P2')">F</button></td>
-        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@0P3')">A</button></td>
-        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@0P4')">X</button></td>
-        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@0P5')">S</button></td>
-        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@0P6')">L</button></td>
-        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@0P11')">M</button></td>
-      </tr>
-      <tr>
-        <td style="padding:4px; color:var(--text-dim);">Front</td>
-        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@1P1')">N</button></td>
-        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@1P2')">F</button></td>
-        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@1P3')">A</button></td>
-        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@1P4')">X</button></td>
-        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@1P5')">S</button></td>
-        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@1P6')">L</button></td>
-        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@1P11')">M</button></td>
-      </tr>
-      <tr>
-        <td style="padding:4px; color:var(--text-dim);">Rear</td>
-        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@2P1')">N</button></td>
-        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@2P2')">F</button></td>
-        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@2P3')">A</button></td>
-        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@2P4')">X</button></td>
-        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@2P5')">S</button></td>
-        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@2P6')">L</button></td>
-        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@2P11')">M</button></td>
-      </tr>
-    </table>
+
+    <div style="margin-top:8px; color:var(--text-dim); font-size:0.8em;">Both</div>
+    <div class="btn-grid">
+      <button class="btn" title="Normal" onclick="sendCmd('@0P1')">Normal</button>
+      <button class="btn" title="Flash" onclick="sendCmd('@0P2')">Flash</button>
+      <button class="btn" title="Alarm" onclick="sendCmd('@0P3')">Alarm</button>
+      <button class="btn" title="Fail" onclick="sendCmd('@0P4')">Fail</button>
+      <button class="btn danger" title="Scream" onclick="sendCmd('@0P5')">Scream</button>
+      <button class="btn" title="Leia" onclick="sendCmd('@0P6')">Leia</button>
+      <button class="btn" title="March" onclick="sendCmd('@0P11')">March</button>
+    </div>
+
+    <div style="margin-top:8px; color:var(--text-dim); font-size:0.8em;">Front</div>
+    <div class="btn-grid">
+      <button class="btn" title="Normal" onclick="sendCmd('@1P1')">Normal</button>
+      <button class="btn" title="Flash" onclick="sendCmd('@1P2')">Flash</button>
+      <button class="btn" title="Alarm" onclick="sendCmd('@1P3')">Alarm</button>
+      <button class="btn" title="Fail" onclick="sendCmd('@1P4')">Fail</button>
+      <button class="btn danger" title="Scream" onclick="sendCmd('@1P5')">Scream</button>
+      <button class="btn" title="Leia" onclick="sendCmd('@1P6')">Leia</button>
+      <button class="btn" title="March" onclick="sendCmd('@1P11')">March</button>
+    </div>
+
+    <div style="margin-top:8px; color:var(--text-dim); font-size:0.8em;">Rear</div>
+    <div class="btn-grid" style="margin-bottom:0;">
+      <button class="btn" title="Normal" onclick="sendCmd('@2P1')">Normal</button>
+      <button class="btn" title="Flash" onclick="sendCmd('@2P2')">Flash</button>
+      <button class="btn" title="Alarm" onclick="sendCmd('@2P3')">Alarm</button>
+      <button class="btn" title="Fail" onclick="sendCmd('@2P4')">Fail</button>
+      <button class="btn danger" title="Scream" onclick="sendCmd('@2P5')">Scream</button>
+      <button class="btn" title="Leia" onclick="sendCmd('@2P6')">Leia</button>
+      <button class="btn" title="March" onclick="sendCmd('@2P11')">March</button>
     </div>
   </div>
 

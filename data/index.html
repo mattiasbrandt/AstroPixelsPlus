@@ -27,23 +27,23 @@
   <h1>AstroPixels</h1>
   <div class="subtitle">R2-D2 Dome Controller</div>
   <nav>
-    <a href="/" class="active">Home</a>
-    <a href="/panels.html">Panels</a>
-    <a href="/holos.html">Holos</a>
-    <a href="/logics.html">Logics</a>
-    <a href="/sequences.html">Sequences</a>
-    <a href="/setup.html">Setup</a>
+    <a href="/" class="active" title="Main dashboard: health, logs, and quick actions">Home</a>
+    <a href="/panels.html" title="Open, close, and animate dome panels">Panels</a>
+    <a href="/holos.html" title="Control holo projector lights and servo movement">Holos</a>
+    <a href="/logics.html" title="Control front/rear logic displays and PSI effects">Logics</a>
+    <a href="/sequences.html" title="Run combined panel, holo, and logic choreography">Sequences</a>
+    <a href="/setup.html" title="WiFi, serial, sound, remote, and firmware settings">Setup</a>
   </nav>
 
   <!-- Quick Actions -->
   <div class="card">
     <h3>Quick Actions</h3>
     <div class="btn-grid">
-      <button class="btn accent" onclick="sendCmd(':SE01')">Scream</button>
-      <button class="btn" onclick="sendCmd(':SE07')">Cantina</button>
-      <button class="btn" onclick="sendCmd(':SE09')">Disco</button>
-      <button class="btn" onclick="sendCmd(':SE08')">Leia</button>
-      <button class="btn danger" onclick="sendCmd(':SE00')">Stop</button>
+      <button class="btn accent" onclick="sendCmd(':SE01')" title="Run sequence 01: scream-style attention mode">Scream</button>
+      <button class="btn" onclick="sendCmd(':SE07')" title="Run sequence 07: cantina-style movement pattern">Cantina</button>
+      <button class="btn" onclick="sendCmd(':SE09')" title="Run sequence 09: disco-style animation pattern">Disco</button>
+      <button class="btn" onclick="sendCmd(':SE08')" title="Run sequence 08: Leia-style animation pattern">Leia</button>
+      <button class="btn danger" onclick="sendCmd(':SE00')" title="Stop active panel sequence and return to idle">Stop</button>
     </div>
   </div>
 
@@ -51,26 +51,26 @@
   <div class="card">
     <h3>Subsystem Health</h3>
     <div class="health-grid" id="health-grid">
-      <div class="health-item"><div class="indicator" id="h-panels"></div><span>Servo Panels</span></div>
-      <div class="health-item"><div class="indicator" id="h-holos"></div><span>Servo Holos</span></div>
-      <div class="health-item"><div class="indicator" id="h-sound"></div><span>Sound Module</span></div>
-      <div class="health-item"><div class="indicator" id="h-wifi"></div><span>WiFi</span></div>
-      <div class="health-item"><div class="indicator" id="h-remote"></div><span>Droid Remote</span></div>
-      <div class="health-item"><div class="indicator" id="h-spiffs"></div><span>SPIFFS</span></div>
+      <div class="health-item" title="Panel servo controller at I2C address 0x40 (dome panel movement)"><div class="indicator" id="h-panels"></div><span>Servo Panels</span></div>
+      <div class="health-item" title="Holo servo controller at I2C address 0x41 (holo pitch/yaw movement)"><div class="indicator" id="h-holos"></div><span>Servo Holos</span></div>
+      <div class="health-item" title="Sound output availability based on sound module preference state"><div class="indicator" id="h-sound"></div><span>Sound Module</span></div>
+      <div class="health-item" title="Current WiFi service state on this controller"><div class="indicator" id="h-wifi"></div><span>WiFi</span></div>
+      <div class="health-item" title="Droid remote link state (warn means remote feature disabled)"><div class="indicator" id="h-remote"></div><span>Droid Remote</span></div>
+      <div class="health-item" title="SPI flash file system mount state used by web UI files"><div class="indicator" id="h-spiffs"></div><span>SPIFFS</span></div>
     </div>
-    <div class="i2c-list" id="i2c-list"></div>
+    <div class="i2c-list" id="i2c-list" title="Detected I2C addresses responding on the bus"></div>
   </div>
 
   <!-- Live Log Console -->
   <div class="card">
-    <h3>Live Log Console</h3>
+    <h3 title="Live firmware log stream. Scroll up to pause auto-follow.">Live Log Console</h3>
     <div id="log-wrap" style="position:relative;">
-      <pre id="log-console" style="
+      <pre id="log-console" title="Recent runtime logs from the controller" style="
         background:var(--bg); color:var(--silver); border:1px solid var(--border);
         border-radius:4px; padding:8px; font-size:0.75em; line-height:1.4;
         height:180px; overflow-y:auto; white-space:pre-wrap; word-break:break-all;
       "></pre>
-      <div id="log-paused" style="
+      <div id="log-paused" title="Auto-scroll paused while viewing older lines" style="
         display:none; position:absolute; top:4px; right:12px;
         background:var(--warning); color:var(--bg); padding:2px 8px;
         border-radius:3px; font-size:0.7em; font-weight:600;
@@ -78,10 +78,30 @@
     </div>
   </div>
 
+  <div class="card">
+    <h3>Manual Command</h3>
+    <div class="desc">Send any Marcduino command directly (example: :OP01, *ON00, @0T5)</div>
+    <div style="display:flex; gap:6px; margin-top:8px; align-items:center;">
+      <input
+        type="text"
+        id="manual-cmd"
+        placeholder="Enter command..."
+        title="Type a raw Marcduino command and press Enter or Send"
+        style="flex:1;"
+        onkeydown="if(event.key==='Enter'){var c=this.value.trim(); if(c){sendCmd(c); this.value='';}}"
+      >
+      <button
+        class="btn accent"
+        title="Send manual command"
+        onclick="var i=document.getElementById('manual-cmd'); var c=i.value.trim(); if(c){sendCmd(c); i.value='';}"
+      >Send</button>
+    </div>
+  </div>
+
   <!-- System Status -->
   <div class="card">
-    <h3>System</h3>
-    <div id="sys-status" style="font-size:0.85em; color:var(--text-dim);">Loading...</div>
+    <h3 title="Live state snapshot: uptime, memory, connectivity, OTA status">System</h3>
+    <div id="sys-status" title="Updates automatically from WebSocket state broadcasts" style="font-size:0.85em; color:var(--text-dim);">Loading...</div>
   </div>
 
   <!-- OTA Progress Overlay -->
@@ -91,7 +111,7 @@
     <div id="ota-percent">0%</div>
   </div>
 
-  <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>
+  <div class="status-bar" id="conn-status" title="Browser WebSocket link to controller"><span class="dot yellow"></span>Connecting...</div>
 
   <script src="/app.js"></script>
   <script>
@@ -106,7 +126,6 @@
         else el.className = 'indicator ' + (ok ? 'ok' : 'fail');
       }
     }
-
     function updateHealth(h) {
       setIndicator('h-panels', h.i2c_panels);
       setIndicator('h-holos', h.i2c_holos);

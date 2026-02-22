@@ -51,6 +51,120 @@
     }
   }
 
+  function holoName(id) {
+    if (id === '1') return 'front holo';
+    if (id === '2') return 'rear holo';
+    if (id === '3') return 'top holo';
+    return 'holo';
+  }
+
+  function logicTarget(id) {
+    if (id === '0') return 'all logic displays';
+    if (id === '1') return 'front logic display';
+    if (id === '2') return 'rear logic display';
+    return 'logic display';
+  }
+
+  function psiTarget(id) {
+    if (id === '0') return 'both PSI indicators';
+    if (id === '1') return 'front PSI indicator';
+    if (id === '2') return 'rear PSI indicator';
+    return 'PSI indicator';
+  }
+
+  function describeCommand(cmd) {
+    var m;
+
+    if (cmd === ':OP00') return 'Open all dome panels';
+    if (cmd === ':CL00') return 'Close all dome panels';
+    if (cmd === ':OF00') return 'Flutter all dome panels';
+
+    m = cmd.match(/^:OP(\d{2})$/);
+    if (m) return 'Open panel/group ' + m[1];
+    m = cmd.match(/^:CL(\d{2})$/);
+    if (m) return 'Close panel/group ' + m[1];
+    m = cmd.match(/^:OF(\d{2})$/);
+    if (m) return 'Flutter panel/group ' + m[1];
+
+    m = cmd.match(/^:SE(\d{2})$/);
+    if (m) return 'Run sequence ' + m[1];
+
+    if (cmd === '*ON00') return 'Turn all holo lights on';
+    if (cmd === '*OF00') return 'Turn all holo lights off';
+    if (cmd === '*ST00') return 'Reset all holos to default state';
+
+    m = cmd.match(/^\*ON0([1-3])$/);
+    if (m) return 'Turn ' + holoName(m[1]) + ' light on';
+    m = cmd.match(/^\*OF0([1-3])$/);
+    if (m) return 'Turn ' + holoName(m[1]) + ' light off';
+    m = cmd.match(/^\*RD0([1-3])$/);
+    if (m) return 'Random servo movement for ' + holoName(m[1]);
+    m = cmd.match(/^\*HW0([1-3])$/);
+    if (m) return 'Wag movement for ' + holoName(m[1]);
+    m = cmd.match(/^\*HN0([1-3])$/);
+    if (m) return 'Nod movement for ' + holoName(m[1]);
+
+    m = cmd.match(/^\*HPS[36]0([1-3])$/);
+    if (m) return 'LED effect for ' + holoName(m[1]);
+    m = cmd.match(/^\*HP([0-8])0([1-3])$/);
+    if (m) return 'Set ' + holoName(m[2]) + ' position preset ' + m[1];
+
+    m = cmd.match(/^@([012])T(\d{1,2})$/);
+    if (m) return 'Set sequence ' + m[2] + ' on ' + logicTarget(m[1]);
+    m = cmd.match(/^@([012])P(11|[1-6])$/);
+    if (m) return 'Set PSI mode ' + m[2] + ' on ' + psiTarget(m[1]);
+    m = cmd.match(/^@[123]M/);
+    if (m) return 'Send scroll text to logic display';
+
+    if (cmd === '$R') return 'Play random sound';
+    if (cmd === '$S') return 'Play scream sound';
+    if (cmd === '$L') return 'Play Leia sound';
+    if (cmd === '$C') return 'Play cantina sound';
+    if (cmd === '$c') return 'Play beep-cantina sound';
+    if (cmd === '$W') return 'Play Star Wars sound';
+    if (cmd === '$M') return 'Play march sound';
+    if (cmd === '$D') return 'Play disco sound';
+    if (cmd === '$F') return 'Play faint sound';
+    if (cmd === '$s') return 'Stop currently playing sound';
+    if (cmd === '$O') return 'Mute audio output';
+    if (cmd === '$-') return 'Decrease volume';
+    if (cmd === '$m') return 'Set volume to medium';
+    if (cmd === '$+') return 'Increase volume';
+    if (cmd === '$f') return 'Set volume to maximum';
+    if (cmd === '$p') return 'Set volume to minimum';
+
+    return '';
+  }
+
+  function enhanceTooltips() {
+    var buttons = document.querySelectorAll('button[onclick]');
+    for (var i = 0; i < buttons.length; i++) {
+      var btn = buttons[i];
+      if (btn.getAttribute('title')) continue;
+      var onClick = btn.getAttribute('onclick') || '';
+      var match = onClick.match(/sendCmd\('([^']+)'\)/);
+      if (!match) continue;
+      var tip = describeCommand(match[1]);
+      if (tip) btn.setAttribute('title', tip + ' (' + match[1] + ')');
+    }
+
+    var linkTips = {
+      '/wifi.html': 'Configure WiFi credentials and AP mode',
+      '/serial.html': 'Configure Marcduino serial settings and passthrough',
+      '/sound.html': 'Configure sound player type, startup track, and defaults',
+      '/remote.html': 'Configure ESPNOW droid remote pairing and secret',
+      '/firmware.html': 'Upload firmware and run maintenance actions'
+    };
+
+    var links = document.querySelectorAll('a[href]');
+    for (var j = 0; j < links.length; j++) {
+      var a = links[j];
+      if (a.getAttribute('title')) continue;
+      var href = a.getAttribute('href');
+      if (linkTips[href]) a.setAttribute('title', linkTips[href]);
+    }
+  }
+
   // --- Command sender ---
   window.sendCmd = function(cmd) {
     // Try WebSocket first for lower latency, fall back to REST
@@ -80,8 +194,12 @@
 
   // --- Init ---
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', wsConnect);
+    document.addEventListener('DOMContentLoaded', function() {
+      enhanceTooltips();
+      wsConnect();
+    });
   } else {
+    enhanceTooltips();
     wsConnect();
   }
 })();
