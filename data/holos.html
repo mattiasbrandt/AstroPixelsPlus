@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Holos — AstroPixels</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <h1>Holo Projectors</h1>
+  <div class="subtitle">RGB LED + servo-positioned holo projectors</div>
+  <nav>
+    <a href="/">Home</a>
+    <a href="/panels.html">Panels</a>
+    <a href="/holos.html" class="active">Holos</a>
+    <a href="/logics.html">Logics</a>
+    <a href="/sequences.html">Sequences</a>
+  </nav>
+
+  <!-- All Holos -->
+  <div class="card">
+    <h3>All Holos</h3>
+    <div class="btn-grid">
+      <button class="btn accent" onclick="sendCmd('*ON00')">All On</button>
+      <button class="btn danger" onclick="sendCmd('*OF00')">All Off</button>
+      <button class="btn" onclick="sendCmd('*ST00')">Reset All</button>
+    </div>
+  </div>
+
+  <!-- Front Holo -->
+  <div class="card">
+    <h3>Front Holo</h3>
+    <div class="btn-grid">
+      <button class="btn accent" onclick="sendCmd('*ON01')">On</button>
+      <button class="btn danger" onclick="sendCmd('*OF01')">Off</button>
+      <button class="btn" onclick="sendCmd('*RD01')">Random Move</button>
+      <button class="btn" onclick="sendCmd('*HW01')">Wag</button>
+      <button class="btn" onclick="sendCmd('*HN01')">Nod</button>
+    </div>
+    <div style="margin-top:6px;">
+      <span style="color:var(--text-dim); font-size:0.8em;">LED Effects:</span>
+      <div class="btn-grid" style="margin-top:4px;">
+        <button class="btn" onclick="sendCmd('*HPS301')">Pulse</button>
+        <button class="btn" onclick="sendCmd('*HPS601')">Rainbow</button>
+      </div>
+    </div>
+    <div style="margin-top:6px;">
+      <span style="color:var(--text-dim); font-size:0.8em;">Position:</span>
+      <div class="btn-grid" style="margin-top:4px;">
+        <button class="btn" onclick="sendCmd('*HP401')">&#x2196;</button>
+        <button class="btn" onclick="sendCmd('*HP201')">&#x2191;</button>
+        <button class="btn" onclick="sendCmd('*HP701')">&#x2197;</button>
+        <button class="btn" onclick="sendCmd('*HP301')">&#x2190;</button>
+        <button class="btn accent" onclick="sendCmd('*HP101')">&#x25CF;</button>
+        <button class="btn" onclick="sendCmd('*HP601')">&#x2192;</button>
+        <button class="btn" onclick="sendCmd('*HP501')">&#x2199;</button>
+        <button class="btn" onclick="sendCmd('*HP001')">&#x2193;</button>
+        <button class="btn" onclick="sendCmd('*HP801')">&#x2198;</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rear Holo -->
+  <div class="card">
+    <h3>Rear Holo</h3>
+    <div class="btn-grid">
+      <button class="btn accent" onclick="sendCmd('*ON02')">On</button>
+      <button class="btn danger" onclick="sendCmd('*OF02')">Off</button>
+      <button class="btn" onclick="sendCmd('*RD02')">Random Move</button>
+      <button class="btn" onclick="sendCmd('*HW02')">Wag</button>
+      <button class="btn" onclick="sendCmd('*HN02')">Nod</button>
+    </div>
+    <div style="margin-top:6px;">
+      <span style="color:var(--text-dim); font-size:0.8em;">LED Effects:</span>
+      <div class="btn-grid" style="margin-top:4px;">
+        <button class="btn" onclick="sendCmd('*HPS302')">Pulse</button>
+        <button class="btn" onclick="sendCmd('*HPS602')">Rainbow</button>
+      </div>
+    </div>
+    <div style="margin-top:6px;">
+      <span style="color:var(--text-dim); font-size:0.8em;">Position:</span>
+      <div class="btn-grid" style="margin-top:4px;">
+        <button class="btn" onclick="sendCmd('*HP402')">&#x2196;</button>
+        <button class="btn" onclick="sendCmd('*HP202')">&#x2191;</button>
+        <button class="btn" onclick="sendCmd('*HP702')">&#x2197;</button>
+        <button class="btn" onclick="sendCmd('*HP302')">&#x2190;</button>
+        <button class="btn accent" onclick="sendCmd('*HP102')">&#x25CF;</button>
+        <button class="btn" onclick="sendCmd('*HP602')">&#x2192;</button>
+        <button class="btn" onclick="sendCmd('*HP502')">&#x2199;</button>
+        <button class="btn" onclick="sendCmd('*HP002')">&#x2193;</button>
+        <button class="btn" onclick="sendCmd('*HP802')">&#x2198;</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top Holo -->
+  <div class="card">
+    <h3>Top Holo</h3>
+    <div class="btn-grid">
+      <button class="btn accent" onclick="sendCmd('*ON03')">On</button>
+      <button class="btn danger" onclick="sendCmd('*OF03')">Off</button>
+      <button class="btn" onclick="sendCmd('*RD03')">Random Move</button>
+      <button class="btn" onclick="sendCmd('*HW03')">Wag</button>
+      <button class="btn" onclick="sendCmd('*HN03')">Nod</button>
+    </div>
+    <div style="margin-top:6px;">
+      <span style="color:var(--text-dim); font-size:0.8em;">LED Effects:</span>
+      <div class="btn-grid" style="margin-top:4px;">
+        <button class="btn" onclick="sendCmd('*HPS303')">Pulse</button>
+        <button class="btn" onclick="sendCmd('*HPS603')">Rainbow</button>
+      </div>
+    </div>
+    <div style="margin-top:6px;">
+      <span style="color:var(--text-dim); font-size:0.8em;">Position:</span>
+      <div class="btn-grid" style="margin-top:4px;">
+        <button class="btn" onclick="sendCmd('*HP403')">&#x2196;</button>
+        <button class="btn" onclick="sendCmd('*HP203')">&#x2191;</button>
+        <button class="btn" onclick="sendCmd('*HP703')">&#x2197;</button>
+        <button class="btn" onclick="sendCmd('*HP303')">&#x2190;</button>
+        <button class="btn accent" onclick="sendCmd('*HP103')">&#x25CF;</button>
+        <button class="btn" onclick="sendCmd('*HP603')">&#x2192;</button>
+        <button class="btn" onclick="sendCmd('*HP503')">&#x2199;</button>
+        <button class="btn" onclick="sendCmd('*HP003')">&#x2193;</button>
+        <button class="btn" onclick="sendCmd('*HP803')">&#x2198;</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Radar Eye -->
+  <div class="card">
+    <h3>Radar Eye</h3>
+    <div class="btn-grid">
+      <button class="btn" onclick="sendCmd('*HRS3')">Pulse</button>
+      <button class="btn" onclick="sendCmd('*HRSR')">Pulse Red</button>
+      <button class="btn" onclick="sendCmd('*HRS6')">Rainbow</button>
+      <button class="btn" onclick="sendCmd('*HRS4')">Cycle</button>
+      <button class="btn danger" onclick="sendCmd('*OF04')">Off</button>
+    </div>
+  </div>
+
+  <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>
+  <script src="/app.js"></script>
+</body>
+</html>

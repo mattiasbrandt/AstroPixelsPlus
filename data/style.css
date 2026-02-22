@@ -1,0 +1,136 @@
+/* AstroPixels Web UI — Shared Styles */
+/* Mobile-first, dark theme, minimal footprint */
+
+:root {
+  --bg: #1a1a2e;
+  --surface: #16213e;
+  --border: #0f3460;
+  --accent: #00d4ff;
+  --accent-dim: #0088aa;
+  --text: #e0e0e0;
+  --text-dim: #888;
+  --danger: #ff4444;
+  --success: #44ff88;
+  --warning: #ffbb33;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  padding: 12px;
+  max-width: 600px;
+  margin: 0 auto;
+  -webkit-text-size-adjust: 100%;
+}
+
+h1 { color: var(--accent); font-size: 1.4em; margin-bottom: 2px; }
+h2 { color: var(--accent); font-size: 1.1em; margin: 16px 0 8px; }
+.subtitle { color: var(--text-dim); font-size: 0.85em; margin-bottom: 16px; }
+
+/* Navigation */
+nav { margin-bottom: 16px; }
+nav a {
+  display: inline-block;
+  padding: 8px 14px;
+  margin: 3px;
+  background: var(--surface);
+  color: var(--accent);
+  text-decoration: none;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  font-size: 0.85em;
+}
+nav a:hover, nav a.active {
+  background: var(--border);
+}
+
+/* Buttons — command triggers */
+.btn {
+  display: inline-block;
+  padding: 10px 14px;
+  margin: 3px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.85em;
+  cursor: pointer;
+  text-align: center;
+  min-width: 70px;
+  transition: background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn:hover { background: var(--border); }
+.btn:active { background: var(--accent-dim); color: #fff; }
+.btn.accent { background: var(--accent-dim); color: #fff; border-color: var(--accent); }
+.btn.danger { background: #442222; color: var(--danger); border-color: #662222; }
+
+/* Button grid */
+.btn-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+/* Dropdown select */
+select {
+  padding: 8px 12px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.85em;
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+/* Section card */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+.card h3 {
+  color: var(--accent);
+  font-size: 0.95em;
+  margin-bottom: 8px;
+}
+
+/* Status bar */
+.status-bar {
+  padding: 8px 12px;
+  background: var(--surface);
+  border-radius: 6px;
+  font-size: 0.8em;
+  color: var(--text-dim);
+  margin-top: 12px;
+}
+.status-bar .dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+.dot.green { background: var(--success); }
+.dot.red { background: var(--danger); }
+.dot.yellow { background: var(--warning); }
+
+/* Descriptions */
+.desc {
+  color: var(--text-dim);
+  font-size: 0.8em;
+  margin-top: 2px;
+  font-style: italic;
+}
+
+/* Responsive: wider screens get more columns */
+@media (min-width: 400px) {
+  .btn { min-width: 80px; }
+}

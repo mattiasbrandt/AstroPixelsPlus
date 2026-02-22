@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logics — AstroPixels</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <h1>Logic Displays</h1>
+  <div class="subtitle">Front Logic, Rear Logic, and PSI indicators</div>
+  <nav>
+    <a href="/">Home</a>
+    <a href="/panels.html">Panels</a>
+    <a href="/holos.html">Holos</a>
+    <a href="/logics.html" class="active">Logics</a>
+    <a href="/sequences.html">Sequences</a>
+  </nav>
+
+  <!-- Quick Sequences — Both FLD + RLD -->
+  <div class="card">
+    <h3>Both Logics (FLD + RLD)</h3>
+    <div class="desc">Sets both front and rear logic displays simultaneously</div>
+    <div class="btn-grid" style="margin-top:8px;">
+      <button class="btn accent" onclick="sendCmd('@0T1')">Normal</button>
+      <button class="btn" onclick="sendCmd('@0T2')">Flash</button>
+      <button class="btn" onclick="sendCmd('@0T3')">Alarm</button>
+      <button class="btn" onclick="sendCmd('@0T4')">Failure</button>
+      <button class="btn danger" onclick="sendCmd('@0T5')">Scream</button>
+      <button class="btn" onclick="sendCmd('@0T6')">Leia</button>
+      <button class="btn" onclick="sendCmd('@0T11')">March</button>
+    </div>
+  </div>
+
+  <!-- Front Logic Display -->
+  <div class="card">
+    <h3>Front Logic Display (FLD)</h3>
+    <div class="btn-grid">
+      <button class="btn accent" onclick="sendCmd('@1T1')">Normal</button>
+      <button class="btn" onclick="sendCmd('@1T2')">Flash</button>
+      <button class="btn" onclick="sendCmd('@1T3')">Alarm</button>
+      <button class="btn" onclick="sendCmd('@1T4')">Failure</button>
+      <button class="btn danger" onclick="sendCmd('@1T5')">Scream</button>
+      <button class="btn" onclick="sendCmd('@1T6')">Leia</button>
+      <button class="btn" onclick="sendCmd('@1T11')">March</button>
+    </div>
+    <div style="margin-top:8px;">
+      <span style="color:var(--text-dim); font-size:0.8em;">Scroll Text (Top half):</span>
+      <div style="display:flex; gap:4px; margin-top:4px;">
+        <input type="text" id="fld-top-text" placeholder="Enter text..."
+               style="flex:1; padding:8px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; font-size:0.85em;">
+        <button class="btn" onclick="sendCmd('@1M'+document.getElementById('fld-top-text').value)">Send</button>
+      </div>
+      <span style="color:var(--text-dim); font-size:0.8em;">Scroll Text (Bottom half):</span>
+      <div style="display:flex; gap:4px; margin-top:4px;">
+        <input type="text" id="fld-bot-text" placeholder="Enter text..."
+               style="flex:1; padding:8px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; font-size:0.85em;">
+        <button class="btn" onclick="sendCmd('@2M'+document.getElementById('fld-bot-text').value)">Send</button>
+      </div>
+      <div style="margin-top:6px;">
+        <span style="color:var(--text-dim); font-size:0.8em;">Font:</span>
+        <button class="btn" onclick="sendCmd('@1P60');sendCmd('@2P60')">Latin</button>
+        <button class="btn" onclick="sendCmd('@1P61');sendCmd('@2P61')">Aurabesh</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rear Logic Display -->
+  <div class="card">
+    <h3>Rear Logic Display (RLD)</h3>
+    <div class="btn-grid">
+      <button class="btn accent" onclick="sendCmd('@2T1')">Normal</button>
+      <button class="btn" onclick="sendCmd('@2T2')">Flash</button>
+      <button class="btn" onclick="sendCmd('@2T3')">Alarm</button>
+      <button class="btn" onclick="sendCmd('@2T4')">Failure</button>
+      <button class="btn danger" onclick="sendCmd('@2T5')">Scream</button>
+      <button class="btn" onclick="sendCmd('@2T6')">Leia</button>
+      <button class="btn" onclick="sendCmd('@2T11')">March</button>
+    </div>
+    <div style="margin-top:8px;">
+      <span style="color:var(--text-dim); font-size:0.8em;">Scroll Text:</span>
+      <div style="display:flex; gap:4px; margin-top:4px;">
+        <input type="text" id="rld-text" placeholder="Enter text..."
+               style="flex:1; padding:8px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; font-size:0.85em;">
+        <button class="btn" onclick="sendCmd('@3M'+document.getElementById('rld-text').value)">Send</button>
+      </div>
+      <div style="margin-top:6px;">
+        <span style="color:var(--text-dim); font-size:0.8em;">Font:</span>
+        <button class="btn" onclick="sendCmd('@3P60')">Latin</button>
+        <button class="btn" onclick="sendCmd('@3P61')">Aurabesh</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PSI Indicators -->
+  <div class="card">
+    <h3>PSI Indicators</h3>
+    <div class="desc">Process State Indicators (front and rear)</div>
+    <table style="width:100%; border-collapse:collapse; font-size:0.85em; margin-top:8px;">
+      <tr style="color:var(--text-dim);">
+        <td style="padding:4px;">Target</td>
+        <td style="padding:4px;">Normal</td>
+        <td style="padding:4px;">Flash</td>
+        <td style="padding:4px;">Alarm</td>
+        <td style="padding:4px;">Fail</td>
+        <td style="padding:4px;">Scream</td>
+        <td style="padding:4px;">Leia</td>
+        <td style="padding:4px;">March</td>
+      </tr>
+      <tr>
+        <td style="padding:4px; color:var(--text-dim);">Both</td>
+        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@0P1')">N</button></td>
+        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@0P2')">F</button></td>
+        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@0P3')">A</button></td>
+        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@0P4')">X</button></td>
+        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@0P5')">S</button></td>
+        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@0P6')">L</button></td>
+        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@0P11')">M</button></td>
+      </tr>
+      <tr>
+        <td style="padding:4px; color:var(--text-dim);">Front</td>
+        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@1P1')">N</button></td>
+        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@1P2')">F</button></td>
+        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@1P3')">A</button></td>
+        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@1P4')">X</button></td>
+        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@1P5')">S</button></td>
+        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@1P6')">L</button></td>
+        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@1P11')">M</button></td>
+      </tr>
+      <tr>
+        <td style="padding:4px; color:var(--text-dim);">Rear</td>
+        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@2P1')">N</button></td>
+        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@2P2')">F</button></td>
+        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@2P3')">A</button></td>
+        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@2P4')">X</button></td>
+        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@2P5')">S</button></td>
+        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@2P6')">L</button></td>
+        <td style="padding:4px;"><button class="btn" onclick="sendCmd('@2P11')">M</button></td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>
+  <script src="/app.js"></script>
+</body>
+</html>

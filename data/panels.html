@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panels — AstroPixels</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <h1>Dome Panels</h1>
+  <div class="subtitle">Servo-actuated dome panel control</div>
+  <nav>
+    <a href="/">Home</a>
+    <a href="/panels.html" class="active">Panels</a>
+    <a href="/holos.html">Holos</a>
+    <a href="/logics.html">Logics</a>
+    <a href="/sequences.html">Sequences</a>
+  </nav>
+
+  <!-- All Panels -->
+  <div class="card">
+    <h3>All Panels</h3>
+    <div class="btn-grid">
+      <button class="btn accent" onclick="sendCmd(':OP00')">Open All</button>
+      <button class="btn" onclick="sendCmd(':CL00')">Close All</button>
+      <button class="btn" onclick="sendCmd(':OF00')">Flutter All</button>
+    </div>
+  </div>
+
+  <!-- Panel Groups 1-10 -->
+  <div class="card">
+    <h3>Panel Groups</h3>
+    <table style="width:100%; border-collapse:collapse; font-size:0.85em;">
+      <tr style="color:var(--text-dim);">
+        <td style="padding:4px;">Group</td>
+        <td style="padding:4px; text-align:center;">Open</td>
+        <td style="padding:4px; text-align:center;">Close</td>
+        <td style="padding:4px; text-align:center;">Flutter</td>
+      </tr>
+      <tr><td style="padding:4px;">Group 1</td>
+        <td style="padding:4px; text-align:center;"><button class="btn" onclick="sendCmd(':OP01')">Open</button></td>
+        <td style="padding:4px; text-align:center;"><button class="btn" onclick="sendCmd(':CL01')">Close</button></td>
+        <td style="padding:4px; text-align:center;"><button class="btn" onclick="sendCmd(':OF01')">Flutter</button></td></tr>
+      <tr><td style="padding:4px;">Group 2</td>
+        <td style="padding:4px; text-align:center;"><button class="btn" onclick="sendCmd(':OP02')">Open</button></td>
+        <td style="padding:4px; text-align:center;"><button class="btn" onclick="sendCmd(':CL02')">Close</button></td>
+        <td style="padding:4px; text-align:center;"><button class="btn" onclick="sendCmd(':OF02')">Flutter</button></td></tr>
+      <tr><td style="padding:4px;">Group 3</td>
+        <td style="padding:4px; text-align:center;"><button class="btn" onclick="sendCmd(':OP03')">Open</button></td>
+        <td style="padding:4px; text-align:center;"><button class="btn" onclick="sendCmd(':CL03')">Close</button></td>
+        <td style="padding:4px; text-align:center;"><button class="btn" onclick="sendCmd(':OF03')">Flutter</button></td></tr>
+      <tr><td style="padding:4px;">Group 4</td>
+        <td style="padding:4px; text-align:center;"><button class="btn" onclick="sendCmd(':OP04')">Open</button></td>
+        <td style="padding:4px; text-align:center;"><button class="btn" onclick="sendCmd(':CL04')">Close</button></td>
+        <td style="padding:4px; text-align:center;"><button class="btn" onclick="sendCmd(':OF04')">Flutter</button></td></tr>
+      <tr><td style="padding:4px;">Group 5</td>
+        <td style="padding:4px; text-align:center;"><button class="btn" onclick="sendCmd(':OP05')">Open</button></td>
+        <td style="padding:4px; text-align:center;"><button class="btn" onclick="sendCmd(':CL05')">Close</button></td>
+        <td style="padding:4px; text-align:center;"><button class="btn" onclick="sendCmd(':OF05')">Flutter</button></td></tr>
+      <tr><td style="padding:4px;">Group 6</td>
+        <td style="padding:4px; text-align:center;"><button class="btn" onclick="sendCmd(':OP06')">Open</button></td>
+        <td style="padding:4px; text-align:center;"><button class="btn" onclick="sendCmd(':CL06')">Close</button></td>
+        <td style="padding:4px; text-align:center;"><button class="btn" onclick="sendCmd(':OF06')">Flutter</button></td></tr>
+      <tr><td style="padding:4px;">Group 7</td>
+        <td style="padding:4px; text-align:center;"><button class="btn" onclick="sendCmd(':OP07')">Open</button></td>
+        <td style="padding:4px; text-align:center;"><button class="btn" onclick="sendCmd(':CL07')">Close</button></td>
+        <td style="padding:4px; text-align:center;"><button class="btn" onclick="sendCmd(':OF07')">Flutter</button></td></tr>
+      <tr><td style="padding:4px;">Group 8</td>
+        <td style="padding:4px; text-align:center;"><button class="btn" onclick="sendCmd(':OP08')">Open</button></td>
+        <td style="padding:4px; text-align:center;"><button class="btn" onclick="sendCmd(':CL08')">Close</button></td>
+        <td style="padding:4px; text-align:center;"><button class="btn" onclick="sendCmd(':OF08')">Flutter</button></td></tr>
+      <tr><td style="padding:4px;">Group 9</td>
+        <td style="padding:4px; text-align:center;"><button class="btn" onclick="sendCmd(':OP09')">Open</button></td>
+        <td style="padding:4px; text-align:center;"><button class="btn" onclick="sendCmd(':CL09')">Close</button></td>
+        <td style="padding:4px; text-align:center;"><button class="btn" onclick="sendCmd(':OF09')">Flutter</button></td></tr>
+      <tr><td style="padding:4px;">Group 10</td>
+        <td style="padding:4px; text-align:center;"><button class="btn" onclick="sendCmd(':OP10')">Open</button></td>
+        <td style="padding:4px; text-align:center;"><button class="btn" onclick="sendCmd(':CL10')">Close</button></td>
+        <td style="padding:4px; text-align:center;"><button class="btn" onclick="sendCmd(':OF10')">Flutter</button></td></tr>
+    </table>
+  </div>
+
+  <!-- Dome Zones -->
+  <div class="card">
+    <h3>Dome Zones</h3>
+    <div class="btn-grid">
+      <button class="btn" onclick="sendCmd(':OP11')">Open Top Pie</button>
+      <button class="btn" onclick="sendCmd(':CL11')">Close Top Pie</button>
+      <button class="btn" onclick="sendCmd(':OP12')">Open Bottom</button>
+      <button class="btn" onclick="sendCmd(':CL12')">Close Bottom</button>
+    </div>
+  </div>
+
+  <!-- Panel Animations -->
+  <div class="card">
+    <h3>Animations (All Panels)</h3>
+    <div class="desc">Dynamic animations applied to all dome panels</div>
+    <div class="btn-grid" style="margin-top:8px;">
+      <button class="btn" onclick="sendCmd(':SE52')">Wave</button>
+      <button class="btn" onclick="sendCmd(':SE53')">Fast Wave</button>
+      <button class="btn" onclick="sendCmd(':SE54')">Open/Close Wave</button>
+      <button class="btn" onclick="sendCmd(':SE55')">Marching Ants</button>
+      <button class="btn" onclick="sendCmd(':SE56')">Faint</button>
+      <button class="btn" onclick="sendCmd(':SE57')">Rhythmic</button>
+      <button class="btn" onclick="sendCmd(':SE51')">Scream (panels)</button>
+    </div>
+  </div>
+
+  <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>
+  <script src="/app.js"></script>
+</body>
+</html>
