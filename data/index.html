@@ -84,6 +84,13 @@
     <div id="sys-status" style="font-size:0.85em; color:var(--text-dim);">Loading...</div>
   </div>
 
+  <!-- OTA Progress Overlay -->
+  <div class="ota-overlay" id="ota-overlay">
+    <div>Firmware Update in Progress...</div>
+    <div class="ota-bar"><div class="ota-bar-fill" id="ota-bar-fill"></div></div>
+    <div id="ota-percent">0%</div>
+  </div>
+
   <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>
 
   <script src="/app.js"></script>
@@ -117,9 +124,15 @@
       var html = '';
       html += '<div>Uptime: ' + Math.floor(s.uptime/60) + 'm ' + (s.uptime%60) + 's</div>';
       html += '<div>Free Heap: ' + (s.freeHeap/1024).toFixed(1) + ' KB</div>';
-      html += '<div>WiFi: ' + (s.wifiEnabled ? '<span class="dot green"></span>Enabled' : '<span class="dot red"></span>Disabled') + '</div>';
+      html += '<div>WiFi: ' + (s.wifiEnabled ? '<span class="dot green"></span>Enabled' : '<span class="dot red"></span>Disabled');
+      if (s.wifiIP) html += ' (' + s.wifiIP + ')';
+      if (s.wifiRSSI && !s.wifiAP) html += ' ' + s.wifiRSSI + ' dBm';
+      html += '</div>';
       if (typeof s.remoteConnected !== 'undefined') {
         html += '<div>Droid Remote: ' + (s.remoteConnected ? '<span class="dot green"></span>Connected' : '<span class="dot red"></span>Disconnected') + '</div>';
+      }
+      if (s.otaInProgress) {
+        html += '<div><span class="dot yellow"></span>Firmware update in progress</div>';
       }
       document.getElementById('sys-status').innerHTML = html;
     }
@@ -162,6 +175,20 @@
     // Initial fetch
     fetchState(updateStatus);
     fetch('/api/health').then(function(r){return r.json();}).then(updateHealth).catch(function(){});
+
+    // OTA progress handler
+    window.onOtaProgress = function(progress) {
+      var overlay = document.getElementById('ota-overlay');
+      var fill = document.getElementById('ota-bar-fill');
+      var pct = document.getElementById('ota-percent');
+      overlay.classList.add('active');
+      var p = Math.round(progress * 100);
+      fill.style.width = p + '%';
+      pct.textContent = p + '%';
+      if (p >= 100) {
+        pct.textContent = 'Rebooting...';
+      }
+    };
 
     // WebSocket live updates
     window.onStateUpdate = updateStatus;

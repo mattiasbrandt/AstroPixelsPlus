@@ -36,6 +36,9 @@
         if (msg.type === 'health' && typeof window.onHealthUpdate === 'function') {
           window.onHealthUpdate(msg.data);
         }
+        if (msg.type === 'ota' && typeof window.onOtaProgress === 'function') {
+          window.onOtaProgress(msg.progress);
+        }
       } catch(e) { /* ignore parse errors */ }
     };
   }

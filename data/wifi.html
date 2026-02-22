@@ -53,8 +53,8 @@
   <script>
     // Load current settings
     fetch('/api/pref?keys=wifi,ap,ssid,pass').then(function(r){return r.json();}).then(function(d){
-      if (typeof d.wifi !== 'undefined') document.getElementById('wifi-enabled').checked = d.wifi === 'true' || d.wifi === true;
-      if (typeof d.ap !== 'undefined') document.getElementById('wifi-ap').checked = d.ap === 'true' || d.ap === true;
+      if (typeof d.wifi !== 'undefined') document.getElementById('wifi-enabled').checked = (d.wifi === true || d.wifi === 'true' || d.wifi === '1');
+      if (typeof d.ap !== 'undefined') document.getElementById('wifi-ap').checked = (d.ap === true || d.ap === 'true' || d.ap === '1');
       if (d.ssid) document.getElementById('wifi-ssid').value = d.ssid;
       if (d.pass) document.getElementById('wifi-pass').value = d.pass;
     }).catch(function(){});

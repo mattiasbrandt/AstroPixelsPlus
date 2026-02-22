@@ -54,14 +54,15 @@ h2 {
 
 /* Navigation — silver tabs like R2's panel seams */
 nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
   margin-bottom: 16px;
   border-bottom: 2px solid var(--border);
   padding-bottom: 10px;
 }
 nav a {
-  display: inline-block;
-  padding: 8px 14px;
-  margin: 3px;
+  padding: 8px 12px;
   background: var(--surface);
   color: var(--silver);
   text-decoration: none;
@@ -70,6 +71,7 @@ nav a {
   border-bottom: none;
   font-size: 0.85em;
   transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
 }
 nav a:hover {
   background: var(--surface-alt);
@@ -215,7 +217,64 @@ table td {
   color: var(--silver);
 }
 
+/* Scrollable table wrapper — prevents overflow on narrow screens */
+.table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 -4px;
+  padding: 0 4px;
+}
+
+/* Holo direction pad — 3x3 CSS Grid */
+.dir-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  max-width: 240px;
+}
+.dir-pad .btn {
+  min-width: 0;
+  width: 100%;
+  padding: 12px 8px;
+  font-size: 1.1em;
+}
+
+/* OTA progress bar overlay */
+.ota-overlay {
+  display: none;
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(12, 21, 37, 0.92);
+  z-index: 100;
+  align-items: center; justify-content: center;
+  flex-direction: column;
+  gap: 12px;
+  color: var(--white);
+  font-size: 1.1em;
+}
+.ota-overlay.active { display: flex; }
+.ota-bar {
+  width: 80%; max-width: 400px; height: 8px;
+  background: var(--surface-alt); border-radius: 4px; overflow: hidden;
+}
+.ota-bar-fill {
+  height: 100%; background: var(--accent); border-radius: 4px;
+  transition: width 0.3s;
+  width: 0%;
+}
+
 /* Responsive: wider screens get more columns */
 @media (min-width: 400px) {
   .btn { min-width: 80px; }
+  .dir-pad .btn { min-width: 0; }
+}
+
+/* Ensure touch targets meet 44px minimum on small screens */
+@media (max-width: 399px) {
+  .btn { min-height: 44px; }
+  nav a { padding: 10px 10px; }
+}
+
+/* Safe area for modern phones */
+@supports (padding: env(safe-area-inset-bottom)) {
+  body { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
 }

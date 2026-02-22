@@ -8,6 +8,7 @@
 #include <ESPAsyncWebServer.h>
 #include <Update.h>
 #include <Wire.h>
+#include <WiFi.h>
 #include "SPIFFS.h"
 #include "LogCapture.h"
 
@@ -34,6 +35,14 @@ static AsyncWebSocket ws("/ws");
 static LogCapture logCapture(Serial);
 static uint32_t lastLogCount = 0;
 
+// Broadcast timers
+static uint32_t lastStateBroadcast = 0;
+static uint32_t lastHealthBroadcast = 0;
+
+// Forward declarations
+static void broadcastState();
+static void broadcastOtaProgress(float progress);
+
 // ---------------------------------------------------------------
 // WebSocket event handler
 // ---------------------------------------------------------------
@@ -51,13 +60,14 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
     }
     else if (type == WS_EVT_DATA)
     {
-        // Could handle incoming WS messages (commands) here in future
         AwsFrameInfo *info = (AwsFrameInfo *)arg;
         if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT)
         {
             data[len] = 0;
             // Treat incoming WS text as Marcduino command
             Marcduino::processCommand(player, (const char *)data);
+            // Echo command acknowledgment to all clients
+            broadcastState();
         }
     }
 }
@@ -73,8 +83,23 @@ static String buildStateJson()
 #ifdef USE_DROID_REMOTE
     json += ",\"remoteConnected\":" + String(sRemoteConnected ? "true" : "false");
 #endif
+    json += ",\"otaInProgress\":" + String(otaInProgress ? "true" : "false");
     json += ",\"uptime\":" + String(millis() / 1000);
     json += ",\"freeHeap\":" + String(ESP.getFreeHeap());
+
+    // WiFi details
+    json += ",\"wifiAP\":" + String((WiFi.getMode() & WIFI_MODE_AP) ? "true" : "false");
+    if (WiFi.getMode() & WIFI_MODE_STA)
+    {
+        json += ",\"wifiIP\":\"" + WiFi.localIP().toString() + "\"";
+        json += ",\"wifiRSSI\":" + String(WiFi.RSSI());
+    }
+    else
+    {
+        json += ",\"wifiIP\":\"" + WiFi.softAPIP().toString() + "\"";
+        json += ",\"wifiRSSI\":0";
+    }
+
     json += "}";
     return json;
 }
@@ -207,6 +232,8 @@ static void initAsyncWeb()
     });
 
     // ---- REST API: Read preferences ----
+    // Boolean preference keys — stored with putBool, read with getBool
+    // These must be handled separately from string preferences
     asyncServer.on("/api/pref", HTTP_GET, [](AsyncWebServerRequest *request)
     {
         if (!request->hasParam("keys"))
@@ -228,10 +255,18 @@ static void initAsyncWeb()
             {
                 if (!first) json += ",";
                 first = false;
-                String val = preferences.getString(key.c_str(), "");
-                // Escape quotes in value
-                val.replace("\"", "\\\"");
-                json += "\"" + key + "\":\"" + val + "\"";
+                // Boolean keys: firmware uses getBool/putBool for these
+                if (key == "wifi" || key == "ap" || key == "remote")
+                {
+                    bool val = preferences.getBool(key.c_str(), false);
+                    json += "\"" + key + "\":" + (val ? "true" : "false");
+                }
+                else
+                {
+                    String val = preferences.getString(key.c_str(), "");
+                    val.replace("\"", "\\\"");
+                    json += "\"" + key + "\":\"" + val + "\"";
+                }
             }
             start = comma + 1;
         }
@@ -252,6 +287,13 @@ static void initAsyncWeb()
             {
                 logCapture.println("[API] Factory reset — clearing all preferences");
                 preferences.clear();
+            }
+            // Boolean keys — firmware uses getBool/putBool
+            else if (key == "wifi" || key == "ap" || key == "remote")
+            {
+                bool bval = (val == "1" || val == "true");
+                preferences.putBool(key.c_str(), bval);
+                logCapture.printf("[API] pref (bool): %s = %s\n", key.c_str(), bval ? "true" : "false");
             }
             else
             {
@@ -329,12 +371,13 @@ static void initAsyncWeb()
                 {
                     Update.printError(Serial);
                 }
-                // Show progress on logic displays
+                // Show progress on logic displays + broadcast to WS clients
                 if (request->contentLength() > 0)
                 {
                     float range = (float)(index + len) / (float)request->contentLength();
                     FLD.setEffectWidthRange(range);
                     RLD.setEffectWidthRange(range);
+                    broadcastOtaProgress(range);
                 }
             }
             if (final)
@@ -364,8 +407,11 @@ static void asyncWebLoop()
 {
     ws.cleanupClients();
 
+    if (ws.count() == 0)
+        return;
+
     // Broadcast new log lines to WebSocket clients
-    if (ws.count() > 0 && logCapture.hasNewLine(lastLogCount))
+    if (logCapture.hasNewLine(lastLogCount))
     {
         const char *line = logCapture.getNewestLine();
         if (line[0] != '\0')
@@ -378,6 +424,23 @@ static void asyncWebLoop()
             ws.textAll(json);
         }
     }
+
+    // Periodic state broadcast every 5 seconds
+    uint32_t now = millis();
+    if (now - lastStateBroadcast >= 5000)
+    {
+        broadcastState();
+        lastStateBroadcast = now;
+    }
+
+    // Periodic health broadcast every 30 seconds
+    // (I2C scan takes ~100ms so keep interval long)
+    if (now - lastHealthBroadcast >= 30000)
+    {
+        String json = "{\"type\":\"health\",\"data\":" + buildHealthJson() + "}";
+        ws.textAll(json);
+        lastHealthBroadcast = now;
+    }
 }
 
 // ---------------------------------------------------------------
@@ -388,6 +451,18 @@ static void broadcastState()
     if (ws.count() > 0)
     {
         String json = "{\"type\":\"state\",\"data\":" + buildStateJson() + "}";
+        ws.textAll(json);
+    }
+}
+
+// ---------------------------------------------------------------
+// Broadcast OTA progress to all connected WebSocket clients
+// ---------------------------------------------------------------
+static void broadcastOtaProgress(float progress)
+{
+    if (ws.count() > 0)
+    {
+        String json = "{\"type\":\"ota\",\"progress\":" + String(progress, 2) + "}";
         ws.textAll(json);
     }
 }
