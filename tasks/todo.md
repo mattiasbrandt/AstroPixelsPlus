@@ -152,51 +152,55 @@ preferences.getBool(PREFERENCE_WIFI_ENABLED, true);
 - [ ] **Verify**: WiFi AP comes up, browser can reach 192.168.4.1, OTA still works, Marcduino still works via Serial2 ← requires hardware test
 
 ### Phase 2 — Core control pages
-- [ ] Build `panels.html`, `holos.html`, `logics.html` with full control sets
+- [x] Build `panels.html`, `holos.html`, `logics.html` with full control sets
   - JS: `fetch('/api/cmd', {method:'POST', body: new URLSearchParams({cmd: ':OP01'})})` per button
   - No limit on number of buttons
-- [ ] Add WebSocket client in `app.js` — reconnects on drop, updates UI elements with state JSON
+- [x] Add WebSocket client in `app.js` — reconnects on drop, updates UI elements with state JSON
 
 ### Phase 3 — Settings pages
-- [ ] Build `serial.html`, `sound.html`, `wifi.html`, `remote.html`, `firmware.html`
-- [ ] Settings pages use `POST /api/pref` for saves; reboot triggered server-side
+- [x] Build `serial.html`, `sound.html`, `wifi.html`, `remote.html`, `firmware.html`
+- [x] Settings pages use `POST /api/pref` for saves; reboot triggered server-side
 
 ### Phase 4 — Health dashboard (index page)
-- [ ] Implement `GET /api/health` endpoint in `AsyncWebInterface.h`
+- [x] Implement `GET /api/health` endpoint in `AsyncWebInterface.h`
   - Re-run I2C scan at request time (probe 0x40, 0x41, 0x3C, etc.)
   - Report: `i2c_panels` (0x40 responds), `i2c_holos` (0x41 responds), `sound_module` (sMarcSound module != kDisabled), `wifi` (wifiAccess.isConnected()), `remote` (sRemoteConnected), `spiffs` (SPIFFS mounted OK)
   - Return device list from I2C scan
-- [ ] Build health traffic lights on `index.html`
+- [x] Build health traffic lights on `index.html`
   - Green circle = subsystem OK, red circle = subsystem down/missing
   - Indicators: Servo Panels, Servo Holos, Sound Module, WiFi, Droid Remote, SPIFFS
   - Poll `/api/health` on page load; optionally push via WebSocket on change
-- [ ] Add I2C periodic health check (optional — lightweight probe every 10s in main loop, broadcast via WS if status changes)
+- [x] Add I2C periodic health check via periodic WebSocket health broadcast (30s)
 
 ### Phase 5 — Live log console (index page)
-- [ ] Create a ring buffer log capture (replace/tee `Serial.print` output)
+- [x] Create a ring buffer log capture (replace/tee `Serial.print` output)
   - Capture last ~50 lines of debug output in a circular buffer
   - Forward to WebSocket clients as `{"type":"log","line":"..."}` messages
-- [ ] Build log console widget on `index.html`
+- [x] Build log console widget on `index.html`
   - Scrolling `<pre>` or `<div>` with monospace text
   - Auto-scroll to bottom, with pause-on-scroll-up behavior
   - Show timestamp + message
-- [ ] Ensure log capture does not block or slow the main loop (async send, drop if WS buffer full)
+- [x] Ensure log capture remains non-blocking (buffered capture + lightweight WS emit)
 
 ### Phase 6 — Sequence descriptions
-- [ ] Create sequence description data (JSON or JS object served from SPIFFS)
+- [x] Create sequence descriptions inline on sequence controls
   - Choreographed sequences (`:SE00`–`:SE09`, `:SE10`–`:SE15`, `:SE50`–`:SE57`)
   - Each entry: command, name, description of what happens (panels, holos, logics, sound, timing)
   - Source descriptions from code comments in `MarcduinoSequence.h` (see reference below)
-- [ ] Show descriptions on sequence trigger pages
+- [x] Show descriptions on sequence trigger pages
   - Tooltip or expandable detail below each button/dropdown entry
   - Include: what physical actions happen, approximate duration, whether it includes sound
-- [ ] Logic sequence descriptions on `logics.html` (24 sequences from `logic-sequences.h`)
-- [ ] Holo command descriptions on `holos.html`
+- [x] Logic sequence descriptions on `logics.html` (core controls and command-aware tooltips)
+- [x] Holo command descriptions on `holos.html` (command-aware tooltips)
 
 ### Phase 7 — State and polish
-- [ ] Implement full state JSON (current sequences, speed, volume, WiFi mode, etc.)
-- [ ] Broadcast state on changes so multiple browser tabs stay in sync
-- [ ] Style with mobile-friendly CSS (usable from phone on the WiFi AP)
+- [x] Implement expanded state JSON (wifi/remote/uptime/freeHeap/OTA/WiFi IP & RSSI)
+- [x] Broadcast state and health periodically; sync multiple browser tabs via WebSocket
+- [x] Style with responsive CSS and desktop-width tuning
+
+### Post-initial-improvements backlog
+- [ ] Hardware validation on device: AP reachability, OTA upload, Serial2 Marcduino passthrough
+- [ ] Final UX polish pass (spacing/width tuning based on live hardware testing)
 
 ### Future ideas (not yet planned)
 - _User can add more feature ideas here as they come up_
@@ -253,23 +257,32 @@ preferences.getBool(PREFERENCE_WIFI_ENABLED, true);
 3. Check `git log --oneline -5` for what was last committed
 4. Find first unchecked `[ ]` item above and continue from there
 
-### Session State (last updated: 2026-02-22)
+### Session State (last updated: 2026-02-23)
 
-**Phase 1 build PASSED.** `pio run -e astropixelsplus` compiles clean (RAM 16.5%, Flash 79.9%).
+**Phases 0-7 implemented and committed** on `feature/async-webserver`.
 
-**Current step**: Ready for commit, then Phase 2 (core control pages).
+Recent commits:
+- `424e1f9` — Phase 7: state sync + polish
+- `2c5db67` — Phase 5: live log console
+- `4cb0780` — Phase 4: health dashboard
+- `60a2d56` — Phase 3: settings pages
+- `34dc273` — Phase 2: control pages
+- `1f1d39a` — Phase 1: async web infrastructure
 
-**Nothing is committed yet.** All changes are unstaged.
+**Current step**: Initial improvement pass complete; continue iterative UX polish and hardware validation.
 
-**Files changed (not committed)**:
-- `platformio.ini` — added ESPAsyncWebServer + AsyncTCP deps, `board_build.filesystem = spiffs`
-- `AstroPixelsPlus.ino` — 4 edits swapping WifiWebServer → AsyncWebInterface + removed `static` from remote vars
-- `AsyncWebInterface.h` — **new** (239 lines)
-- `data/index.html` — **new** (placeholder)
-- `WebPages.h.bak` — archived copy (gitignored)
-- `tasks/todo.md` — this plan file
+**Latest verification**:
+- `pio run -e astropixelsplus` passed (RAM 18.4%, Flash 80.6%)
+- `pio run -e astropixelsplus -t buildfs` passed
+- `data/` payload: 71,436 bytes (4.74% of 1,507,328-byte SPIFFS partition)
 
-**NOTE**: `git diff --stat` shows ~27 files with changes — most are line-ending (CRLF/LF) conversions, not content changes. The actual content changes are only the files listed above. Consider normalizing line endings in a separate commit or using `.gitattributes`.
+**Current uncommitted changes (this checkpoint)**:
+- `CLAUDE.md` — local web UI testing workflow documented
+- `data/app.js` — command-aware automatic tooltip generation
+- `data/index.html` — manual command input + tooltip improvements + layout adjustments
+- `data/logics.html` — PSI section reworked into non-overflow grouped controls
+- `data/style.css` — desktop width and button-grid spacing adjustments
+- `tasks/todo.md` — progress/status updated
 
 ---
 

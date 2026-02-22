@@ -29,6 +29,31 @@ pio run -e astropixelsplus -t upload && pio device monitor -p /dev/ttyUSB0 -b 11
 
 The Makefile (`make TARGET=ESP32`) is an alternative build path using a custom `../Arduino.mk` shim — prefer PlatformIO.
 
+## Web UI Local Testing Workflow (Async Web Server)
+
+Use this workflow when iterating on files in `data/` (HTML/CSS/JS) before uploading to SPIFFS.
+
+```bash
+# Start local static server from repo root
+python3 -m http.server 8080 --directory data > /tmp/astropixels-http.log 2>&1 &
+
+# Open in browser
+http://localhost:8080/
+
+# Tail request/errors log while testing
+tail -f /tmp/astropixels-http.log
+
+# Stop the local server when done
+pkill -f "http.server 8080 --directory data"
+```
+
+Recommended collaboration loop:
+1. Implement UI changes in `data/*`
+2. Start local server and test in browser
+3. User validates UX/behavior manually
+4. Agent tails `/tmp/astropixels-http.log` to catch missing files/404s/runtime serving issues
+5. Iterate until stable, then upload SPIFFS (`pio run -e astropixelsplus -t uploadfs`)
+
 ## Architecture
 
 ### Command Flow
