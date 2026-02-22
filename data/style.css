@@ -1,17 +1,25 @@
-/* AstroPixels Web UI — Shared Styles */
-/* Mobile-first, dark theme, minimal footprint */
+/* AstroPixels Web UI — R2-D2 Theme */
+/* White, blue, and silver inspired by R2-D2's iconic color scheme */
+/* Mobile-first, minimal footprint */
 
 :root {
-  --bg: #1a1a2e;
-  --surface: #16213e;
-  --border: #0f3460;
-  --accent: #00d4ff;
-  --accent-dim: #0088aa;
-  --text: #e0e0e0;
-  --text-dim: #888;
-  --danger: #ff4444;
-  --success: #44ff88;
-  --warning: #ffbb33;
+  /* R2-D2 palette */
+  --bg: #0c1525;              /* deep space navy */
+  --surface: #152238;          /* dark panel blue */
+  --surface-alt: #1a2d4a;     /* slightly lighter panel */
+  --border: #2a4a7a;          /* R2 mid-blue trim */
+  --accent: #4a90d9;          /* R2 signature blue */
+  --accent-bright: #6ab0ff;   /* bright blue highlight */
+  --accent-dim: #2d6cb5;      /* pressed/active blue */
+  --silver: #b8c5d6;          /* R2 silver/aluminum */
+  --silver-bright: #d4dde8;   /* bright silver */
+  --text: #e8edf4;            /* near-white text */
+  --text-dim: #8899b0;        /* muted silver-blue */
+  --danger: #e85454;          /* R2's red indicator */
+  --danger-bg: #3a1a1a;
+  --success: #54c87a;         /* green indicator */
+  --warning: #e8a832;         /* amber indicator */
+  --white: #f0f4f8;           /* R2 white panels */
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -26,47 +34,98 @@ body {
   -webkit-text-size-adjust: 100%;
 }
 
-h1 { color: var(--accent); font-size: 1.4em; margin-bottom: 2px; }
-h2 { color: var(--accent); font-size: 1.1em; margin: 16px 0 8px; }
-.subtitle { color: var(--text-dim); font-size: 0.85em; margin-bottom: 16px; }
+/* Header — R2's white dome panel feel */
+h1 {
+  color: var(--white);
+  font-size: 1.4em;
+  margin-bottom: 2px;
+  letter-spacing: 0.5px;
+}
+h2 {
+  color: var(--silver-bright);
+  font-size: 1.1em;
+  margin: 16px 0 8px;
+}
+.subtitle {
+  color: var(--text-dim);
+  font-size: 0.85em;
+  margin-bottom: 16px;
+}
 
-/* Navigation */
-nav { margin-bottom: 16px; }
+/* Navigation — silver tabs like R2's panel seams */
+nav {
+  margin-bottom: 16px;
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 10px;
+}
 nav a {
   display: inline-block;
   padding: 8px 14px;
   margin: 3px;
   background: var(--surface);
-  color: var(--accent);
+  color: var(--silver);
   text-decoration: none;
-  border-radius: 6px;
+  border-radius: 4px 4px 0 0;
   border: 1px solid var(--border);
+  border-bottom: none;
   font-size: 0.85em;
+  transition: background 0.15s, color 0.15s;
 }
-nav a:hover, nav a.active {
-  background: var(--border);
+nav a:hover {
+  background: var(--surface-alt);
+  color: var(--accent-bright);
+}
+nav a.active {
+  background: var(--accent);
+  color: var(--white);
+  border-color: var(--accent);
 }
 
-/* Buttons — command triggers */
+/* Buttons — R2's blue panel buttons */
 .btn {
   display: inline-block;
   padding: 10px 14px;
   margin: 3px;
-  background: var(--surface);
-  color: var(--text);
+  background: var(--surface-alt);
+  color: var(--silver-bright);
   border: 1px solid var(--border);
   border-radius: 6px;
   font-size: 0.85em;
   cursor: pointer;
   text-align: center;
   min-width: 70px;
-  transition: background 0.15s;
+  transition: background 0.15s, border-color 0.15s;
   -webkit-tap-highlight-color: transparent;
 }
-.btn:hover { background: var(--border); }
-.btn:active { background: var(--accent-dim); color: #fff; }
-.btn.accent { background: var(--accent-dim); color: #fff; border-color: var(--accent); }
-.btn.danger { background: #442222; color: var(--danger); border-color: #662222; }
+.btn:hover {
+  background: var(--border);
+  border-color: var(--accent);
+  color: var(--white);
+}
+.btn:active {
+  background: var(--accent-dim);
+  color: var(--white);
+}
+/* Primary action — R2's signature blue */
+.btn.accent {
+  background: var(--accent);
+  color: var(--white);
+  border-color: var(--accent-bright);
+  font-weight: 600;
+}
+.btn.accent:hover {
+  background: var(--accent-bright);
+}
+/* Danger — R2's red indicator light */
+.btn.danger {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border-color: #5a2a2a;
+}
+.btn.danger:hover {
+  background: #4a2020;
+  border-color: var(--danger);
+}
 
 /* Button grid */
 .btn-grid {
@@ -87,40 +146,61 @@ select {
   width: 100%;
   margin-bottom: 8px;
 }
+select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
 
-/* Section card */
+/* Text input */
+input[type="text"], input[type="password"], input[type="number"] {
+  padding: 8px 12px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.85em;
+}
+input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* Section card — like R2's body panels */
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 12px;
   margin-bottom: 12px;
+  border-left: 3px solid var(--accent);
 }
 .card h3 {
-  color: var(--accent);
+  color: var(--accent-bright);
   font-size: 0.95em;
   margin-bottom: 8px;
+  font-weight: 600;
 }
 
-/* Status bar */
+/* Status bar — R2's indicator strip */
 .status-bar {
   padding: 8px 12px;
   background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 6px;
   font-size: 0.8em;
   color: var(--text-dim);
   margin-top: 12px;
 }
-.status-bar .dot {
+.status-bar .dot, .dot {
   display: inline-block;
   width: 8px; height: 8px;
   border-radius: 50%;
   margin-right: 4px;
   vertical-align: middle;
 }
-.dot.green { background: var(--success); }
-.dot.red { background: var(--danger); }
-.dot.yellow { background: var(--warning); }
+.dot.green { background: var(--success); box-shadow: 0 0 4px var(--success); }
+.dot.red { background: var(--danger); box-shadow: 0 0 4px var(--danger); }
+.dot.yellow { background: var(--warning); box-shadow: 0 0 4px var(--warning); }
 
 /* Descriptions */
 .desc {
@@ -128,6 +208,11 @@ select {
   font-size: 0.8em;
   margin-top: 2px;
   font-style: italic;
+}
+
+/* Tables */
+table td {
+  color: var(--silver);
 }
 
 /* Responsive: wider screens get more columns */
