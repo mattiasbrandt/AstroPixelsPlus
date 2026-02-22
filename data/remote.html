@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Remote — AstroPixels</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <h1>Droid Remote</h1>
+  <div class="subtitle">ESPNOW wireless remote configuration</div>
+  <nav>
+    <a href="/">Home</a>
+    <a href="/setup.html">Setup</a>
+  </nav>
+
+  <div class="card">
+    <h3>ESPNOW Settings</h3>
+    <div class="desc">Changes require reboot to take effect</div>
+
+    <div style="margin-top:12px;">
+      <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+        <input type="checkbox" id="remote-enabled">
+        <span>Droid Remote Enabled</span>
+      </label>
+
+      <div style="margin-bottom:10px;">
+        <label style="color:var(--text-dim); font-size:0.8em;">Device Name</label>
+        <input type="text" id="remote-host" value="Astro"
+               style="width:100%; margin-top:4px;">
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="color:var(--text-dim); font-size:0.8em;">Pairing Secret</label>
+        <input type="password" id="remote-secret" value="Astromech"
+               style="width:100%; margin-top:4px;">
+      </div>
+    </div>
+
+    <button class="btn accent" onclick="saveRemote()" style="width:100%; margin-top:8px;">Save &amp; Reboot</button>
+  </div>
+
+  <div class="card">
+    <h3>Pairing</h3>
+    <div class="btn-grid">
+      <button class="btn" onclick="sendCmd('#APPAIR')">Start Pairing</button>
+      <button class="btn danger" onclick="sendCmd('#APUNPAIR')">Unpair</button>
+    </div>
+    <div class="desc">Hold the pairing button on your remote, then click Start Pairing</div>
+  </div>
+
+  <div class="card">
+    <div class="desc">Note: Droid Remote uses ESPNOW which cannot run simultaneously with WiFi. Enabling remote disables WiFi and vice versa.</div>
+  </div>
+
+  <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>
+  <script src="/app.js"></script>
+  <script>
+    fetch('/api/pref?keys=remote,rhost,rsecret').then(function(r){return r.json();}).then(function(d){
+      if (typeof d.remote !== 'undefined') document.getElementById('remote-enabled').checked = d.remote === 'true' || d.remote === true || d.remote === '1';
+      if (d.rhost) document.getElementById('remote-host').value = d.rhost;
+      if (d.rsecret) document.getElementById('remote-secret').value = d.rsecret;
+    }).catch(function(){});
+
+    function saveRemote() {
+      var prefs = [
+        {key:'remote', val: document.getElementById('remote-enabled').checked ? '1' : '0'},
+        {key:'rhost', val: document.getElementById('remote-host').value},
+        {key:'rsecret', val: document.getElementById('remote-secret').value}
+      ];
+      var chain = Promise.resolve();
+      prefs.forEach(function(p, i) {
+        chain = chain.then(function() {
+          var body = 'key=' + encodeURIComponent(p.key) + '&val=' + encodeURIComponent(p.val);
+          if (i === prefs.length - 1) body += '&reboot=1';
+          return fetch('/api/pref', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:body});
+        });
+      });
+      chain.then(function(){
+        document.getElementById('conn-status').innerHTML = '<span class="dot yellow"></span>Rebooting...';
+      });
+    }
+  </script>
+</body>
+</html>

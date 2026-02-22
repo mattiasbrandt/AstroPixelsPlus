@@ -108,6 +108,39 @@ static void initAsyncWeb()
         request->send(200, "application/json", buildStateJson());
     });
 
+    // ---- REST API: Read preferences ----
+    asyncServer.on("/api/pref", HTTP_GET, [](AsyncWebServerRequest *request)
+    {
+        if (!request->hasParam("keys"))
+        {
+            request->send(400, "application/json", "{\"error\":\"missing keys param\"}");
+            return;
+        }
+        String keys = request->getParam("keys")->value();
+        String json = "{";
+        bool first = true;
+        int start = 0;
+        while (start <= (int)keys.length())
+        {
+            int comma = keys.indexOf(',', start);
+            if (comma < 0) comma = keys.length();
+            String key = keys.substring(start, comma);
+            key.trim();
+            if (key.length() > 0)
+            {
+                if (!first) json += ",";
+                first = false;
+                String val = preferences.getString(key.c_str(), "");
+                // Escape quotes in value
+                val.replace("\"", "\\\"");
+                json += "\"" + key + "\":\"" + val + "\"";
+            }
+            start = comma + 1;
+        }
+        json += "}";
+        request->send(200, "application/json", json);
+    });
+
     // ---- REST API: Set preference ----
     asyncServer.on("/api/pref", HTTP_POST, [](AsyncWebServerRequest *request)
     {
@@ -115,9 +148,18 @@ static void initAsyncWeb()
         {
             String key = request->getParam("key", true)->value();
             String val = request->getParam("val", true)->value();
-            // Store as string by default; specific keys may need int/bool
-            preferences.putString(key.c_str(), val);
-            Serial.printf("[API] pref: %s = %s\n", key.c_str(), val.c_str());
+
+            // Special key: factory reset
+            if (key == "_clear")
+            {
+                Serial.println("[API] Factory reset — clearing all preferences");
+                preferences.clear();
+            }
+            else
+            {
+                preferences.putString(key.c_str(), val);
+                Serial.printf("[API] pref: %s = %s\n", key.c_str(), val.c_str());
+            }
 
             bool needsReboot = request->hasParam("reboot", true) &&
                                request->getParam("reboot", true)->value() == "1";

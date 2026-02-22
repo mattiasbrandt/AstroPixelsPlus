@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Serial — AstroPixels</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <h1>Serial / Marcduino</h1>
+  <div class="subtitle">Serial communication and JawaLite settings</div>
+  <nav>
+    <a href="/">Home</a>
+    <a href="/setup.html">Setup</a>
+  </nav>
+
+  <div class="card">
+    <h3>Serial2 (Marcduino Input)</h3>
+
+    <div style="margin-bottom:10px;">
+      <label style="color:var(--text-dim); font-size:0.8em;">Baud Rate</label>
+      <select id="serial2-baud" style="margin-top:4px;">
+        <option value="2400">2400</option>
+        <option value="9600">9600</option>
+      </select>
+    </div>
+
+    <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+      <input type="checkbox" id="serial-pass" checked>
+      <span>Serial pass-through to Serial2</span>
+    </label>
+  </div>
+
+  <div class="card">
+    <h3>JawaLite Protocol</h3>
+
+    <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+      <input type="checkbox" id="jawalite-serial" checked>
+      <span>JawaLite on Serial2</span>
+    </label>
+    <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+      <input type="checkbox" id="jawalite-wifi" checked>
+      <span>JawaLite on WiFi (port 2000)</span>
+    </label>
+    <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+      <input type="checkbox" id="wifi-serial-pass" checked>
+      <span>WiFi JawaLite pass-through to Serial2</span>
+    </label>
+  </div>
+
+  <button class="btn accent" onclick="saveSerial()" style="width:100%; margin-top:8px;">Save</button>
+
+  <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>
+  <script src="/app.js"></script>
+  <script>
+    fetch('/api/pref?keys=mserial2,mserialpass,mserial,mwifi,mwifipass').then(function(r){return r.json();}).then(function(d){
+      if (d.mserial2) document.getElementById('serial2-baud').value = d.mserial2;
+      if (typeof d.mserialpass !== 'undefined') document.getElementById('serial-pass').checked = d.mserialpass === 'true' || d.mserialpass === true || d.mserialpass === '1';
+      if (typeof d.mserial !== 'undefined') document.getElementById('jawalite-serial').checked = d.mserial === 'true' || d.mserial === true || d.mserial === '1';
+      if (typeof d.mwifi !== 'undefined') document.getElementById('jawalite-wifi').checked = d.mwifi === 'true' || d.mwifi === true || d.mwifi === '1';
+      if (typeof d.mwifipass !== 'undefined') document.getElementById('wifi-serial-pass').checked = d.mwifipass === 'true' || d.mwifipass === true || d.mwifipass === '1';
+    }).catch(function(){});
+
+    function saveSerial() {
+      var prefs = [
+        {key:'mserial2', val: document.getElementById('serial2-baud').value},
+        {key:'mserialpass', val: document.getElementById('serial-pass').checked ? '1' : '0'},
+        {key:'mserial', val: document.getElementById('jawalite-serial').checked ? '1' : '0'},
+        {key:'mwifi', val: document.getElementById('jawalite-wifi').checked ? '1' : '0'},
+        {key:'mwifipass', val: document.getElementById('wifi-serial-pass').checked ? '1' : '0'}
+      ];
+      var chain = Promise.resolve();
+      prefs.forEach(function(p) {
+        chain = chain.then(function() {
+          return fetch('/api/pref', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
+            body: 'key=' + encodeURIComponent(p.key) + '&val=' + encodeURIComponent(p.val)});
+        });
+      });
+      chain.then(function(){ alert('Settings saved. Some changes may require reboot.'); });
+    }
+  </script>
+</body>
+</html>

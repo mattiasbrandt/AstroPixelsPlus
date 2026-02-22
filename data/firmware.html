@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Firmware — AstroPixels</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <h1>Firmware Update</h1>
+  <div class="subtitle">OTA firmware upload and system maintenance</div>
+  <nav>
+    <a href="/">Home</a>
+    <a href="/setup.html">Setup</a>
+  </nav>
+
+  <div class="card">
+    <h3>Upload Firmware</h3>
+    <div class="desc">Select a .bin firmware file to flash over-the-air</div>
+
+    <div style="margin-top:12px;">
+      <input type="file" id="fw-file" accept=".bin"
+             style="color:var(--text); font-size:0.85em; margin-bottom:10px;">
+    </div>
+
+    <div id="fw-progress" style="display:none; margin-bottom:10px;">
+      <div style="background:var(--bg); border-radius:4px; overflow:hidden; height:20px;">
+        <div id="fw-bar" style="background:var(--accent); height:100%; width:0%; transition:width 0.3s;"></div>
+      </div>
+      <div id="fw-status" style="font-size:0.8em; color:var(--text-dim); margin-top:4px;">Uploading...</div>
+    </div>
+
+    <button class="btn accent" onclick="uploadFirmware()" style="width:100%;">Upload &amp; Flash</button>
+  </div>
+
+  <div class="card">
+    <h3>System</h3>
+    <div class="btn-grid">
+      <button class="btn" onclick="if(confirm('Reboot the controller?')){fetch('/api/reboot',{method:'POST'});document.getElementById('conn-status').innerHTML='<span class=dot yellow></span>Rebooting...';}">Reboot</button>
+      <button class="btn danger" onclick="if(confirm('Clear ALL preferences and reboot? This resets WiFi, sound, and remote settings to defaults.')){fetch('/api/pref',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'key=_clear&val=1&reboot=1'});}">Factory Reset</button>
+    </div>
+  </div>
+
+  <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>
+  <script src="/app.js"></script>
+  <script>
+    function uploadFirmware() {
+      var file = document.getElementById('fw-file').files[0];
+      if (!file) { alert('Select a firmware file first.'); return; }
+      if (!confirm('Flash firmware: ' + file.name + ' (' + (file.size/1024).toFixed(0) + ' KB)?')) return;
+
+      var prog = document.getElementById('fw-progress');
+      var bar = document.getElementById('fw-bar');
+      var status = document.getElementById('fw-status');
+      prog.style.display = 'block';
+
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', '/upload/firmware');
+
+      xhr.upload.onprogress = function(e) {
+        if (e.lengthComputable) {
+          var pct = Math.round((e.loaded / e.total) * 100);
+          bar.style.width = pct + '%';
+          status.textContent = 'Uploading... ' + pct + '%';
+        }
+      };
+
+      xhr.onload = function() {
+        if (xhr.status === 200) {
+          bar.style.width = '100%';
+          bar.style.background = 'var(--success)';
+          status.textContent = 'Update complete. Rebooting...';
+        } else {
+          bar.style.background = 'var(--danger)';
+          status.textContent = 'Update failed: ' + xhr.responseText;
+        }
+      };
+
+      xhr.onerror = function() {
+        bar.style.background = 'var(--danger)';
+        status.textContent = 'Upload error — connection lost';
+      };
+
+      var formData = new FormData();
+      formData.append('firmware', file, file.name);
+      xhr.send(formData);
+    }
+  </script>
+</body>
+</html>

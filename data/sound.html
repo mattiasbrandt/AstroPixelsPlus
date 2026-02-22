@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sound — AstroPixels</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <h1>Sound Player</h1>
+  <div class="subtitle">DFPlayer Mini audio configuration</div>
+  <nav>
+    <a href="/">Home</a>
+    <a href="/setup.html">Setup</a>
+  </nav>
+
+  <div class="card">
+    <h3>Sound Module</h3>
+
+    <div style="margin-bottom:10px;">
+      <label style="color:var(--text-dim); font-size:0.8em;">Sound Player</label>
+      <select id="sound-player" style="margin-top:4px;">
+        <option value="0">Disabled</option>
+        <option value="1">MP3 Trigger</option>
+        <option value="2">DFMini Player</option>
+        <option value="3">HCR</option>
+      </select>
+    </div>
+
+    <div style="margin-bottom:10px;">
+      <label style="color:var(--text-dim); font-size:0.8em;">Sound Serial Port</label>
+      <select id="sound-serial" style="margin-top:4px;">
+        <option value="0">AUX4/AUX5</option>
+        <option value="1">Serial2</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Volume</h3>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <input type="range" id="sound-volume" min="0" max="1000" value="500"
+             style="flex:1; accent-color:var(--accent);">
+      <span id="vol-label" style="min-width:40px; text-align:right; font-size:0.85em;">50%</span>
+    </div>
+    <div style="margin-top:8px;">
+      <span style="color:var(--text-dim); font-size:0.8em;">Quick:</span>
+      <button class="btn" onclick="sendCmd('$-')">Vol -</button>
+      <button class="btn" onclick="sendCmd('$m')">Mid</button>
+      <button class="btn" onclick="sendCmd('$+')">Vol +</button>
+      <button class="btn" onclick="sendCmd('$f')">Max</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Startup &amp; Random</h3>
+
+    <div style="margin-bottom:10px;">
+      <label style="color:var(--text-dim); font-size:0.8em;">Startup Sound Track (255=none)</label>
+      <input type="number" id="sound-startup" min="0" max="255" value="255"
+             style="width:100%; margin-top:4px;">
+    </div>
+
+    <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+      <input type="checkbox" id="sound-random" checked>
+      <span>Random Sound Enabled</span>
+    </label>
+
+    <div style="display:flex; gap:10px; margin-bottom:10px;">
+      <div style="flex:1;">
+        <label style="color:var(--text-dim); font-size:0.8em;">Min Interval (ms)</label>
+        <input type="number" id="random-min" min="1000" max="120000" value="5000"
+               style="width:100%; margin-top:4px;">
+      </div>
+      <div style="flex:1;">
+        <label style="color:var(--text-dim); font-size:0.8em;">Max Interval (ms)</label>
+        <input type="number" id="random-max" min="1000" max="120000" value="30000"
+               style="width:100%; margin-top:4px;">
+      </div>
+    </div>
+  </div>
+
+  <button class="btn accent" onclick="saveSound()" style="width:100%; margin-top:8px;">Save</button>
+
+  <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>
+  <script src="/app.js"></script>
+  <script>
+    document.getElementById('sound-volume').addEventListener('input', function() {
+      document.getElementById('vol-label').textContent = Math.round(this.value / 10) + '%';
+    });
+
+    fetch('/api/pref?keys=msound,msoundser,mvolume,msoundstart,mrandom,mrandommin,mrandommax').then(function(r){return r.json();}).then(function(d){
+      if (d.msound) document.getElementById('sound-player').value = d.msound;
+      if (d.msoundser) document.getElementById('sound-serial').value = d.msoundser;
+      if (d.mvolume) { document.getElementById('sound-volume').value = d.mvolume; document.getElementById('vol-label').textContent = Math.round(d.mvolume/10) + '%'; }
+      if (d.msoundstart) document.getElementById('sound-startup').value = d.msoundstart;
+      if (typeof d.mrandom !== 'undefined') document.getElementById('sound-random').checked = d.mrandom === 'true' || d.mrandom === true || d.mrandom === '1';
+      if (d.mrandommin) document.getElementById('random-min').value = d.mrandommin;
+      if (d.mrandommax) document.getElementById('random-max').value = d.mrandommax;
+    }).catch(function(){});
+
+    function saveSound() {
+      var prefs = [
+        {key:'msound', val: document.getElementById('sound-player').value},
+        {key:'msoundser', val: document.getElementById('sound-serial').value},
+        {key:'mvolume', val: document.getElementById('sound-volume').value},
+        {key:'msoundstart', val: document.getElementById('sound-startup').value},
+        {key:'mrandom', val: document.getElementById('sound-random').checked ? '1' : '0'},
+        {key:'mrandommin', val: document.getElementById('random-min').value},
+        {key:'mrandommax', val: document.getElementById('random-max').value}
+      ];
+      var chain = Promise.resolve();
+      prefs.forEach(function(p) {
+        chain = chain.then(function() {
+          return fetch('/api/pref', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
+            body: 'key=' + encodeURIComponent(p.key) + '&val=' + encodeURIComponent(p.val)});
+        });
+      });
+      chain.then(function(){ alert('Sound settings saved.'); });
+    }
+  </script>
+</body>
+</html>
