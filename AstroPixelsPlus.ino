@@ -161,7 +161,7 @@
 #include <ESPmDNS.h>
 #endif
 #ifdef USE_WIFI_WEB
-#include "wifi/WifiWebServer.h"
+#include <ESPAsyncWebServer.h>
 #endif
 #ifdef USE_WIFI_MARCDUINO
 #include "wifi/WifiMarcduinoReceiver.h"
@@ -525,13 +525,13 @@ CommandScreenHandlerSMQ sDisplay;
 ////////////////////////////////
 
 #ifdef USE_WIFI_WEB
-#include "WebPages.h"
+#include "AsyncWebInterface.h"
 #endif
 
 #ifdef USE_DROID_REMOTE
-static bool sRemoteConnected;
-static bool sRemoteConnecting;
-static SMQAddress sRemoteAddress;
+bool sRemoteConnected;
+bool sRemoteConnecting;
+SMQAddress sRemoteAddress;
 #endif
 
 ////////////////////////////////
@@ -539,7 +539,11 @@ static SMQAddress sRemoteAddress;
 void scan_i2c()
 {
     unsigned nDevices = 0;
+    Serial.println("===========================================");
     Serial.println("Scanning I2C addresses 0x01-0x7E...");
+    Serial.println("Expected: 0x40 (Panels), 0x41 (Holos)");
+    Serial.println("===========================================");
+    
     for (byte address = 1; address < 127; address++)
     {
         String name = "<unknown>";
@@ -553,12 +557,12 @@ void scan_i2c()
         if (address == 0x40)
         {
             // Adafruit PCA9685 - Panels Controller
-            name = "PCA9685 (Panels)";
+            name = "PCA9685 (Panels) ← EXPECTED";
         }
         if (address == 0x41)
         {
             // Adafruit PCA9685 - Holos Controller
-            name = "PCA9685 (Holos)";
+            name = "PCA9685 (Holos) ← EXPECTED";
         }
         if (address == 0x14)
         {
@@ -578,7 +582,7 @@ void scan_i2c()
 
         if (error == 0)
         {
-            Serial.print("I2C device found at address 0x");
+            Serial.print("✓ I2C device found at address 0x");
             if (address < 16)
                 Serial.print("0");
             Serial.print(address, HEX);
@@ -588,16 +592,22 @@ void scan_i2c()
         }
         else if (error == 4)
         {
-            Serial.print("Unknown error at address 0x");
+            Serial.print("✗ Unknown error at address 0x");
             if (address < 16)
                 Serial.print("0");
             Serial.println(address, HEX);
         }
     }
+    Serial.println("===========================================");
     if (nDevices == 0)
-        Serial.println("No I2C devices found\n");
+        Serial.println("❌ NO I2C DEVICES FOUND!");
     else
-        Serial.println("done\n");
+    {
+        Serial.print("✓ Found ");
+        Serial.print(nDevices);
+        Serial.println(" I2C device(s)");
+    }
+    Serial.println("===========================================\n");
 }
 
 ////////////////////////////////
@@ -630,8 +640,12 @@ void setup()
 
 #ifndef USE_I2C_ADDRESS
     Wire.begin();
+    Serial.println("\n=== I2C DIAGNOSTICS ===");
+    Serial.println("Initializing I2C on SDA=21, SCL=22");
+    delay(100); // Give I2C time to settle
+    scan_i2c();
+    Serial.println("=== END I2C DIAGNOSTICS ===\n");
 #endif
-    // scan_i2c();
     SetupEvent::ready();
 
     // dataPanel.setSequence(DataPanel::kDisabled);
@@ -861,11 +875,8 @@ void setup()
     }
 #endif
 #ifdef USE_WIFI_WEB
-    // For safety we will stop the motors if the web client is connected
-    webServer.setConnect([]()
-                         {
-                             // Callback for each connected web client
-                         });
+    // Initialize async web server (serves SPIFFS files + REST API + WebSocket)
+    initAsyncWeb();
 #endif
 
     // DEBUG TEMP: Deferring web server creation until WiFi connected
@@ -1146,7 +1157,7 @@ void eventLoopTask(void *)
             ArduinoOTA.handle();
 #endif
 #ifdef USE_WIFI_WEB
-            webServer.handle();
+            asyncWebLoop();
 #endif
         }
         if (remoteActive)

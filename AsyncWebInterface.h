@@ -1,0 +1,239 @@
+#ifndef ASYNC_WEB_INTERFACE_H
+#define ASYNC_WEB_INTERFACE_H
+
+// AsyncWebInterface.h — Replaces WebPages.h
+// Registers ESPAsyncWebServer routes, REST API, WebSocket, and OTA upload.
+// All ReelTwo core (Marcduino, ServoDispatch, LogicEngine, etc.) stays unchanged.
+
+#include <ESPAsyncWebServer.h>
+#include <Update.h>
+#include "SPIFFS.h"
+
+// Forward declarations — these are defined in AstroPixelsPlus.ino
+extern void reboot();
+extern void unmountFileSystems();
+
+// Globals defined in .ino that we need access to
+extern AnimationPlayer player;
+extern Preferences preferences;
+extern bool wifiEnabled;
+extern bool remoteEnabled;
+extern bool otaInProgress;
+
+#ifdef USE_DROID_REMOTE
+extern bool sRemoteConnected;
+#endif
+
+// ESPAsyncWebServer objects — allocated once, no static init heap issues
+static AsyncWebServer asyncServer(80);
+static AsyncWebSocket ws("/ws");
+
+// ---------------------------------------------------------------
+// WebSocket event handler
+// ---------------------------------------------------------------
+static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
+                       AwsEventType type, void *arg, uint8_t *data, size_t len)
+{
+    if (type == WS_EVT_CONNECT)
+    {
+        Serial.printf("[WS] Client #%u connected from %s\n", client->id(),
+                      client->remoteIP().toString().c_str());
+    }
+    else if (type == WS_EVT_DISCONNECT)
+    {
+        Serial.printf("[WS] Client #%u disconnected\n", client->id());
+    }
+    else if (type == WS_EVT_DATA)
+    {
+        // Could handle incoming WS messages (commands) here in future
+        AwsFrameInfo *info = (AwsFrameInfo *)arg;
+        if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT)
+        {
+            data[len] = 0;
+            // Treat incoming WS text as Marcduino command
+            Marcduino::processCommand(player, (const char *)data);
+        }
+    }
+}
+
+// ---------------------------------------------------------------
+// Build state JSON string
+// ---------------------------------------------------------------
+static String buildStateJson()
+{
+    String json = "{";
+    json += "\"wifiEnabled\":" + String(wifiEnabled ? "true" : "false");
+    json += ",\"remoteEnabled\":" + String(remoteEnabled ? "true" : "false");
+#ifdef USE_DROID_REMOTE
+    json += ",\"remoteConnected\":" + String(sRemoteConnected ? "true" : "false");
+#endif
+    json += ",\"uptime\":" + String(millis() / 1000);
+    json += ",\"freeHeap\":" + String(ESP.getFreeHeap());
+    json += "}";
+    return json;
+}
+
+// ---------------------------------------------------------------
+// Initialize the async web server
+// Call from setup() after WiFi is configured
+// ---------------------------------------------------------------
+static void initAsyncWeb()
+{
+    // Attach WebSocket
+    ws.onEvent(onWsEvent);
+    asyncServer.addHandler(&ws);
+
+    // ---- Static files from SPIFFS ----
+    asyncServer.serveStatic("/", SPIFFS, "/").setDefaultFile("index.html");
+
+    // ---- REST API: Send Marcduino command ----
+    asyncServer.on("/api/cmd", HTTP_POST, [](AsyncWebServerRequest *request)
+    {
+        if (request->hasParam("cmd", true))
+        {
+            String cmd = request->getParam("cmd", true)->value();
+            Serial.printf("[API] cmd: %s\n", cmd.c_str());
+            Marcduino::processCommand(player, cmd.c_str());
+            request->send(200, "application/json", "{\"ok\":true}");
+        }
+        else
+        {
+            request->send(400, "application/json", "{\"error\":\"missing cmd param\"}");
+        }
+    });
+
+    // ---- REST API: Get state ----
+    asyncServer.on("/api/state", HTTP_GET, [](AsyncWebServerRequest *request)
+    {
+        request->send(200, "application/json", buildStateJson());
+    });
+
+    // ---- REST API: Set preference ----
+    asyncServer.on("/api/pref", HTTP_POST, [](AsyncWebServerRequest *request)
+    {
+        if (request->hasParam("key", true) && request->hasParam("val", true))
+        {
+            String key = request->getParam("key", true)->value();
+            String val = request->getParam("val", true)->value();
+            // Store as string by default; specific keys may need int/bool
+            preferences.putString(key.c_str(), val);
+            Serial.printf("[API] pref: %s = %s\n", key.c_str(), val.c_str());
+
+            bool needsReboot = request->hasParam("reboot", true) &&
+                               request->getParam("reboot", true)->value() == "1";
+            request->send(200, "application/json", "{\"ok\":true}");
+            if (needsReboot)
+            {
+                delay(500);
+                reboot();
+            }
+        }
+        else
+        {
+            request->send(400, "application/json", "{\"error\":\"missing key/val params\"}");
+        }
+    });
+
+    // ---- REST API: Reboot ----
+    asyncServer.on("/api/reboot", HTTP_POST, [](AsyncWebServerRequest *request)
+    {
+        request->send(200, "application/json", "{\"ok\":true,\"msg\":\"rebooting\"}");
+        delay(500);
+        reboot();
+    });
+
+    // ---- Firmware upload (OTA via web) ----
+    asyncServer.on("/upload/firmware", HTTP_POST,
+        // Response handler (called after upload completes)
+        [](AsyncWebServerRequest *request)
+        {
+            otaInProgress = false;
+            if (Update.hasError())
+            {
+                request->send(500, "text/plain", "Update FAILED");
+                FLD.selectSequence(LogicEngineDefaults::FAILURE);
+                FLD.setTextMessage("Flash Fail");
+                FLD.selectSequence(LogicEngineDefaults::TEXTSCROLLLEFT,
+                                   LogicEngineRenderer::kRed, 1, 0);
+            }
+            else
+            {
+                request->send(200, "text/plain", "Update OK - Rebooting...");
+                delay(1000);
+                preferences.end();
+                ESP.restart();
+            }
+        },
+        // Upload handler (called for each chunk)
+        [](AsyncWebServerRequest *request, const String &filename,
+           size_t index, uint8_t *data, size_t len, bool final)
+        {
+            if (index == 0)
+            {
+                // First chunk — start the update
+                otaInProgress = true;
+                unmountFileSystems();
+                FLD.selectSequence(LogicEngineDefaults::NORMAL);
+                RLD.selectSequence(LogicEngineDefaults::NORMAL);
+                FLD.setEffectWidthRange(0);
+                RLD.setEffectWidthRange(0);
+                Serial.printf("Update: %s\n", filename.c_str());
+                if (!Update.begin(request->contentLength()))
+                {
+                    Update.printError(Serial);
+                }
+            }
+            if (len)
+            {
+                if (Update.write(data, len) != len)
+                {
+                    Update.printError(Serial);
+                }
+                // Show progress on logic displays
+                if (request->contentLength() > 0)
+                {
+                    float range = (float)(index + len) / (float)request->contentLength();
+                    FLD.setEffectWidthRange(range);
+                    RLD.setEffectWidthRange(range);
+                }
+            }
+            if (final)
+            {
+                Serial.printf("Update complete: %u bytes\n", index + len);
+                if (Update.end(true))
+                {
+                    Serial.println("Update Success. Rebooting...");
+                }
+                else
+                {
+                    Update.printError(Serial);
+                }
+            }
+        });
+
+    // Start the server
+    asyncServer.begin();
+    Serial.println("[AsyncWeb] Server started on port 80");
+}
+
+// ---------------------------------------------------------------
+// Call from eventLoopTask to clean up dead WS clients periodically
+// ---------------------------------------------------------------
+static void asyncWebLoop()
+{
+    ws.cleanupClients();
+}
+
+// ---------------------------------------------------------------
+// Broadcast state to all connected WebSocket clients
+// ---------------------------------------------------------------
+static void broadcastState()
+{
+    if (ws.count() > 0)
+    {
+        String json = "{\"type\":\"state\",\"data\":" + buildStateJson() + "}";
+        ws.textAll(json);
+    }
+}
+
+#endif // ASYNC_WEB_INTERFACE_H
