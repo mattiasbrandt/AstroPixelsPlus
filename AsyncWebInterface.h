@@ -7,6 +7,7 @@
 
 #include <ESPAsyncWebServer.h>
 #include <Update.h>
+#include <Wire.h>
 #include "SPIFFS.h"
 
 // Forward declarations — these are defined in AstroPixelsPlus.ino
@@ -74,6 +75,74 @@ static String buildStateJson()
 }
 
 // ---------------------------------------------------------------
+// Probe an I2C address — returns true if device ACKs
+// ---------------------------------------------------------------
+static bool probeI2C(uint8_t addr)
+{
+    Wire.beginTransmission(addr);
+    return (Wire.endTransmission() == 0);
+}
+
+// ---------------------------------------------------------------
+// Build health JSON string
+// ---------------------------------------------------------------
+static String buildHealthJson()
+{
+    String json = "{";
+
+    // I2C device probes
+    bool panelsOk = probeI2C(0x40);   // PCA9685 — dome panels
+    bool holosOk  = probeI2C(0x41);   // PCA9685 — holo servos
+    json += "\"i2c_panels\":" + String(panelsOk ? "true" : "false");
+    json += ",\"i2c_holos\":" + String(holosOk ? "true" : "false");
+
+    // Sound module — check if not disabled
+    // sMarcSound is the global MarcSound instance in .ino
+    // We can't easily check module state from here without another extern,
+    // so we report it based on preference config
+    String soundPref = preferences.getString("msound", "0");
+    bool soundEnabled = (soundPref != "0");
+    json += ",\"sound_module\":" + String(soundEnabled ? "true" : "false");
+
+    // WiFi
+    json += ",\"wifi\":" + String(wifiEnabled ? "true" : "false");
+
+    // Droid Remote
+#ifdef USE_DROID_REMOTE
+    json += ",\"remote\":" + String(sRemoteConnected ? "true" : "false");
+    json += ",\"remote_enabled\":" + String(remoteEnabled ? "true" : "false");
+#else
+    json += ",\"remote\":false";
+    json += ",\"remote_enabled\":false";
+#endif
+
+    // SPIFFS
+    json += ",\"spiffs\":true"; // If we got this far, SPIFFS is mounted
+
+    // Free heap
+    json += ",\"freeHeap\":" + String(ESP.getFreeHeap());
+    json += ",\"uptime\":" + String(millis() / 1000);
+
+    // I2C scan — list all responding addresses
+    json += ",\"i2c_devices\":[";
+    bool firstDev = true;
+    for (uint8_t addr = 1; addr < 127; addr++)
+    {
+        Wire.beginTransmission(addr);
+        if (Wire.endTransmission() == 0)
+        {
+            if (!firstDev) json += ",";
+            firstDev = false;
+            json += "\"0x" + String(addr, HEX) + "\"";
+        }
+    }
+    json += "]";
+
+    json += "}";
+    return json;
+}
+
+// ---------------------------------------------------------------
 // Initialize the async web server
 // Call from setup() after WiFi is configured
 // ---------------------------------------------------------------
@@ -106,6 +175,12 @@ static void initAsyncWeb()
     asyncServer.on("/api/state", HTTP_GET, [](AsyncWebServerRequest *request)
     {
         request->send(200, "application/json", buildStateJson());
+    });
+
+    // ---- REST API: Get health ----
+    asyncServer.on("/api/health", HTTP_GET, [](AsyncWebServerRequest *request)
+    {
+        request->send(200, "application/json", buildHealthJson());
     });
 
     // ---- REST API: Read preferences ----
