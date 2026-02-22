@@ -9,6 +9,7 @@
 #include <Update.h>
 #include <Wire.h>
 #include "SPIFFS.h"
+#include "LogCapture.h"
 
 // Forward declarations — these are defined in AstroPixelsPlus.ino
 extern void reboot();
@@ -29,6 +30,10 @@ extern bool sRemoteConnected;
 static AsyncWebServer asyncServer(80);
 static AsyncWebSocket ws("/ws");
 
+// Log capture — wraps Serial, tees output to ring buffer for WS broadcast
+static LogCapture logCapture(Serial);
+static uint32_t lastLogCount = 0;
+
 // ---------------------------------------------------------------
 // WebSocket event handler
 // ---------------------------------------------------------------
@@ -37,12 +42,12 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
 {
     if (type == WS_EVT_CONNECT)
     {
-        Serial.printf("[WS] Client #%u connected from %s\n", client->id(),
-                      client->remoteIP().toString().c_str());
+        logCapture.printf("[WS] Client #%u connected from %s\n", client->id(),
+                         client->remoteIP().toString().c_str());
     }
     else if (type == WS_EVT_DISCONNECT)
     {
-        Serial.printf("[WS] Client #%u disconnected\n", client->id());
+        logCapture.printf("[WS] Client #%u disconnected\n", client->id());
     }
     else if (type == WS_EVT_DATA)
     {
@@ -161,7 +166,7 @@ static void initAsyncWeb()
         if (request->hasParam("cmd", true))
         {
             String cmd = request->getParam("cmd", true)->value();
-            Serial.printf("[API] cmd: %s\n", cmd.c_str());
+            logCapture.printf("[API] cmd: %s\n", cmd.c_str());
             Marcduino::processCommand(player, cmd.c_str());
             request->send(200, "application/json", "{\"ok\":true}");
         }
@@ -181,6 +186,24 @@ static void initAsyncWeb()
     asyncServer.on("/api/health", HTTP_GET, [](AsyncWebServerRequest *request)
     {
         request->send(200, "application/json", buildHealthJson());
+    });
+
+    // ---- REST API: Get log lines ----
+    asyncServer.on("/api/logs", HTTP_GET, [](AsyncWebServerRequest *request)
+    {
+        String json = "{\"lines\":[";
+        int count = logCapture.lineCount();
+        for (int i = 0; i < count; i++)
+        {
+            if (i > 0) json += ",";
+            // Escape special chars in log line
+            String line = logCapture.getLine(i);
+            line.replace("\\", "\\\\");
+            line.replace("\"", "\\\"");
+            json += "\"" + line + "\"";
+        }
+        json += "]}";
+        request->send(200, "application/json", json);
     });
 
     // ---- REST API: Read preferences ----
@@ -227,13 +250,13 @@ static void initAsyncWeb()
             // Special key: factory reset
             if (key == "_clear")
             {
-                Serial.println("[API] Factory reset — clearing all preferences");
+                logCapture.println("[API] Factory reset — clearing all preferences");
                 preferences.clear();
             }
             else
             {
                 preferences.putString(key.c_str(), val);
-                Serial.printf("[API] pref: %s = %s\n", key.c_str(), val.c_str());
+                logCapture.printf("[API] pref: %s = %s\n", key.c_str(), val.c_str());
             }
 
             bool needsReboot = request->hasParam("reboot", true) &&
@@ -294,7 +317,7 @@ static void initAsyncWeb()
                 RLD.selectSequence(LogicEngineDefaults::NORMAL);
                 FLD.setEffectWidthRange(0);
                 RLD.setEffectWidthRange(0);
-                Serial.printf("Update: %s\n", filename.c_str());
+                logCapture.printf("Update: %s\n", filename.c_str());
                 if (!Update.begin(request->contentLength()))
                 {
                     Update.printError(Serial);
@@ -316,10 +339,10 @@ static void initAsyncWeb()
             }
             if (final)
             {
-                Serial.printf("Update complete: %u bytes\n", index + len);
+                logCapture.printf("Update complete: %u bytes\n", index + len);
                 if (Update.end(true))
                 {
-                    Serial.println("Update Success. Rebooting...");
+                    logCapture.println("Update Success. Rebooting...");
                 }
                 else
                 {
@@ -330,15 +353,31 @@ static void initAsyncWeb()
 
     // Start the server
     asyncServer.begin();
-    Serial.println("[AsyncWeb] Server started on port 80");
+    logCapture.println("[AsyncWeb] Server started on port 80");
 }
 
 // ---------------------------------------------------------------
-// Call from eventLoopTask to clean up dead WS clients periodically
+// Call from eventLoopTask to clean up dead WS clients and
+// broadcast new log lines
 // ---------------------------------------------------------------
 static void asyncWebLoop()
 {
     ws.cleanupClients();
+
+    // Broadcast new log lines to WebSocket clients
+    if (ws.count() > 0 && logCapture.hasNewLine(lastLogCount))
+    {
+        const char *line = logCapture.getNewestLine();
+        if (line[0] != '\0')
+        {
+            // Escape special chars for JSON
+            String escaped = line;
+            escaped.replace("\\", "\\\\");
+            escaped.replace("\"", "\\\"");
+            String json = "{\"type\":\"log\",\"line\":\"" + escaped + "\"}";
+            ws.textAll(json);
+        }
+    }
 }
 
 // ---------------------------------------------------------------
@@ -351,6 +390,14 @@ static void broadcastState()
         String json = "{\"type\":\"state\",\"data\":" + buildStateJson() + "}";
         ws.textAll(json);
     }
+}
+
+// ---------------------------------------------------------------
+// Get the LogCapture instance — used in .ino to redirect Serial
+// ---------------------------------------------------------------
+static LogCapture &getLogCapture()
+{
+    return logCapture;
 }
 
 #endif // ASYNC_WEB_INTERFACE_H

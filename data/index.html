@@ -61,6 +61,23 @@
     <div class="i2c-list" id="i2c-list"></div>
   </div>
 
+  <!-- Live Log Console -->
+  <div class="card">
+    <h3>Live Log Console</h3>
+    <div id="log-wrap" style="position:relative;">
+      <pre id="log-console" style="
+        background:var(--bg); color:var(--silver); border:1px solid var(--border);
+        border-radius:4px; padding:8px; font-size:0.75em; line-height:1.4;
+        height:180px; overflow-y:auto; white-space:pre-wrap; word-break:break-all;
+      "></pre>
+      <div id="log-paused" style="
+        display:none; position:absolute; top:4px; right:12px;
+        background:var(--warning); color:var(--bg); padding:2px 8px;
+        border-radius:3px; font-size:0.7em; font-weight:600;
+      ">PAUSED</div>
+    </div>
+  </div>
+
   <!-- System Status -->
   <div class="card">
     <h3>System</h3>
@@ -106,6 +123,41 @@
       }
       document.getElementById('sys-status').innerHTML = html;
     }
+
+    // --- Log Console ---
+    var logEl = document.getElementById('log-console');
+    var logPaused = document.getElementById('log-paused');
+    var logAutoScroll = true;
+    var LOG_MAX_LINES = 200;
+
+    // Detect user scroll — pause auto-scroll when scrolled up
+    logEl.addEventListener('scroll', function() {
+      var atBottom = (logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight) < 20;
+      logAutoScroll = atBottom;
+      logPaused.style.display = atBottom ? 'none' : 'block';
+    });
+
+    function appendLogLine(text) {
+      logEl.textContent += text + '\n';
+      // Trim old lines if too many
+      var lines = logEl.textContent.split('\n');
+      if (lines.length > LOG_MAX_LINES + 50) {
+        logEl.textContent = lines.slice(lines.length - LOG_MAX_LINES).join('\n');
+      }
+      if (logAutoScroll) {
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+    }
+
+    // WebSocket log handler
+    window.onLogLine = appendLogLine;
+
+    // Fetch initial log buffer
+    fetch('/api/logs').then(function(r){return r.json();}).then(function(data){
+      if (data.lines) {
+        data.lines.forEach(function(line) { appendLogLine(line); });
+      }
+    }).catch(function(){});
 
     // Initial fetch
     fetchState(updateStatus);
