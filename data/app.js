@@ -138,6 +138,7 @@
     if (m) return 'Turn ' + holoName(m[1]) + ' light on';
     m = cmd.match(/^\*OF0([1-3])$/);
     if (m) return 'Turn ' + holoName(m[1]) + ' light off';
+    if (cmd === '*OF04') return 'Turn radar eye light off';
     m = cmd.match(/^\*RD0([1-3])$/);
     if (m) return 'Random servo movement for ' + holoName(m[1]);
     m = cmd.match(/^\*HW0([1-3])$/);
@@ -147,6 +148,13 @@
 
     m = cmd.match(/^\*HPS[36]0([1-3])$/);
     if (m) return 'LED effect for ' + holoName(m[1]);
+    m = cmd.match(/^\*HRS([346R])$/);
+    if (m) {
+      if (m[1] === '3') return 'Radar eye pulse effect';
+      if (m[1] === 'R') return 'Radar eye red pulse effect';
+      if (m[1] === '6') return 'Radar eye rainbow effect';
+      if (m[1] === '4') return 'Radar eye color-cycle effect';
+    }
     m = cmd.match(/^\*HP([0-8])0([1-3])$/);
     if (m) return 'Set ' + holoName(m[2]) + ' position preset ' + m[1];
 
