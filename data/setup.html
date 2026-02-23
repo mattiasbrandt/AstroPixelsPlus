@@ -28,7 +28,44 @@
     </div>
   </div>
 
+  <div class="card">
+    <h3>Write API Token (Optional)</h3>
+    <div class="desc">Used by this browser when write endpoints are protected</div>
+    <div style="display:flex; gap:6px; margin-top:8px; align-items:center;">
+      <input type="password" id="api-token" placeholder="Enter token..." style="flex:1;">
+      <button class="btn accent" onclick="saveApiToken()">Save</button>
+      <button class="btn danger" onclick="clearApiToken()">Clear</button>
+    </div>
+    <div class="desc" id="api-token-status" style="margin-top:8px;">Not set</div>
+  </div>
+
   <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>
   <script src="/app.js"></script>
+  <script>
+    function refreshTokenStatus() {
+      var token = getApiToken();
+      var el = document.getElementById('api-token-status');
+      if (token) {
+        el.textContent = 'Token stored in this browser';
+      } else {
+        el.textContent = 'Not set';
+      }
+    }
+
+    function saveApiToken() {
+      var token = document.getElementById('api-token').value.trim();
+      setApiToken(token);
+      refreshTokenStatus();
+      alert(token ? 'Token saved in browser.' : 'Token cleared.');
+    }
+
+    function clearApiToken() {
+      setApiToken('');
+      document.getElementById('api-token').value = '';
+      refreshTokenStatus();
+    }
+
+    refreshTokenStatus();
+  </script>
 </body>
 </html>

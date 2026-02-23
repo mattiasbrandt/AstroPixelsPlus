@@ -51,6 +51,47 @@
     }
   }
 
+  function getApiToken() {
+    try {
+      return localStorage.getItem('apitoken') || '';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  window.getApiToken = getApiToken;
+
+  window.setApiToken = function(token) {
+    try {
+      if (token) localStorage.setItem('apitoken', token);
+      else localStorage.removeItem('apitoken');
+    } catch (e) {}
+  };
+
+  function withWriteAuthHeaders(headers) {
+    var merged = headers || {};
+    var token = getApiToken();
+    if (token) {
+      merged['X-AP-Token'] = token;
+    }
+    return merged;
+  }
+
+  window.apiPostForm = function(path, body) {
+    return fetch(path, {
+      method: 'POST',
+      headers: withWriteAuthHeaders({'Content-Type': 'application/x-www-form-urlencoded'}),
+      body: body
+    });
+  };
+
+  window.apiPost = function(path, options) {
+    var opts = options || {};
+    opts.method = 'POST';
+    opts.headers = withWriteAuthHeaders(opts.headers || {});
+    return fetch(path, opts);
+  };
+
   function holoName(id) {
     if (id === '1') return 'front holo';
     if (id === '2') return 'rear holo';
@@ -192,11 +233,7 @@
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(cmd);
     } else {
-      fetch('/api/cmd', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'cmd=' + encodeURIComponent(cmd)
-      }).catch(function(){});
+      apiPostForm('/api/cmd', 'cmd=' + encodeURIComponent(cmd)).catch(function(){});
     }
     // Brief visual feedback on the clicked button
     var ev = (typeof event !== 'undefined') ? event : null;

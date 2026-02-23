@@ -36,8 +36,8 @@
   <div class="card">
     <h3>System</h3>
     <div class="btn-grid">
-      <button class="btn" onclick="if(confirm('Reboot the controller?')){fetch('/api/reboot',{method:'POST'});document.getElementById('conn-status').innerHTML='<span class=dot yellow></span>Rebooting...';}">Reboot</button>
-      <button class="btn danger" onclick="if(confirm('Clear ALL preferences and reboot? This resets WiFi, sound, and remote settings to defaults.')){fetch('/api/pref',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'key=_clear&val=1&reboot=1'});}">Factory Reset</button>
+      <button class="btn" onclick="if(confirm('Reboot the controller?')){apiPost('/api/reboot');document.getElementById('conn-status').innerHTML='<span class=dot yellow></span>Rebooting...';}">Reboot</button>
+      <button class="btn danger" onclick="if(confirm('Clear ALL preferences and reboot? This resets WiFi, sound, and remote settings to defaults.')){apiPostForm('/api/pref','key=_clear&val=1&reboot=1');}">Factory Reset</button>
     </div>
   </div>
 
@@ -56,6 +56,8 @@
 
       var xhr = new XMLHttpRequest();
       xhr.open('POST', '/upload/firmware');
+      var token = getApiToken();
+      if (token) xhr.setRequestHeader('X-AP-Token', token);
 
       xhr.upload.onprogress = function(e) {
         if (e.lengthComputable) {

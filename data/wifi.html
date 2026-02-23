@@ -74,7 +74,7 @@
         chain = chain.then(function() {
           var body = 'key=' + encodeURIComponent(p.key) + '&val=' + encodeURIComponent(p.val);
           if (i === prefs.length - 1) body += '&reboot=1';
-          return fetch('/api/pref', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:body});
+          return apiPostForm('/api/pref', body);
         });
       });
       chain.then(function(){
