@@ -47,13 +47,13 @@
     <div style="margin-top:8px;">
       <span style="color:var(--text-dim); font-size:0.8em;">Scroll Text (Top half):</span>
       <div style="display:flex; gap:4px; margin-top:4px;">
-        <input type="text" id="fld-top-text" placeholder="Enter text..."
+        <input type="text" id="fld-top-text" placeholder="Enter text..." maxlength="58"
                style="flex:1; padding:8px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; font-size:0.85em;">
         <button class="btn" onclick="sendCmd('@1M'+document.getElementById('fld-top-text').value)">Send</button>
       </div>
       <span style="color:var(--text-dim); font-size:0.8em;">Scroll Text (Bottom half):</span>
       <div style="display:flex; gap:4px; margin-top:4px;">
-        <input type="text" id="fld-bot-text" placeholder="Enter text..."
+        <input type="text" id="fld-bot-text" placeholder="Enter text..." maxlength="58"
                style="flex:1; padding:8px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; font-size:0.85em;">
         <button class="btn" onclick="sendCmd('@2M'+document.getElementById('fld-bot-text').value)">Send</button>
       </div>
@@ -80,7 +80,7 @@
     <div style="margin-top:8px;">
       <span style="color:var(--text-dim); font-size:0.8em;">Scroll Text:</span>
       <div style="display:flex; gap:4px; margin-top:4px;">
-        <input type="text" id="rld-text" placeholder="Enter text..."
+        <input type="text" id="rld-text" placeholder="Enter text..." maxlength="60"
                style="flex:1; padding:8px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; font-size:0.85em;">
         <button class="btn" onclick="sendCmd('@3M'+document.getElementById('rld-text').value)">Send</button>
       </div>

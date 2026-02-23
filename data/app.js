@@ -136,16 +136,34 @@
     return '';
   }
 
+  function extractCommandFromButton(btn) {
+    var direct = btn.getAttribute('data-cmd');
+    if (direct) return direct;
+
+    var onClick = btn.getAttribute('onclick') || '';
+    var match = onClick.match(/sendCmd\((['"])(.*?)\1\)/);
+    if (!match) return '';
+    return match[2] || '';
+  }
+
+  function isValidManualCommand(cmd) {
+    if (!cmd || cmd.length > 63) return false;
+    for (var i = 0; i < cmd.length; i++) {
+      var cc = cmd.charCodeAt(i);
+      if (cc < 32 || cc > 126) return false;
+    }
+    return true;
+  }
+
   function enhanceTooltips() {
     var buttons = document.querySelectorAll('button[onclick]');
     for (var i = 0; i < buttons.length; i++) {
       var btn = buttons[i];
       if (btn.getAttribute('title')) continue;
-      var onClick = btn.getAttribute('onclick') || '';
-      var match = onClick.match(/sendCmd\('([^']+)'\)/);
-      if (!match) continue;
-      var tip = describeCommand(match[1]);
-      if (tip) btn.setAttribute('title', tip + ' (' + match[1] + ')');
+      var cmd = extractCommandFromButton(btn);
+      if (!cmd) continue;
+      var tip = describeCommand(cmd);
+      if (tip) btn.setAttribute('title', tip + ' (' + cmd + ')');
     }
 
     var linkTips = {
@@ -167,6 +185,9 @@
 
   // --- Command sender ---
   window.sendCmd = function(cmd) {
+    if (!isValidManualCommand(cmd)) {
+      return;
+    }
     // Try WebSocket first for lower latency, fall back to REST
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(cmd);
@@ -178,8 +199,9 @@
       }).catch(function(){});
     }
     // Brief visual feedback on the clicked button
-    if (event && event.target) {
-      var btn = event.target;
+    var ev = (typeof event !== 'undefined') ? event : null;
+    if (ev && ev.target) {
+      var btn = ev.target;
       btn.style.background = '#0088aa';
       setTimeout(function() { btn.style.background = ''; }, 150);
     }

@@ -86,6 +86,7 @@
         type="text"
         id="manual-cmd"
         placeholder="Enter command..."
+        maxlength="63"
         title="Type a raw Marcduino command and press Enter or Send"
         style="flex:1;"
         onkeydown="if(event.key==='Enter'){var c=this.value.trim(); if(c){sendCmd(c); this.value='';}}"
