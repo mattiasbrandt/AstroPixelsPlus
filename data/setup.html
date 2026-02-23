@@ -19,24 +19,24 @@
 
   <div class="card">
     <h3>Settings</h3>
-    <div style="display:flex; flex-direction:column; gap:6px;">
-      <a href="/wifi.html" class="btn" style="text-decoration:none; text-align:left;">WiFi Configuration</a>
-      <a href="/serial.html" class="btn" style="text-decoration:none; text-align:left;">Serial / Marcduino</a>
-      <a href="/sound.html" class="btn" style="text-decoration:none; text-align:left;">Sound Player</a>
-      <a href="/remote.html" class="btn" style="text-decoration:none; text-align:left;">Droid Remote (ESPNOW)</a>
-      <a href="/firmware.html" class="btn" style="text-decoration:none; text-align:left;">Firmware Update</a>
+    <div class="stack-6">
+      <a href="/wifi.html" class="btn link-btn">WiFi Configuration</a>
+      <a href="/serial.html" class="btn link-btn">Serial / Marcduino</a>
+      <a href="/sound.html" class="btn link-btn">Sound Player</a>
+      <a href="/remote.html" class="btn link-btn">Droid Remote (ESPNOW)</a>
+      <a href="/firmware.html" class="btn link-btn">Firmware Update</a>
     </div>
   </div>
 
   <div class="card">
     <h3>Write API Token (Optional)</h3>
     <div class="desc">Used by this browser when write endpoints are protected</div>
-    <div style="display:flex; gap:6px; margin-top:8px; align-items:center;">
-      <input type="password" id="api-token" placeholder="Enter token..." style="flex:1;">
+    <div class="row mt-8">
+      <input type="password" id="api-token" placeholder="Enter token..." class="flex-1">
       <button class="btn accent" onclick="saveApiToken()">Save</button>
       <button class="btn danger" onclick="clearApiToken()">Clear</button>
     </div>
-    <div class="desc" id="api-token-status" style="margin-top:8px;">Not set</div>
+    <div class="desc mt-8" id="api-token-status">Not set</div>
   </div>
 
   <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>

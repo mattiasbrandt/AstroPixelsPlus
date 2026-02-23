@@ -20,7 +20,7 @@
   <!-- Stop -->
   <div class="card">
     <div class="btn-grid">
-      <button class="btn danger" onclick="sendCmd(':SE00')" style="width:100%;">Stop All Sequences</button>
+      <button class="btn danger w-100" onclick="sendCmd(':SE00')">Stop All Sequences</button>
     </div>
   </div>
 
@@ -29,56 +29,56 @@
     <h3>Full Choreography</h3>
     <div class="desc">Coordinated panels, logics, holos, and sound</div>
 
-    <div style="margin-top:10px;">
-      <button class="btn" onclick="sendCmd(':SE01')" style="width:100%; text-align:left;">
+    <div class="mt-10">
+      <button class="btn btn-full-left" onclick="sendCmd(':SE01')">
         <strong>Scream</strong>
         <div class="desc">Alarm logics (3s) + scream sound + all panels open/close</div>
       </button>
     </div>
-    <div style="margin-top:4px;">
-      <button class="btn" onclick="sendCmd(':SE02')" style="width:100%; text-align:left;">
+    <div class="mt-4">
+      <button class="btn btn-full-left" onclick="sendCmd(':SE02')">
         <strong>Wave</strong>
         <div class="desc">Sound + sequential panel wave animation</div>
       </button>
     </div>
-    <div style="margin-top:4px;">
-      <button class="btn" onclick="sendCmd(':SE03')" style="width:100%; text-align:left;">
+    <div class="mt-4">
+      <button class="btn btn-full-left" onclick="sendCmd(':SE03')">
         <strong>Smirk / Fast Wave</strong>
         <div class="desc">Sound + fast panel wave</div>
       </button>
     </div>
-    <div style="margin-top:4px;">
-      <button class="btn" onclick="sendCmd(':SE04')" style="width:100%; text-align:left;">
+    <div class="mt-4">
+      <button class="btn btn-full-left" onclick="sendCmd(':SE04')">
         <strong>Open/Close Wave</strong>
         <div class="desc">Sound + panel open/close wave</div>
       </button>
     </div>
-    <div style="margin-top:4px;">
-      <button class="btn" onclick="sendCmd(':SE05')" style="width:100%; text-align:left;">
+    <div class="mt-4">
+      <button class="btn btn-full-left" onclick="sendCmd(':SE05')">
         <strong>Beep Cantina</strong>
         <div class="desc">Beep cantina + fire logics + holo short circuit + marching ants (15s)</div>
       </button>
     </div>
-    <div style="margin-top:4px;">
-      <button class="btn" onclick="sendCmd(':SE06')" style="width:100%; text-align:left;">
+    <div class="mt-4">
+      <button class="btn btn-full-left" onclick="sendCmd(':SE06')">
         <strong>Short Circuit</strong>
         <div class="desc">Alarm, scream, failure logics + holo circuit + smoke + sparks, fakes death (8s)</div>
       </button>
     </div>
-    <div style="margin-top:4px;">
-      <button class="btn" onclick="sendCmd(':SE07')" style="width:100%; text-align:left;">
+    <div class="mt-4">
+      <button class="btn btn-full-left" onclick="sendCmd(':SE07')">
         <strong>Cantina Dance</strong>
         <div class="desc">Orchestral cantina + disco logics + holo circuit + panel dance (46s)</div>
       </button>
     </div>
-    <div style="margin-top:4px;">
-      <button class="btn" onclick="sendCmd(':SE08')" style="width:100%; text-align:left;">
+    <div class="mt-4">
+      <button class="btn btn-full-left" onclick="sendCmd(':SE08')">
         <strong>Leia Message</strong>
         <div class="desc">Leia sound + Leia logics + front holo on (45s)</div>
       </button>
     </div>
-    <div style="margin-top:4px;">
-      <button class="btn" onclick="sendCmd(':SE09')" style="width:100%; text-align:left;">
+    <div class="mt-4">
+      <button class="btn btn-full-left" onclick="sendCmd(':SE09')">
         <strong>Disco</strong>
         <div class="desc">Disco sound + panel dance + FLD rainbow + RLD "STAR WARS" scroll (45s)</div>
       </button>
@@ -89,20 +89,20 @@
   <div class="card">
     <h3>Special Sequences</h3>
 
-    <div style="margin-top:4px;">
-      <button class="btn" onclick="sendCmd('$815')" style="width:100%; text-align:left;">
+    <div class="mt-4">
+      <button class="btn btn-full-left" onclick="sendCmd('$815')">
         <strong>Harlem Shake</strong>
         <div class="desc">Fire logics + holo circuit + shake panels + random steps (26.5s)</div>
       </button>
     </div>
-    <div style="margin-top:4px;">
-      <button class="btn" onclick="sendCmd('$821')" style="width:100%; text-align:left;">
+    <div class="mt-4">
+      <button class="btn btn-full-left" onclick="sendCmd('$821')">
         <strong>Girl on Fire</strong>
         <div class="desc">Panel dance + fire logics + holo + smoke + fire strip (53s)</div>
       </button>
     </div>
-    <div style="margin-top:4px;">
-      <button class="btn" onclick="sendCmd('$720')" style="width:100%; text-align:left;">
+    <div class="mt-4">
+      <button class="btn btn-full-left" onclick="sendCmd('$720')">
         <strong>Yoda Clear Mind</strong>
         <div class="desc">Opens panel group 6 + Yoda LED on holo (15s)</div>
       </button>
@@ -145,9 +145,9 @@
       <button class="btn danger" onclick="sendCmd('$s')">Stop</button>
       <button class="btn danger" onclick="sendCmd('$O')">Mute</button>
     </div>
-    <div style="margin-top:8px;">
-      <span style="color:var(--text-dim); font-size:0.8em;">Volume:</span>
-      <div class="btn-grid" style="margin-top:4px;">
+    <div class="mt-8">
+      <span class="label-dim">Volume:</span>
+      <div class="btn-grid mt-4">
         <button class="btn" onclick="sendCmd('$-')">Vol -</button>
         <button class="btn" onclick="sendCmd('$m')">Mid</button>
         <button class="btn" onclick="sendCmd('$+')">Vol +</button>

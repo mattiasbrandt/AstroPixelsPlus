@@ -21,7 +21,7 @@
   <div class="card">
     <h3>Both Logics (FLD + RLD)</h3>
     <div class="desc">Sets both front and rear logic displays simultaneously</div>
-    <div class="btn-grid" style="margin-top:8px;">
+    <div class="btn-grid mt-8">
       <button class="btn accent" onclick="sendCmd('@0T1')">Normal</button>
       <button class="btn" onclick="sendCmd('@0T2')">Flash</button>
       <button class="btn" onclick="sendCmd('@0T3')">Alarm</button>
@@ -44,21 +44,21 @@
       <button class="btn" onclick="sendCmd('@1T6')">Leia</button>
       <button class="btn" onclick="sendCmd('@1T11')">March</button>
     </div>
-    <div style="margin-top:8px;">
-      <span style="color:var(--text-dim); font-size:0.8em;">Scroll Text (Top half):</span>
-      <div style="display:flex; gap:4px; margin-top:4px;">
+    <div class="mt-8">
+      <span class="label-dim">Scroll Text (Top half):</span>
+      <div class="row mt-4">
         <input type="text" id="fld-top-text" placeholder="Enter text..." maxlength="58"
-               style="flex:1; padding:8px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; font-size:0.85em;">
+               class="flex-1">
         <button class="btn" onclick="sendCmd('@1M'+document.getElementById('fld-top-text').value)">Send</button>
       </div>
-      <span style="color:var(--text-dim); font-size:0.8em;">Scroll Text (Bottom half):</span>
-      <div style="display:flex; gap:4px; margin-top:4px;">
+      <span class="label-dim">Scroll Text (Bottom half):</span>
+      <div class="row mt-4">
         <input type="text" id="fld-bot-text" placeholder="Enter text..." maxlength="58"
-               style="flex:1; padding:8px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; font-size:0.85em;">
+               class="flex-1">
         <button class="btn" onclick="sendCmd('@2M'+document.getElementById('fld-bot-text').value)">Send</button>
       </div>
-      <div style="margin-top:6px;">
-        <span style="color:var(--text-dim); font-size:0.8em;">Font:</span>
+      <div class="mt-6">
+        <span class="label-dim">Font:</span>
         <button class="btn" onclick="sendCmd('@1P60');sendCmd('@2P60')">Latin</button>
         <button class="btn" onclick="sendCmd('@1P61');sendCmd('@2P61')">Aurabesh</button>
       </div>
@@ -77,15 +77,15 @@
       <button class="btn" onclick="sendCmd('@2T6')">Leia</button>
       <button class="btn" onclick="sendCmd('@2T11')">March</button>
     </div>
-    <div style="margin-top:8px;">
-      <span style="color:var(--text-dim); font-size:0.8em;">Scroll Text:</span>
-      <div style="display:flex; gap:4px; margin-top:4px;">
+    <div class="mt-8">
+      <span class="label-dim">Scroll Text:</span>
+      <div class="row mt-4">
         <input type="text" id="rld-text" placeholder="Enter text..." maxlength="60"
-               style="flex:1; padding:8px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; font-size:0.85em;">
+               class="flex-1">
         <button class="btn" onclick="sendCmd('@3M'+document.getElementById('rld-text').value)">Send</button>
       </div>
-      <div style="margin-top:6px;">
-        <span style="color:var(--text-dim); font-size:0.8em;">Font:</span>
+      <div class="mt-6">
+        <span class="label-dim">Font:</span>
         <button class="btn" onclick="sendCmd('@3P60')">Latin</button>
         <button class="btn" onclick="sendCmd('@3P61')">Aurabesh</button>
       </div>
@@ -97,7 +97,7 @@
     <h3>PSI Indicators</h3>
     <div class="desc">Process State Indicators (front and rear)</div>
 
-    <div style="margin-top:8px; color:var(--text-dim); font-size:0.8em;">Both</div>
+    <div class="label-dim mt-8">Both</div>
     <div class="btn-grid">
       <button class="btn" title="Normal" onclick="sendCmd('@0P1')">Normal</button>
       <button class="btn" title="Flash" onclick="sendCmd('@0P2')">Flash</button>
@@ -108,7 +108,7 @@
       <button class="btn" title="March" onclick="sendCmd('@0P11')">March</button>
     </div>
 
-    <div style="margin-top:8px; color:var(--text-dim); font-size:0.8em;">Front</div>
+    <div class="label-dim mt-8">Front</div>
     <div class="btn-grid">
       <button class="btn" title="Normal" onclick="sendCmd('@1P1')">Normal</button>
       <button class="btn" title="Flash" onclick="sendCmd('@1P2')">Flash</button>
@@ -119,8 +119,8 @@
       <button class="btn" title="March" onclick="sendCmd('@1P11')">March</button>
     </div>
 
-    <div style="margin-top:8px; color:var(--text-dim); font-size:0.8em;">Rear</div>
-    <div class="btn-grid" style="margin-bottom:0;">
+    <div class="label-dim mt-8">Rear</div>
+    <div class="btn-grid mb-0">
       <button class="btn" title="Normal" onclick="sendCmd('@2P1')">Normal</button>
       <button class="btn" title="Flash" onclick="sendCmd('@2P2')">Flash</button>
       <button class="btn" title="Alarm" onclick="sendCmd('@2P3')">Alarm</button>
