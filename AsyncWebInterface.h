@@ -9,6 +9,7 @@
 #include <Update.h>
 #include <Wire.h>
 #include <WiFi.h>
+#include <ctype.h>
 #include "SPIFFS.h"
 #include "LogCapture.h"
 
@@ -38,10 +39,110 @@ static uint32_t lastLogCount = 0;
 // Broadcast timers
 static uint32_t lastStateBroadcast = 0;
 static uint32_t lastHealthBroadcast = 0;
+static bool authWarningLogged = false;
 
 // Forward declarations
 static void broadcastState();
 static void broadcastOtaProgress(float progress);
+
+static bool isAsciiPrintable(char c)
+{
+    return c >= 32 && c <= 126;
+}
+
+static bool isValidCommandString(const String &cmd)
+{
+    if (cmd.length() == 0 || cmd.length() > 63) return false;
+    for (size_t i = 0; i < cmd.length(); i++)
+    {
+        if (!isAsciiPrintable(cmd[i])) return false;
+    }
+    return true;
+}
+
+static bool parseWsCommand(const uint8_t *data, size_t len, char *out, size_t outSize)
+{
+    if (len == 0 || len >= outSize) return false;
+    for (size_t i = 0; i < len; i++)
+    {
+        char c = (char)data[i];
+        if (!isAsciiPrintable(c)) return false;
+    }
+    memcpy(out, data, len);
+    out[len] = '\0';
+    return true;
+}
+
+static bool isSensitivePrefKey(const String &key)
+{
+    return key == "pass" || key == "rsecret";
+}
+
+static bool isAllowedPrefKey(const String &key)
+{
+    return key == "wifi" || key == "ap" || key == "ssid" || key == "pass" ||
+           key == "remote" || key == "rhost" || key == "rsecret" ||
+           key == "mserial2" || key == "mserialpass" || key == "mserial" ||
+           key == "mwifi" || key == "mwifipass" ||
+           key == "msound" || key == "msoundser" || key == "mvolume" ||
+           key == "msoundstart" || key == "mrandom" || key == "mrandommin" ||
+           key == "mrandommax" || key == "apitoken";
+}
+
+static size_t maxPrefValueLen(const String &key)
+{
+    if (key == "ssid" || key == "rhost") return 32;
+    if (key == "pass" || key == "rsecret" || key == "apitoken") return 64;
+    return 16;
+}
+
+static String jsonEscape(const String &in)
+{
+    String out;
+    out.reserve(in.length() + 8);
+    for (size_t i = 0; i < in.length(); i++)
+    {
+        char c = in[i];
+        if (c == '"') out += "\\\"";
+        else if (c == '\\') out += "\\\\";
+        else if (c == '\b') out += "\\b";
+        else if (c == '\f') out += "\\f";
+        else if (c == '\n') out += "\\n";
+        else if (c == '\r') out += "\\r";
+        else if (c == '\t') out += "\\t";
+        else if ((unsigned char)c < 0x20)
+        {
+            const char *hex = "0123456789ABCDEF";
+            out += "\\u00";
+            out += hex[(c >> 4) & 0x0F];
+            out += hex[c & 0x0F];
+        }
+        else out += c;
+    }
+    return out;
+}
+
+static bool checkWriteAuth(AsyncWebServerRequest *request)
+{
+    String token = preferences.getString("apitoken", "");
+    if (token.length() == 0)
+    {
+        if (!authWarningLogged)
+        {
+            logCapture.println("[Auth] Write API token not configured; write endpoints are open");
+            authWarningLogged = true;
+        }
+        return true;
+    }
+
+    if (request->hasHeader("X-AP-Token") && request->getHeader("X-AP-Token")->value() == token)
+        return true;
+
+    if (request->hasParam("token", true) && request->getParam("token", true)->value() == token)
+        return true;
+
+    return false;
+}
 
 // ---------------------------------------------------------------
 // WebSocket event handler
@@ -63,11 +164,12 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
         AwsFrameInfo *info = (AwsFrameInfo *)arg;
         if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT)
         {
-            data[len] = 0;
-            // Treat incoming WS text as Marcduino command
-            Marcduino::processCommand(player, (const char *)data);
-            // Echo command acknowledgment to all clients
-            broadcastState();
+            char cmd[64];
+            if (parseWsCommand(data, len, cmd, sizeof(cmd)))
+            {
+                Marcduino::processCommand(player, cmd);
+                broadcastState();
+            }
         }
     }
 }
@@ -188,10 +290,21 @@ static void initAsyncWeb()
     // ---- REST API: Send Marcduino command ----
     asyncServer.on("/api/cmd", HTTP_POST, [](AsyncWebServerRequest *request)
     {
+        if (!checkWriteAuth(request))
+        {
+            request->send(401, "application/json", "{\"error\":\"unauthorized\"}");
+            return;
+        }
         if (request->hasParam("cmd", true))
         {
             String cmd = request->getParam("cmd", true)->value();
-            logCapture.printf("[API] cmd: %s\n", cmd.c_str());
+            cmd.trim();
+            if (!isValidCommandString(cmd))
+            {
+                request->send(400, "application/json", "{\"error\":\"invalid cmd\"}");
+                return;
+            }
+            logCapture.printf("[API] cmd len=%u\n", (unsigned int)cmd.length());
             Marcduino::processCommand(player, cmd.c_str());
             request->send(200, "application/json", "{\"ok\":true}");
         }
@@ -223,9 +336,7 @@ static void initAsyncWeb()
             if (i > 0) json += ",";
             // Escape special chars in log line
             String line = logCapture.getLine(i);
-            line.replace("\\", "\\\\");
-            line.replace("\"", "\\\"");
-            json += "\"" + line + "\"";
+            json += "\"" + jsonEscape(line) + "\"";
         }
         json += "]}";
         request->send(200, "application/json", json);
@@ -253,19 +364,23 @@ static void initAsyncWeb()
             key.trim();
             if (key.length() > 0)
             {
+                if (!isAllowedPrefKey(key))
+                {
+                    request->send(400, "application/json", "{\"error\":\"invalid key\"}");
+                    return;
+                }
                 if (!first) json += ",";
                 first = false;
                 // Boolean keys: firmware uses getBool/putBool for these
                 if (key == "wifi" || key == "ap" || key == "remote")
                 {
                     bool val = preferences.getBool(key.c_str(), false);
-                    json += "\"" + key + "\":" + (val ? "true" : "false");
+                    json += "\"" + jsonEscape(key) + "\":" + (val ? "true" : "false");
                 }
                 else
                 {
                     String val = preferences.getString(key.c_str(), "");
-                    val.replace("\"", "\\\"");
-                    json += "\"" + key + "\":\"" + val + "\"";
+                    json += "\"" + jsonEscape(key) + "\":\"" + jsonEscape(val) + "\"";
                 }
             }
             start = comma + 1;
@@ -277,16 +392,38 @@ static void initAsyncWeb()
     // ---- REST API: Set preference ----
     asyncServer.on("/api/pref", HTTP_POST, [](AsyncWebServerRequest *request)
     {
+        if (!checkWriteAuth(request))
+        {
+            request->send(401, "application/json", "{\"error\":\"unauthorized\"}");
+            return;
+        }
         if (request->hasParam("key", true) && request->hasParam("val", true))
         {
             String key = request->getParam("key", true)->value();
             String val = request->getParam("val", true)->value();
+            key.trim();
+
+            if (key.length() == 0 || key.length() > 16)
+            {
+                request->send(400, "application/json", "{\"error\":\"invalid key\"}");
+                return;
+            }
 
             // Special key: factory reset
             if (key == "_clear")
             {
                 logCapture.println("[API] Factory reset — clearing all preferences");
                 preferences.clear();
+            }
+            else if (!isAllowedPrefKey(key))
+            {
+                request->send(400, "application/json", "{\"error\":\"key not allowed\"}");
+                return;
+            }
+            else if (val.length() > maxPrefValueLen(key))
+            {
+                request->send(400, "application/json", "{\"error\":\"value too long\"}");
+                return;
             }
             // Boolean keys — firmware uses getBool/putBool
             else if (key == "wifi" || key == "ap" || key == "remote")
@@ -298,7 +435,10 @@ static void initAsyncWeb()
             else
             {
                 preferences.putString(key.c_str(), val);
-                logCapture.printf("[API] pref: %s = %s\n", key.c_str(), val.c_str());
+                if (isSensitivePrefKey(key))
+                    logCapture.printf("[API] pref: %s = <redacted>\n", key.c_str());
+                else
+                    logCapture.printf("[API] pref: %s = %s\n", key.c_str(), val.c_str());
             }
 
             bool needsReboot = request->hasParam("reboot", true) &&
@@ -319,6 +459,11 @@ static void initAsyncWeb()
     // ---- REST API: Reboot ----
     asyncServer.on("/api/reboot", HTTP_POST, [](AsyncWebServerRequest *request)
     {
+        if (!checkWriteAuth(request))
+        {
+            request->send(401, "application/json", "{\"error\":\"unauthorized\"}");
+            return;
+        }
         request->send(200, "application/json", "{\"ok\":true,\"msg\":\"rebooting\"}");
         delay(500);
         reboot();
@@ -329,6 +474,11 @@ static void initAsyncWeb()
         // Response handler (called after upload completes)
         [](AsyncWebServerRequest *request)
         {
+            if (!checkWriteAuth(request))
+            {
+                request->send(401, "text/plain", "Unauthorized");
+                return;
+            }
             otaInProgress = false;
             if (Update.hasError())
             {
@@ -411,18 +561,21 @@ static void asyncWebLoop()
         return;
 
     // Broadcast new log lines to WebSocket clients
-    if (logCapture.hasNewLine(lastLogCount))
+    uint32_t totalLogs = logCapture.totalCount();
+    if (totalLogs > lastLogCount)
     {
-        const char *line = logCapture.getNewestLine();
-        if (line[0] != '\0')
+        uint32_t start = lastLogCount + 1;
+        if (totalLogs - start + 1 > LOG_CAPTURE_MAX_LINES)
+            start = totalLogs - LOG_CAPTURE_MAX_LINES + 1;
+
+        for (uint32_t idx = start; idx <= totalLogs; idx++)
         {
-            // Escape special chars for JSON
-            String escaped = line;
-            escaped.replace("\\", "\\\\");
-            escaped.replace("\"", "\\\"");
-            String json = "{\"type\":\"log\",\"line\":\"" + escaped + "\"}";
+            const char *line = logCapture.getLineByCount(idx);
+            if (line[0] == '\0') continue;
+            String json = "{\"type\":\"log\",\"line\":\"" + jsonEscape(String(line)) + "\"}";
             ws.textAll(json);
         }
+        lastLogCount = totalLogs;
     }
 
     // Periodic state broadcast every 5 seconds

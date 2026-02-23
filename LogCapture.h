@@ -75,6 +75,16 @@ public:
     // Get the latest line index (for detecting new lines)
     uint32_t writeIndex() const { return fWriteIdx; }
 
+    uint32_t totalCount() const { return fCount; }
+
+    const char *getLineByCount(uint32_t count) const
+    {
+        if (count == 0 || count > fCount) return "";
+        if ((fCount - count) >= LOG_CAPTURE_MAX_LINES) return "";
+        int ringIdx = (int)((count - 1) % LOG_CAPTURE_MAX_LINES);
+        return fRing[ringIdx];
+    }
+
     // Flag: new line was added since last check
     bool hasNewLine(uint32_t &lastIdx) const
     {
