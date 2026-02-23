@@ -5,23 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AstroPixels</title>
   <link rel="stylesheet" href="/style.css">
-  <style>
-    .health-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; }
-    .health-item {
-      display:flex; align-items:center; gap:8px;
-      padding:8px 10px; background:var(--bg); border-radius:6px;
-      font-size:0.85em;
-    }
-    .health-item .indicator {
-      width:12px; height:12px; border-radius:50%;
-      background:#555; flex-shrink:0;
-      transition: background 0.3s, box-shadow 0.3s;
-    }
-    .health-item .indicator.ok { background:var(--success); box-shadow:0 0 6px var(--success); }
-    .health-item .indicator.fail { background:var(--danger); box-shadow:0 0 6px var(--danger); }
-    .health-item .indicator.warn { background:var(--warning); box-shadow:0 0 6px var(--warning); }
-    .i2c-list { font-size:0.8em; color:var(--text-dim); margin-top:6px; }
-  </style>
 </head>
 <body>
   <h1>AstroPixels</h1>
@@ -64,31 +47,23 @@
   <!-- Live Log Console -->
   <div class="card">
     <h3 title="Live firmware log stream. Scroll up to pause auto-follow.">Live Log Console</h3>
-    <div id="log-wrap" style="position:relative;">
-      <pre id="log-console" title="Recent runtime logs from the controller" style="
-        background:var(--bg); color:var(--silver); border:1px solid var(--border);
-        border-radius:4px; padding:8px; font-size:0.75em; line-height:1.4;
-        height:180px; overflow-y:auto; white-space:pre-wrap; word-break:break-all;
-      "></pre>
-      <div id="log-paused" title="Auto-scroll paused while viewing older lines" style="
-        display:none; position:absolute; top:4px; right:12px;
-        background:var(--warning); color:var(--bg); padding:2px 8px;
-        border-radius:3px; font-size:0.7em; font-weight:600;
-      ">PAUSED</div>
+    <div id="log-wrap" class="log-wrap">
+      <pre id="log-console" class="log-console" title="Recent runtime logs from the controller"></pre>
+      <div id="log-paused" class="log-paused" title="Auto-scroll paused while viewing older lines">PAUSED</div>
     </div>
   </div>
 
   <div class="card">
     <h3>Manual Command</h3>
     <div class="desc">Send any Marcduino command directly (example: :OP01, *ON00, @0T5)</div>
-    <div style="display:flex; gap:6px; margin-top:8px; align-items:center;">
+    <div class="row mt-8">
       <input
         type="text"
         id="manual-cmd"
         placeholder="Enter command..."
         maxlength="63"
         title="Type a raw Marcduino command and press Enter or Send"
-        style="flex:1;"
+        class="flex-1"
         onkeydown="if(event.key==='Enter'){var c=this.value.trim(); if(c){sendCmd(c); this.value='';}}"
       >
       <button
@@ -102,7 +77,7 @@
   <!-- System Status -->
   <div class="card">
     <h3 title="Live state snapshot: uptime, memory, connectivity, OTA status">System</h3>
-    <div id="sys-status" title="Updates automatically from WebSocket state broadcasts" style="font-size:0.85em; color:var(--text-dim);">Loading...</div>
+    <div id="sys-status" class="sys-status" title="Updates automatically from WebSocket state broadcasts">Loading...</div>
   </div>
 
   <!-- OTA Progress Overlay -->
