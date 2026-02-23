@@ -259,30 +259,30 @@ preferences.getBool(PREFERENCE_WIFI_ENABLED, true);
 
 ### Session State (last updated: 2026-02-23)
 
-**Phases 0-7 implemented and committed** on `feature/async-webserver`.
+**Phases 0-7 implemented and committed** on `feature/async-webserver`, followed by a full hardening + maintainability pass.
 
-Recent commits:
-- `424e1f9` — Phase 7: state sync + polish
-- `2c5db67` — Phase 5: live log console
-- `4cb0780` — Phase 4: health dashboard
-- `60a2d56` — Phase 3: settings pages
-- `34dc273` — Phase 2: control pages
-- `1f1d39a` — Phase 1: async web infrastructure
+Recent improvement commits (newest first):
+- `63f6351` — UI cleanup: remove final inline styles and centralize dashboard/log styling
+- `40d09fb` — Firmware page cleanup: extract OTA progress styles into shared CSS classes
+- `5df886a` — Panels cleanup: replace table inline styles with shared CSS classes
+- `4f58b7d` — Holos accessibility: add labels for icon-only direction controls
+- `557f092` — Web UI maintainability: migrate remaining settings pages off repeated inline styles
+- `a066438` — Web UI feedback: add lightweight toast notifications for invalid/unauthorized writes
+- `e0d0349` — Holos UX alignment: document radar-eye controls and add command descriptions
+- `61d312e` — Web UI maintainability: extract reusable utility classes and reduce inline styles
+- `ff97339` — Web UI auth wiring: add shared token helpers and propagate to write actions
+- `0081d65` — Web UI robustness: resilient tooltip parsing and safer manual command inputs
+- `8e2c29e` — Async API hardening: validate commands/prefs and tighten WS/log handling
 
-**Current step**: Initial improvement pass complete; continue iterative UX polish and hardware validation.
+**Current step**: Web UI initial hardening/polish checkpoint complete; next focus is hardware-in-the-loop validation and any resulting targeted fixes.
 
 **Latest verification**:
-- `pio run -e astropixelsplus` passed (RAM 18.4%, Flash 80.6%)
+- `pio run -e astropixelsplus` passed (RAM 18.4%, Flash 80.8%)
 - `pio run -e astropixelsplus -t buildfs` passed
-- `data/` payload: 71,436 bytes (4.74% of 1,507,328-byte SPIFFS partition)
+- All HTML pages now render without inline `style="..."` attributes (centralized in `data/style.css`)
 
 **Current uncommitted changes (this checkpoint)**:
-- `CLAUDE.md` — local web UI testing workflow documented
-- `data/app.js` — command-aware automatic tooltip generation
-- `data/index.html` — manual command input + tooltip improvements + layout adjustments
-- `data/logics.html` — PSI section reworked into non-overflow grouped controls
-- `data/style.css` — desktop width and button-grid spacing adjustments
-- `tasks/todo.md` — progress/status updated
+- `tasks/todo.md` — session checkpoint/status refreshed
 
 ---
 
