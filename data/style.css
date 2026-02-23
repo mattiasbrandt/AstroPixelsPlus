@@ -291,6 +291,25 @@ table td {
   color: var(--silver);
 }
 
+.panel-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85em;
+}
+
+.panel-head {
+  color: var(--text-dim);
+}
+
+.panel-cell {
+  padding: 4px;
+}
+
+.panel-cell-center {
+  padding: 4px;
+  text-align: center;
+}
+
 /* Scrollable table wrapper — prevents overflow on narrow screens */
 .table-wrap {
   overflow-x: auto;
