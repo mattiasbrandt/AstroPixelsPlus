@@ -51,6 +51,23 @@
     }
   }
 
+  var toastTimer = null;
+  function uiToast(message, kind) {
+    var el = document.getElementById('ui-toast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'ui-toast';
+      el.className = 'ui-toast';
+      document.body.appendChild(el);
+    }
+    el.textContent = message;
+    el.className = 'ui-toast show' + (kind ? (' ' + kind) : '');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function() {
+      el.className = 'ui-toast';
+    }, 1800);
+  }
+
   function getApiToken() {
     try {
       return localStorage.getItem('apitoken') || '';
@@ -82,6 +99,9 @@
       method: 'POST',
       headers: withWriteAuthHeaders({'Content-Type': 'application/x-www-form-urlencoded'}),
       body: body
+    }).then(function(resp) {
+      if (resp.status === 401) uiToast('Write request unauthorized (token required)', 'error');
+      return resp;
     });
   };
 
@@ -89,7 +109,10 @@
     var opts = options || {};
     opts.method = 'POST';
     opts.headers = withWriteAuthHeaders(opts.headers || {});
-    return fetch(path, opts);
+    return fetch(path, opts).then(function(resp) {
+      if (resp.status === 401) uiToast('Write request unauthorized (token required)', 'error');
+      return resp;
+    });
   };
 
   function holoName(id) {
@@ -235,13 +258,16 @@
   // --- Command sender ---
   window.sendCmd = function(cmd) {
     if (!isValidManualCommand(cmd)) {
+      uiToast('Invalid command format', 'warn');
       return;
     }
     // Try WebSocket first for lower latency, fall back to REST
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(cmd);
     } else {
-      apiPostForm('/api/cmd', 'cmd=' + encodeURIComponent(cmd)).catch(function(){});
+      apiPostForm('/api/cmd', 'cmd=' + encodeURIComponent(cmd)).catch(function() {
+        uiToast('Command send failed (network)', 'error');
+      });
     }
     // Brief visual feedback on the clicked button
     var ev = (typeof event !== 'undefined') ? event : null;
