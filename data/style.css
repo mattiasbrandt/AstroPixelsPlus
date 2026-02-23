@@ -386,6 +386,31 @@ table td {
   border-left-color: var(--danger);
 }
 
+.fw-progress {
+  display: none;
+  margin-bottom: 10px;
+}
+
+.fw-progress-track {
+  background: var(--bg);
+  border-radius: 4px;
+  overflow: hidden;
+  height: 20px;
+}
+
+.fw-progress-bar {
+  background: var(--accent);
+  height: 100%;
+  width: 0%;
+  transition: width 0.3s;
+}
+
+.fw-progress-status {
+  font-size: 0.8em;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
 /* Responsive: wider screens get more columns */
 @media (min-width: 400px) {
   .btn { min-width: 74px; }

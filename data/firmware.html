@@ -23,11 +23,11 @@
              class="file-input">
     </div>
 
-    <div id="fw-progress" style="display:none; margin-bottom:10px;">
-      <div style="background:var(--bg); border-radius:4px; overflow:hidden; height:20px;">
-        <div id="fw-bar" style="background:var(--accent); height:100%; width:0%; transition:width 0.3s;"></div>
+    <div id="fw-progress" class="fw-progress">
+      <div class="fw-progress-track">
+        <div id="fw-bar" class="fw-progress-bar"></div>
       </div>
-      <div id="fw-status" style="font-size:0.8em; color:var(--text-dim); margin-top:4px;">Uploading...</div>
+      <div id="fw-status" class="fw-progress-status">Uploading...</div>
     </div>
 
     <button class="btn accent w-100" onclick="uploadFirmware()">Upload &amp; Flash</button>
