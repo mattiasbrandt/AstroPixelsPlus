@@ -1,4 +1,4 @@
-# AstroPixelsPlus Improvements Documentation
+# AstroPixelsPlus Fork Improvements Documentation
 
 This document summarizes all improvements made to the AstroPixelsPlus project to enhance usability, organization, and stability.
 
@@ -8,6 +8,55 @@ This document summarizes all improvements made to the AstroPixelsPlus project to
 
 **Total Lines Modified:** ~822 additions, ~522 deletions across 7 files  
 **Focus Areas:** Web interface reorganization, memory optimization, credenda fork integration, code documentation
+
+---
+
+## 0. 2026 Async Web Migration (Current Architecture)
+
+### Why We Switched From ReelTwo WebPages
+
+The old ReelTwo web UI (`WebPages.h` + `WifiWebServer` + `WButton`) allocated heap during static initialization. On ESP32 this led to a practical button/UI size ceiling and boot instability as the page set grew.
+
+The migration replaced only the web transport/presentation layer with `ESPAsyncWebServer` + SPIFFS UI files:
+
+- `AsyncWebInterface.h` now serves REST + WebSocket endpoints
+- `data/*.html`, `data/style.css`, `data/app.js` now hold UI structure/behavior
+- `WebPages.h` is now legacy/archived (`WebPages.h.bak`)
+
+### Important Clarification: Core Robot Behavior Was Not Rewritten
+
+This migration did **not** replace ReelTwo command handling. It wrapped the existing control path.
+
+All control paths still converge on the same dispatcher:
+
+```
+Serial2 (Marcduino hardware)
+WiFi socket (port 2000)
+REST /api/cmd + WebSocket /ws
+  -> Marcduino::processCommand(player, cmd)
+  -> existing MARCDUINO_ACTION handlers
+  -> existing ReelTwo hardware drivers
+```
+
+So REST/WebSocket is a new input layer on top of existing ReelTwo-era behavior.
+
+### Endpoint Mapping to Existing Runtime/Core Calls
+
+| Endpoint | Method | Runtime/Core Integration |
+|----------|--------|--------------------------|
+| `/api/cmd` | POST | `Marcduino::processCommand(player, cmd)` |
+| `/ws` | WS text | `Marcduino::processCommand(player, cmd)` |
+| `/api/pref` | GET/POST | existing `Preferences` read/write (`get*`, `put*`) |
+| `/api/reboot` | POST | existing `reboot()` path |
+| `/upload/firmware` | POST | existing `Update.*` OTA flow + logic progress rendering |
+| `/api/state` `/api/health` `/api/logs` | GET | snapshot/broadcast wrappers over current runtime state |
+
+### What This Enables
+
+- Removes compile-time widget count limits from firmware code
+- Scales UI by editing SPIFFS web files rather than adding static `WButton` objects
+- Keeps command behavior consistent across Serial2, socket, and web clients
+- Simplifies future UI iteration/testing (`python3 -m http.server 8080 --directory data`)
 
 ---
 

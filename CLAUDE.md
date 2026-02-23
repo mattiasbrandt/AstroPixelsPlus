@@ -54,6 +54,12 @@ Recommended collaboration loop:
 4. Agent tails `/tmp/astropixels-http.log` to catch missing files/404s/runtime serving issues
 5. Iterate until stable, then upload SPIFFS (`pio run -e astropixelsplus -t uploadfs`)
 
+## Fork Documentation Maintenance
+
+When this fork adds or changes behavior (async web routes, UI flows, safety/hardening logic, command mappings, validation rules, etc.), update `FORK_IMPROVEMENTS.md` in the same work cycle.
+
+Keep that file as the fork-specific change log and rationale document so contributors can quickly understand what differs from upstream.
+
 ## Architecture
 
 ### Command Flow
@@ -68,17 +74,33 @@ Web UI button press                       ─┘
 
 Commands are parsed from a **64-byte buffer** (hardcoded in ReelTwo). Commands longer than 63 chars are silently truncated — this is a known architectural constraint.
 
+### Why Async Web Layer Replaced ReelTwo WebPages
+
+The old ReelTwo web UI (`WebPages.h` + `WifiWebServer` + `WButton`) allocated heap during static initialization. On ESP32 this created a hard practical limit (~44 WButtons + a handful of String arrays) and caused boot crashes when the UI grew.
+
+The migration to `AsyncWebInterface.h` solves that by moving UI structure to SPIFFS files (`data/*.html`, `data/app.js`, `data/style.css`) and keeping firmware-side web code minimal.
+
+Important: this migration changed the **transport layer**, not the robot control core.
+
+- Web requests now call async handlers (`/api/cmd`, `/api/pref`, `/api/reboot`, `/upload/firmware`, `/ws`) in `AsyncWebInterface.h`
+- Robot actions still flow through the same core dispatcher: `Marcduino::processCommand(player, cmd)`
+- Existing ReelTwo command handlers (`MarcduinoPanel.h`, `MarcduinoHolo.h`, `MarcduinoLogics.h`, etc.) remain the source of behavior
+- Preferences, OTA, and reboot still use existing runtime objects/functions (`Preferences`, `Update`, `reboot()`)
+
+In short: the REST/WebSocket API is a new wrapper built on top of existing ReelTwo-era control paths, so behavior stays consistent while UI scalability improves.
+
 ### Subsystem Files
 
 | File | Responsibility |
 |------|---------------|
 | `AstroPixelsPlus.ino` | Setup, event loop, hardware pin/object initialization |
+| `AsyncWebInterface.h` | Async web server routes (REST/WS), SPIFFS serving, OTA upload handler |
 | `MarcduinoLogics.h` | `@1T`, `@2T`, `@0T` commands → LogicEngineRenderer sequences |
 | `MarcduinoHolo.h` | `*ON`, `*OF`, `*HP`, `*RD`, `*HN` → holo projector servo/LED |
 | `MarcduinoPanel.h` | `:OP`, `:CL`, `:OF` → PCA9685 servo panel choreography |
 | `MarcduinoSound.h` | `@4Sn` → DFPlayer Mini MP3 playback |
 | `MarcduinoSequence.h` | Compound choreography (panels + holos + LEDs coordinated) |
-| `WebPages.h` | Web UI layout — WButton/WSelect/WLabel widget declarations |
+| `WebPages.h` | Legacy web UI layout (archived as `.bak` after async migration) |
 | `logic-sequences.h` | 26 named LogicEngine animation sequences (LOGICENGINE_SEQ macros) |
 | `effects/*.h` | Custom LED rendering effects (Plasma, Fractal, MetaBalls, FadeAndScroll, Bitmap) |
 | `menus/*.h` | Optional TFT LCD screen layouts (physical display, if connected) |
