@@ -17,15 +17,15 @@
   <div class="card">
     <h3>Serial2 (Marcduino Input)</h3>
 
-    <div style="margin-bottom:10px;">
-      <label style="color:var(--text-dim); font-size:0.8em;">Baud Rate</label>
-      <select id="serial2-baud" style="margin-top:4px;">
+    <div class="mb-10">
+      <label class="label-dim">Baud Rate</label>
+      <select id="serial2-baud" class="mt-4">
         <option value="2400">2400</option>
         <option value="9600">9600</option>
       </select>
     </div>
 
-    <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+    <label class="check-row">
       <input type="checkbox" id="serial-pass" checked>
       <span>Serial pass-through to Serial2</span>
     </label>
@@ -34,21 +34,21 @@
   <div class="card">
     <h3>JawaLite Protocol</h3>
 
-    <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+    <label class="check-row">
       <input type="checkbox" id="jawalite-serial" checked>
       <span>JawaLite on Serial2</span>
     </label>
-    <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+    <label class="check-row">
       <input type="checkbox" id="jawalite-wifi" checked>
       <span>JawaLite on WiFi (port 2000)</span>
     </label>
-    <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+    <label class="check-row">
       <input type="checkbox" id="wifi-serial-pass" checked>
       <span>WiFi JawaLite pass-through to Serial2</span>
     </label>
   </div>
 
-  <button class="btn accent" onclick="saveSerial()" style="width:100%; margin-top:8px;">Save</button>
+  <button class="btn accent w-100 mt-8" onclick="saveSerial()">Save</button>
 
   <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>
   <script src="/app.js"></script>

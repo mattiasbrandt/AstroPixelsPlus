@@ -17,9 +17,9 @@
   <div class="card">
     <h3>Sound Module</h3>
 
-    <div style="margin-bottom:10px;">
-      <label style="color:var(--text-dim); font-size:0.8em;">Sound Player</label>
-      <select id="sound-player" style="margin-top:4px;">
+    <div class="mb-10">
+      <label class="label-dim">Sound Player</label>
+      <select id="sound-player" class="mt-4">
         <option value="0">Disabled</option>
         <option value="1">MP3 Trigger</option>
         <option value="2">DFMini Player</option>
@@ -27,9 +27,9 @@
       </select>
     </div>
 
-    <div style="margin-bottom:10px;">
-      <label style="color:var(--text-dim); font-size:0.8em;">Sound Serial Port</label>
-      <select id="sound-serial" style="margin-top:4px;">
+    <div class="mb-10">
+      <label class="label-dim">Sound Serial Port</label>
+      <select id="sound-serial" class="mt-4">
         <option value="0">AUX4/AUX5</option>
         <option value="1">Serial2</option>
       </select>
@@ -38,13 +38,13 @@
 
   <div class="card">
     <h3>Volume</h3>
-    <div style="display:flex; align-items:center; gap:10px;">
+    <div class="row-10">
       <input type="range" id="sound-volume" min="0" max="1000" value="500"
              style="flex:1; accent-color:var(--accent);">
-      <span id="vol-label" style="min-width:40px; text-align:right; font-size:0.85em;">50%</span>
+      <span id="vol-label" class="value-label">50%</span>
     </div>
-    <div style="margin-top:8px;">
-      <span style="color:var(--text-dim); font-size:0.8em;">Quick:</span>
+    <div class="mt-8">
+      <span class="label-dim">Quick:</span>
       <button class="btn" onclick="sendCmd('$-')">Vol -</button>
       <button class="btn" onclick="sendCmd('$m')">Mid</button>
       <button class="btn" onclick="sendCmd('$+')">Vol +</button>
@@ -55,32 +55,32 @@
   <div class="card">
     <h3>Startup &amp; Random</h3>
 
-    <div style="margin-bottom:10px;">
-      <label style="color:var(--text-dim); font-size:0.8em;">Startup Sound Track (255=none)</label>
+    <div class="mb-10">
+      <label class="label-dim">Startup Sound Track (255=none)</label>
       <input type="number" id="sound-startup" min="0" max="255" value="255"
-             style="width:100%; margin-top:4px;">
+             class="input-full">
     </div>
 
-    <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+    <label class="check-row">
       <input type="checkbox" id="sound-random" checked>
       <span>Random Sound Enabled</span>
     </label>
 
-    <div style="display:flex; gap:10px; margin-bottom:10px;">
-      <div style="flex:1;">
-        <label style="color:var(--text-dim); font-size:0.8em;">Min Interval (ms)</label>
+    <div class="row-10 mb-10">
+      <div class="flex-1">
+        <label class="label-dim">Min Interval (ms)</label>
         <input type="number" id="random-min" min="1000" max="120000" value="5000"
-               style="width:100%; margin-top:4px;">
+               class="input-full">
       </div>
-      <div style="flex:1;">
-        <label style="color:var(--text-dim); font-size:0.8em;">Max Interval (ms)</label>
+      <div class="flex-1">
+        <label class="label-dim">Max Interval (ms)</label>
         <input type="number" id="random-max" min="1000" max="120000" value="30000"
-               style="width:100%; margin-top:4px;">
+               class="input-full">
       </div>
     </div>
   </div>
 
-  <button class="btn accent" onclick="saveSound()" style="width:100%; margin-top:8px;">Save</button>
+  <button class="btn accent w-100 mt-8" onclick="saveSound()">Save</button>
 
   <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>
   <script src="/app.js"></script>

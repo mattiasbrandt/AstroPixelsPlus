@@ -18,30 +18,30 @@
     <h3>WiFi Settings</h3>
     <div class="desc">Changes require reboot to take effect</div>
 
-    <div style="margin-top:12px;">
-      <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+    <div class="mt-12">
+      <label class="check-row">
         <input type="checkbox" id="wifi-enabled" checked>
         <span>WiFi Enabled</span>
       </label>
-      <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+      <label class="check-row">
         <input type="checkbox" id="wifi-ap" checked>
         <span>Access Point Mode</span>
       </label>
-      <div class="desc" style="margin-bottom:10px;">Uncheck to join an existing WiFi network instead</div>
+      <div class="desc mb-10">Uncheck to join an existing WiFi network instead</div>
 
-      <div style="margin-bottom:10px;">
-        <label style="color:var(--text-dim); font-size:0.8em;">SSID</label>
+      <div class="mb-10">
+        <label class="label-dim">SSID</label>
         <input type="text" id="wifi-ssid" value="AstroPixels"
-               style="width:100%; margin-top:4px;">
+               class="input-full">
       </div>
-      <div style="margin-bottom:10px;">
-        <label style="color:var(--text-dim); font-size:0.8em;">Password</label>
+      <div class="mb-10">
+        <label class="label-dim">Password</label>
         <input type="password" id="wifi-pass" value="Astromech"
-               style="width:100%; margin-top:4px;">
+               class="input-full">
       </div>
     </div>
 
-    <button class="btn accent" onclick="saveWifi()" style="width:100%; margin-top:8px;">Save &amp; Reboot</button>
+    <button class="btn accent w-100 mt-8" onclick="saveWifi()">Save &amp; Reboot</button>
   </div>
 
   <div class="card">

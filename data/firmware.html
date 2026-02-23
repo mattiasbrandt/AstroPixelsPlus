@@ -18,9 +18,9 @@
     <h3>Upload Firmware</h3>
     <div class="desc">Select a .bin firmware file to flash over-the-air</div>
 
-    <div style="margin-top:12px;">
+    <div class="mt-12">
       <input type="file" id="fw-file" accept=".bin"
-             style="color:var(--text); font-size:0.85em; margin-bottom:10px;">
+             class="file-input">
     </div>
 
     <div id="fw-progress" style="display:none; margin-bottom:10px;">
@@ -30,7 +30,7 @@
       <div id="fw-status" style="font-size:0.8em; color:var(--text-dim); margin-top:4px;">Uploading...</div>
     </div>
 
-    <button class="btn accent" onclick="uploadFirmware()" style="width:100%;">Upload &amp; Flash</button>
+    <button class="btn accent w-100" onclick="uploadFirmware()">Upload &amp; Flash</button>
   </div>
 
   <div class="card">

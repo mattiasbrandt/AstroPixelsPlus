@@ -18,25 +18,25 @@
     <h3>ESPNOW Settings</h3>
     <div class="desc">Changes require reboot to take effect</div>
 
-    <div style="margin-top:12px;">
-      <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+    <div class="mt-12">
+      <label class="check-row">
         <input type="checkbox" id="remote-enabled">
         <span>Droid Remote Enabled</span>
       </label>
 
-      <div style="margin-bottom:10px;">
-        <label style="color:var(--text-dim); font-size:0.8em;">Device Name</label>
+      <div class="mb-10">
+        <label class="label-dim">Device Name</label>
         <input type="text" id="remote-host" value="Astro"
-               style="width:100%; margin-top:4px;">
+               class="input-full">
       </div>
-      <div style="margin-bottom:10px;">
-        <label style="color:var(--text-dim); font-size:0.8em;">Pairing Secret</label>
+      <div class="mb-10">
+        <label class="label-dim">Pairing Secret</label>
         <input type="password" id="remote-secret" value="Astromech"
-               style="width:100%; margin-top:4px;">
+               class="input-full">
       </div>
     </div>
 
-    <button class="btn accent" onclick="saveRemote()" style="width:100%; margin-top:8px;">Save &amp; Reboot</button>
+    <button class="btn accent w-100 mt-8" onclick="saveRemote()">Save &amp; Reboot</button>
   </div>
 
   <div class="card">
