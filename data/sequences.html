@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sequences — AstroPixels</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons8-r2-d2-color-32.png?v=2">
+  <link rel="shortcut icon" type="image/png" href="/icons8-r2-d2-color-32.png?v=2">
+  <link rel="apple-touch-icon" sizes="192x192" href="/icons8-r2-d2-color-192.png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <h1>Sequences 🎬</h1>
+  <div class="subtitle">Choreographed multi-system animations</div>
+  <nav>
+    <a href="/">Home</a>
+    <a href="/setup.html">Setup</a>
+    <a href="/panels.html">Panels</a>
+    <a href="/holos.html">Holos</a>
+    <a href="/logics.html">Logics</a>
+    <a href="/sequences.html" class="active">Sequences</a>
+  </nav>
+
+  <!-- Stop -->
+  <div class="card">
+    <div class="btn-grid">
+      <button class="btn danger w-100" onclick="sendCmd(':SE00')">Stop All Sequences</button>
+    </div>
+  </div>
+
+  <!-- Full Choreography (panels + logics + holos + sound) -->
+  <div class="card">
+    <h3>Full Choreography</h3>
+    <div class="desc">Coordinated panels, logics, holos, and sound</div>
+
+    <div class="mt-10">
+      <button class="btn btn-full-left" onclick="sendCmd(':SE01')">
+        <strong>Scream</strong>
+        <div class="desc">Alarm logics (3s) + scream sound + all panels open/close</div>
+      </button>
+    </div>
+    <div class="mt-4">
+      <button class="btn btn-full-left" onclick="sendCmd(':SE02')">
+        <strong>Wave</strong>
+        <div class="desc">Sound + sequential panel wave animation</div>
+      </button>
+    </div>
+    <div class="mt-4">
+      <button class="btn btn-full-left" onclick="sendCmd(':SE03')">
+        <strong>Smirk / Fast Wave</strong>
+        <div class="desc">Sound + fast panel wave</div>
+      </button>
+    </div>
+    <div class="mt-4">
+      <button class="btn btn-full-left" onclick="sendCmd(':SE04')">
+        <strong>Open/Close Wave</strong>
+        <div class="desc">Sound + panel open/close wave</div>
+      </button>
+    </div>
+    <div class="mt-4">
+      <button class="btn btn-full-left" onclick="sendCmd(':SE05')">
+        <strong>Beep Cantina</strong>
+        <div class="desc">Beep cantina + fire logics + holo short circuit + marching ants (15s)</div>
+      </button>
+    </div>
+    <div class="mt-4">
+      <button class="btn btn-full-left" onclick="sendCmd(':SE06')">
+        <strong>Short Circuit</strong>
+        <div class="desc">Alarm, scream, failure logics + holo circuit + smoke + sparks, fakes death (8s)</div>
+      </button>
+    </div>
+    <div class="mt-4">
+      <button class="btn btn-full-left" onclick="sendCmd(':SE07')">
+        <strong>Cantina Dance</strong>
+        <div class="desc">Orchestral cantina + disco logics + holo circuit + panel dance (46s)</div>
+      </button>
+    </div>
+    <div class="mt-4">
+      <button class="btn btn-full-left" onclick="sendCmd(':SE08')">
+        <strong>Leia Message</strong>
+        <div class="desc">Leia sound + Leia logics + front holo on (45s)</div>
+      </button>
+    </div>
+    <div class="mt-4">
+      <button class="btn btn-full-left" onclick="sendCmd(':SE09')">
+        <strong>Disco</strong>
+        <div class="desc">Disco sound + panel dance + FLD rainbow + RLD "STAR WARS" scroll (45s)</div>
+      </button>
+    </div>
+  </div>
+
+  <!-- Special Sequences -->
+  <div class="card">
+    <h3>Special Sequences</h3>
+
+    <div class="mt-4">
+      <button class="btn btn-full-left" title="Run panel wiggle showcase sequence" onclick="sendCmd(':SE16')">
+        <strong>Panel Wiggle</strong>
+        <div class="desc">Fast alternating panel movement for quick dome reaction showcase</div>
+      </button>
+    </div>
+    <div class="mt-4">
+      <button class="btn btn-full-left" title="Run bye-bye wave sequence with holo pulse accent" onclick="sendCmd(':SE58')">
+        <strong>Panel Bye Bye</strong>
+        <div class="desc">Variable-speed panel wave with holo pulse for a short farewell gesture</div>
+      </button>
+    </div>
+
+    <div class="mt-4">
+      <button class="btn btn-full-left" onclick="sendCmd('$815')">
+        <strong>Harlem Shake</strong>
+        <div class="desc">Fire logics + holo circuit + shake panels + random steps (26.5s)</div>
+      </button>
+    </div>
+    <div class="mt-4">
+      <button class="btn btn-full-left" onclick="sendCmd('$821')">
+        <strong>Girl on Fire</strong>
+        <div class="desc">Panel dance + fire logics + holo + smoke + fire strip (53s)</div>
+      </button>
+    </div>
+    <div class="mt-4">
+      <button class="btn btn-full-left" onclick="sendCmd('$720')">
+        <strong>Yoda Clear Mind</strong>
+        <div class="desc">Opens panel group 6 + Yoda LED on holo (15s)</div>
+      </button>
+    </div>
+  </div>
+
+  <!-- Logics-Only Sequences -->
+  <div class="card">
+    <h3>Logics-Only (no panels)</h3>
+    <div class="btn-grid">
+      <button class="btn" onclick="sendCmd(':SE50')">Scream</button>
+    </div>
+    <div class="desc">Scream logics + sound, panels stay closed</div>
+  </div>
+
+  <!-- Behaviour Modes -->
+  <div class="card">
+    <h3>Behaviour Modes</h3>
+    <div class="btn-grid">
+      <button class="btn" title="Stop sound, disable holo LEDs, close panels, return logics to normal" onclick="sendCmd(':SE10')">Quiet Reset</button>
+      <button class="btn" title="Random chatter baseline, holos stopped, panels closed" onclick="sendCmd(':SE13')">Mid-Awake Reset</button>
+      <button class="btn accent" title="Random chatter baseline with holo movement enabled" onclick="sendCmd(':SE11')">Full-Awake Reset</button>
+      <button class="btn" title="Random chatter baseline with holo movement and holo LEDs active" onclick="sendCmd(':SE14')">Awake+</button>
+      <button class="btn" title="Top-panel choreography plus holo LED cycle" onclick="sendCmd(':SE12')">Top Panel Showcase</button>
+      <button class="btn danger" title="Trigger scream logic+sound without moving panels" onclick="sendCmd(':SE15')">Scream (No Panels)</button>
+    </div>
+    <div class="desc">Showcase/reset presets for panel state, holo behavior, and sound routing</div>
+  </div>
+
+  <!-- Sound Quick Access -->
+  <div class="card">
+    <h3>Sound</h3>
+    <div class="btn-grid">
+      <button class="btn" onclick="sendCmd('$R')">Random</button>
+      <button class="btn" onclick="sendCmd('$S')">Scream</button>
+      <button class="btn" onclick="sendCmd('$L')">Leia</button>
+      <button class="btn" onclick="sendCmd('$C')">Cantina</button>
+      <button class="btn" onclick="sendCmd('$c')">Beep Cantina</button>
+      <button class="btn" onclick="sendCmd('$W')">Star Wars</button>
+      <button class="btn" onclick="sendCmd('$M')">March</button>
+      <button class="btn" onclick="sendCmd('$D')">Disco</button>
+      <button class="btn" onclick="sendCmd('$F')">Faint</button>
+      <button class="btn danger" onclick="sendCmd('$s')">Stop</button>
+      <button class="btn danger" onclick="sendCmd('$O')">Mute</button>
+    </div>
+    <div class="mt-8">
+      <span class="label-dim">Volume:</span>
+      <div class="btn-grid mt-4">
+        <button class="btn" onclick="sendCmd('$-')">Vol -</button>
+        <button class="btn" onclick="sendCmd('$m')">Mid</button>
+        <button class="btn" onclick="sendCmd('$+')">Vol +</button>
+        <button class="btn" onclick="sendCmd('$f')">Max</button>
+        <button class="btn" onclick="sendCmd('$p')">Min</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Setup — AstroPixels</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons8-r2-d2-color-32.png?v=2">
+  <link rel="shortcut icon" type="image/png" href="/icons8-r2-d2-color-32.png?v=2">
+  <link rel="apple-touch-icon" sizes="192x192" href="/icons8-r2-d2-color-192.png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <h1>Setup ⚙️</h1>
+  <div class="subtitle">Configuration and system settings</div>
+  <nav>
+    <a href="/">Home</a>
+    <a href="/panels.html">Panels</a>
+    <a href="/holos.html">Holos</a>
+    <a href="/logics.html">Logics</a>
+    <a href="/sequences.html">Sequences</a>
+  </nav>
+
+  <div class="card">
+    <h3>Settings</h3>
+    <div class="stack-6">
+      <a href="/wifi.html" class="btn link-btn">WiFi Configuration</a>
+      <a href="/serial.html" class="btn link-btn">Serial / Marcduino</a>
+      <a href="/sound.html" class="btn link-btn">Sound Player</a>
+      <a href="/remote.html" class="btn link-btn" id="remote-link">Droid Remote (ESPNOW only)</a>
+      <a href="/firmware.html" class="btn link-btn">Firmware Update</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Write API Token (Optional)</h3>
+    <div class="desc">Used by this browser when write endpoints are protected</div>
+    <div class="row mt-8">
+      <input type="password" id="api-token" placeholder="Enter token..." class="flex-1">
+      <button class="btn accent" onclick="saveApiToken()">Save</button>
+      <button class="btn danger" onclick="clearApiToken()">Clear</button>
+    </div>
+    <div class="desc mt-8" id="api-token-status">Not set</div>
+  </div>
+
+  <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>
+  <script src="/app.js"></script>
+  <script>
+    fetch('/api/state').then(function(r){return r.json();}).then(function(s){
+      var link = document.getElementById('remote-link');
+      if (!link) return;
+      if (typeof s.remoteSupported !== 'undefined' && !s.remoteSupported) {
+        link.textContent = 'Droid Remote (Disabled in this build)';
+        link.title = 'Droid Remote ESPNOW support is compiled out in this firmware build.';
+      } else {
+        link.textContent = 'Droid Remote (ESPNOW only)';
+        link.title = 'Configure ESPNOW Droid Remote pairing.';
+      }
+    }).catch(function(){});
+
+    function refreshTokenStatus() {
+      var token = getApiToken();
+      var el = document.getElementById('api-token-status');
+      if (token) {
+        el.textContent = 'Token stored in this browser';
+      } else {
+        el.textContent = 'Not set';
+      }
+    }
+
+    function saveApiToken() {
+      var token = document.getElementById('api-token').value.trim();
+      setApiToken(token);
+      refreshTokenStatus();
+      alert(token ? 'Token saved in browser.' : 'Token cleared.');
+    }
+
+    function clearApiToken() {
+      setApiToken('');
+      document.getElementById('api-token').value = '';
+      refreshTokenStatus();
+    }
+
+    refreshTokenStatus();
+  </script>
+</body>
+</html>

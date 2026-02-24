@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AstroPixels</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons8-r2-d2-color-32.png?v=2">
+  <link rel="shortcut icon" type="image/png" href="/icons8-r2-d2-color-32.png?v=2">
+  <link rel="apple-touch-icon" sizes="192x192" href="/icons8-r2-d2-color-192.png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <h1>AstroPixels 🤖</h1>
+  <div class="subtitle">R2-D2 Dome Controller</div>
+  <nav>
+    <a href="/" class="active" title="Main dashboard: health, logs, and quick actions">Home</a>
+    <a href="/panels.html" title="Open, close, and animate dome panels">Panels</a>
+    <a href="/holos.html" title="Control holo projector lights and servo movement">Holos</a>
+    <a href="/logics.html" title="Control front/rear logic displays and PSI effects">Logics</a>
+    <a href="/sequences.html" title="Run combined panel, holo, and logic choreography">Sequences</a>
+    <a href="/setup.html" title="WiFi, serial, sound, remote, and firmware settings">Setup</a>
+  </nav>
+
+  <!-- Quick Actions -->
+  <div class="card">
+    <h3>Quick Actions</h3>
+    <div class="btn-grid">
+      <button class="btn accent" onclick="sendCmd(':SE09')" title="Disco showcase: panels + rainbow logic + holo sync">Disco Showcase</button>
+      <button class="btn" onclick="sendCmd(':SE07')" title="Cantina choreography with synchronized panel/logic/holo activity">Cantina Sync</button>
+      <button class="btn" onclick="sendCmd(':SE08')" title="Leia showcase with synchronized logic and holo message behavior">Leia Sync</button>
+      <button class="btn danger" onclick="sendCmd(':SE06')" title="Electrocute/faint sequence with short-circuit effects across logic, holo, smoke, and panels">Electrocute / Faint</button>
+      <button class="btn" onclick="sendCmd('$821')" title="Girl On Fire: high-intensity multi-subsystem sequence">Girl On Fire</button>
+      <button class="btn" onclick="sendCmd('$815')" title="Harlem Shake: rhythmic dance-style synchronized sequence">Harlem Shake</button>
+      <button class="btn" onclick="sendCmd(':SE14')" title="Awake+ reset profile with movement and active holo LEDs">Awake+</button>
+      <button class="btn danger" onclick="sendCmd(':SE10')" title="Quiet reset: stop sound, holos idle, panels closed">Quiet Reset</button>
+      <button class="btn danger" onclick="sendCmd(':SE00')" title="Stop active panel choreography and return to idle">Stop Sequence</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Mood Presets</h3>
+    <div class="desc">Set the idle behavior profile for chatter, holo activity, and visual intensity.</div>
+    <div class="btn-grid mt-8">
+      <button class="btn" onclick="sendCmd(':SE10')" title="Quiet profile: stop sounds, holos idle, panels closed, logic normal">Quiet</button>
+      <button class="btn" onclick="sendCmd(':SE13')" title="Mid-awake profile: balanced idle activity with restrained motion">Mid-Awake</button>
+      <button class="btn accent" onclick="sendCmd(':SE11')" title="Full-awake profile: active idle chatter with holo movement baseline">Full-Awake</button>
+      <button class="btn" onclick="sendCmd(':SE14')" title="Awake+ profile: full-awake plus active holo LED behavior">Awake+</button>
+    </div>
+  </div>
+
+  <!-- Health Dashboard -->
+  <div class="card">
+    <h3>Subsystem Health</h3>
+    <div class="health-grid" id="health-grid">
+      <div class="health-item" title="Panel servo controller at I2C address 0x40 (dome panel movement)"><div class="indicator" id="h-panels"></div><span>Servo Panels</span></div>
+      <div class="health-item" title="Holo servo controller at I2C address 0x41 (holo pitch/yaw movement)"><div class="indicator" id="h-holos"></div><span>Servo Holos</span></div>
+      <div class="health-item" title="Sound output availability based on sound module preference state"><div class="indicator" id="h-sound"></div><span>Sound Module</span></div>
+      <div class="health-item" title="Body-to-dome serial traffic telemetry profile for Artoo-style controllers"><div class="indicator" id="h-artoo"></div><span>Artoo Controller</span></div>
+      <div class="health-item" title="Current WiFi service state on this controller"><div class="indicator" id="h-wifi"></div><span>WiFi</span></div>
+      <div class="health-item" title="Droid remote link state (warn means remote feature disabled)"><div class="indicator" id="h-remote"></div><span>Droid Remote</span></div>
+      <div class="health-item" title="SPI flash file system mount state used by web UI files"><div class="indicator" id="h-spiffs"></div><span>SPIFFS</span></div>
+    </div>
+    <div class="i2c-list" id="i2c-list" title="Detected I2C addresses responding on the bus"></div>
+  </div>
+
+  <!-- Live Log Console -->
+  <div class="card">
+    <h3 title="Live firmware log stream. Scroll up to pause auto-follow.">Live Log Console</h3>
+    <div id="log-wrap" class="log-wrap">
+      <pre id="log-console" class="log-console" title="Recent runtime logs from the controller"></pre>
+      <div id="log-paused" class="log-paused" title="Auto-scroll paused while viewing older lines">PAUSED</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Manual Command</h3>
+    <div class="desc">Send any Marcduino command directly (example: :OP01, *ON00, @0T5)</div>
+    <div class="row mt-8">
+      <input
+        type="text"
+        id="manual-cmd"
+        placeholder="Enter command..."
+        maxlength="63"
+        title="Type a raw Marcduino command and press Enter or Send"
+        class="flex-1"
+        onkeydown="if(event.key==='Enter'){var c=this.value.trim(); if(c){sendCmd(c); this.value='';}}"
+      >
+      <button
+        class="btn accent"
+        title="Send manual command"
+        onclick="var i=document.getElementById('manual-cmd'); var c=i.value.trim(); if(c){sendCmd(c); i.value='';}"
+      >Send</button>
+    </div>
+  </div>
+
+  <!-- System Status -->
+  <div class="card">
+    <h3 title="Live state snapshot: uptime, memory, connectivity, OTA status">System</h3>
+    <div id="sys-status" class="sys-status" title="Updates automatically from WebSocket state broadcasts">Loading...</div>
+  </div>
+
+  <!-- OTA Progress Overlay -->
+  <div class="ota-overlay" id="ota-overlay">
+    <div>Firmware Update in Progress...</div>
+    <div class="ota-bar"><div class="ota-bar-fill" id="ota-bar-fill"></div></div>
+    <div id="ota-percent">0%</div>
+  </div>
+
+  <div class="status-bar" id="conn-status" title="Browser WebSocket link to controller"><span class="dot yellow"></span>Connecting...</div>
+
+  <script src="/app.js"></script>
+  <script>
+    var remoteSupported = true;
+
+    function setIndicator(id, ok) {
+      var el = document.getElementById(id);
+      if (el) { el.className = 'indicator ' + (ok ? 'ok' : 'fail'); }
+    }
+    function setIndicatorWarn(id, ok, enabled) {
+      var el = document.getElementById(id);
+      if (el) {
+        if (!enabled) el.className = 'indicator warn';
+        else el.className = 'indicator ' + (ok ? 'ok' : 'fail');
+      }
+    }
+    function setHealthItemVisible(id, visible) {
+      var el = document.getElementById(id);
+      if (el && el.parentElement) {
+        el.parentElement.style.display = visible ? '' : 'none';
+      }
+    }
+    function renderHeapStatus(freeHeapBytes) {
+      var kb = freeHeapBytes / 1024;
+      var label = 'Healthy';
+      var color = 'var(--success)';
+      if (kb < 80) {
+        label = 'Critical';
+        color = 'var(--danger)';
+      } else if (kb < 120) {
+        label = 'Low';
+        color = 'var(--warning)';
+      }
+      return 'Free Heap: <span style="color:' + color + ';font-weight:700" title="Thresholds: Healthy >= 120 KB, Low 80-119 KB, Critical < 80 KB">' + kb.toFixed(1) + ' KB (' + label + ')</span>';
+    }
+    function renderMinHeapStatus(minHeapBytes) {
+      var kb = minHeapBytes / 1024;
+      var label = 'Good';
+      var color = 'var(--success)';
+      if (kb < 64) {
+        label = 'Critical';
+        color = 'var(--danger)';
+      } else if (kb < 96) {
+        label = 'Watch';
+        color = 'var(--warning)';
+      }
+      return 'Min Free Heap: <span style="color:' + color + ';font-weight:700" title="Thresholds: Good >= 96 KB, Watch 64-95 KB, Critical < 64 KB">' + kb.toFixed(1) + ' KB (' + label + ')</span>';
+    }
+    function renderSerial2Health(lastSeenMs, uptimeSec) {
+      var nowMs = uptimeSec * 1000;
+      var ageMs = (lastSeenMs > 0 && nowMs >= lastSeenMs) ? (nowMs - lastSeenMs) : 0xFFFFFFFF;
+      var text = 'No traffic';
+      var color = 'var(--danger)';
+      if (ageMs <= 5000) {
+        text = 'Active';
+        color = 'var(--success)';
+      } else if (ageMs <= 30000) {
+        text = 'Idle';
+        color = 'var(--warning)';
+      }
+      return 'Serial2 Activity: <span style="color:' + color + ';font-weight:700" title="Thresholds: Active <= 5s, Idle 5-30s, No traffic > 30s">' + text + '</span>';
+    }
+    function renderWifiQuality(rssi, apMode) {
+      if (apMode) {
+        return 'WiFi Quality: <span style="color:var(--warning);font-weight:700">AP mode</span>';
+      }
+      if (!rssi) {
+        return 'WiFi Quality: <span style="color:var(--danger);font-weight:700">Unknown</span>';
+      }
+      var quality = 'Poor';
+      var color = 'var(--danger)';
+      if (rssi >= -67) {
+        quality = 'Excellent';
+        color = 'var(--success)';
+      } else if (rssi >= -75) {
+        quality = 'Good';
+        color = 'var(--success)';
+      } else if (rssi >= -85) {
+        quality = 'Fair';
+        color = 'var(--warning)';
+      }
+      return 'WiFi Quality: <span style="color:' + color + ';font-weight:700" title="Thresholds: Excellent >= -67 dBm, Good -68..-75 dBm, Fair -76..-85 dBm, Poor < -85 dBm">' + quality + ' (' + rssi + ' dBm)</span>';
+    }
+    function renderI2CProbeHealth(failures) {
+      var label = 'Clean';
+      var color = 'var(--success)';
+      if (failures > 10) {
+        label = 'Unstable';
+        color = 'var(--danger)';
+      } else if (failures > 0) {
+        label = 'Warning';
+        color = 'var(--warning)';
+      }
+      return 'I2C Probe Errors: <span style="color:' + color + ';font-weight:700" title="Thresholds: Clean 0, Warning 1-10, Unstable > 10 since boot">' + failures + ' (' + label + ')</span>';
+    }
+    function updateHealth(h) {
+      setIndicator('h-panels', h.i2c_panels);
+      setIndicator('h-holos', h.i2c_holos);
+      setIndicatorWarn('h-sound', h.sound_module, h.sound_local_enabled);
+      setIndicatorWarn('h-artoo', h.artoo, h.artoo_enabled);
+      setHealthItemVisible('h-artoo', !!h.artoo_enabled);
+      setIndicator('h-wifi', h.wifi);
+      if (remoteSupported) {
+        setIndicatorWarn('h-remote', h.remote, h.remote_enabled);
+        setHealthItemVisible('h-remote', true);
+      } else {
+        setHealthItemVisible('h-remote', false);
+      }
+      setIndicator('h-spiffs', h.spiffs);
+
+      if (h.i2c_devices && h.i2c_devices.length > 0) {
+        document.getElementById('i2c-list').textContent = 'I2C devices: ' + h.i2c_devices.join(', ');
+      }
+    }
+
+    function updateStatus(s) {
+      if (typeof s.remoteSupported !== 'undefined') {
+        remoteSupported = !!s.remoteSupported;
+        setHealthItemVisible('h-remote', remoteSupported);
+      }
+
+      var html = '';
+      html += '<div>Uptime: ' + Math.floor(s.uptime/60) + 'm ' + (s.uptime%60) + 's</div>';
+      html += '<div>' + renderHeapStatus(s.freeHeap) + '</div>';
+      if (typeof s.minFreeHeap !== 'undefined') {
+        html += '<div>' + renderMinHeapStatus(s.minFreeHeap) + '</div>';
+      }
+      if (typeof s.serial2LastSeenMs !== 'undefined') {
+        html += '<div>' + renderSerial2Health(s.serial2LastSeenMs, s.uptime) + '</div>';
+      }
+      if (typeof s.i2c_probe_failures !== 'undefined') {
+        html += '<div>' + renderI2CProbeHealth(s.i2c_probe_failures) + '</div>';
+      }
+      html += '<div>WiFi: ' + (s.wifiEnabled ? '<span class="dot green"></span>Enabled' : '<span class="dot red"></span>Disabled');
+      if (s.wifiIP) html += ' (' + s.wifiIP + ')';
+      if (s.wifiRSSI && !s.wifiAP) html += ' ' + s.wifiRSSI + ' dBm';
+      html += '</div>';
+      html += '<div>' + renderWifiQuality(s.wifiRSSI, s.wifiAP) + '</div>';
+      if (typeof s.remoteSupported !== 'undefined' && !s.remoteSupported) {
+        html += '<div>Droid Remote: <span class="dot yellow"></span>Disabled (build-time)</div>';
+      } else if (typeof s.remoteConnected !== 'undefined') {
+        html += '<div>Droid Remote: ' + (s.remoteConnected ? '<span class="dot green"></span>Connected' : '<span class="dot red"></span>Disconnected') + '</div>';
+      }
+      if (typeof s.artooEnabled !== 'undefined') {
+        html += '<div>Artoo Controller Communication: ' + (s.artooEnabled ? '<span class="dot green"></span>Enabled' : '<span class="dot yellow"></span>Disabled') + ' (' + s.artooBaud + ' baud)</div>';
+      }
+      if (typeof s.soundLocalEnabled !== 'undefined') {
+        html += '<div>Local Sound Execution: ' + (s.soundLocalEnabled ? '<span class="dot green"></span>Enabled' : '<span class="dot yellow"></span>Disabled') + '</div>';
+      }
+      if (s.otaInProgress) {
+        html += '<div><span class="dot yellow"></span>Firmware update in progress</div>';
+      } else {
+        var overlay = document.getElementById('ota-overlay');
+        if (overlay) overlay.classList.remove('active');
+      }
+      document.getElementById('sys-status').innerHTML = html;
+    }
+
+    // --- Log Console ---
+    var logEl = document.getElementById('log-console');
+    var logPaused = document.getElementById('log-paused');
+    var logAutoScroll = true;
+    var LOG_MAX_LINES = 200;
+
+    // Detect user scroll — pause auto-scroll when scrolled up
+    logEl.addEventListener('scroll', function() {
+      var atBottom = (logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight) < 20;
+      logAutoScroll = atBottom;
+      logPaused.style.display = atBottom ? 'none' : 'block';
+    });
+
+    function appendLogLine(text) {
+      logEl.textContent += text + '\n';
+      // Trim old lines if too many
+      var lines = logEl.textContent.split('\n');
+      if (lines.length > LOG_MAX_LINES + 50) {
+        logEl.textContent = lines.slice(lines.length - LOG_MAX_LINES).join('\n');
+      }
+      if (logAutoScroll) {
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+    }
+
+    // WebSocket log handler
+    window.onLogLine = appendLogLine;
+
+    // Fetch initial log buffer
+    fetch('/api/logs').then(function(r){return r.json();}).then(function(data){
+      if (data.lines) {
+        data.lines.forEach(function(line) { appendLogLine(line); });
+      }
+    }).catch(function(){});
+
+    // Initial fetch
+    fetchState(updateStatus);
+    fetch('/api/health').then(function(r){return r.json();}).then(updateHealth).catch(function(){});
+
+    // OTA progress handler
+    window.onOtaProgress = function(progress) {
+      var overlay = document.getElementById('ota-overlay');
+      var fill = document.getElementById('ota-bar-fill');
+      var pct = document.getElementById('ota-percent');
+      overlay.classList.add('active');
+      var p = Math.round(progress * 100);
+      fill.style.width = p + '%';
+      pct.textContent = p + '%';
+      if (p >= 100) {
+        pct.textContent = 'Rebooting...';
+      }
+    };
+
+    // WebSocket live updates
+    window.onStateUpdate = updateStatus;
+    window.onHealthUpdate = updateHealth;
+  </script>
+</body>
+</html>

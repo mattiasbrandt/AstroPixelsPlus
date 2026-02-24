@@ -41,11 +41,6 @@ static bool LogicEffectMetaBalls(LogicEngineRenderer& r)
                 mb_dx[j] = (randomDouble() < 0.5) ? -1 : 1;
                 mb_dy[j] = (randomDouble() < 0.5) ? -1 : 1;
             }
-            Serial.println(randomDouble());
-            Serial.println(randomDouble());
-            Serial.println(randomDouble());
-            Serial.println(randomDouble());
-            Serial.println(randomDouble());
         }
 
         virtual ~MetaBallsObject() override
@@ -103,9 +98,9 @@ static bool LogicEffectMetaBalls(LogicEngineRenderer& r)
         else if (mb_py[i] > h)
             mb_dy[i] = -1;
         for (int x = 0; x < w; x++)
-            mb_vx[i*mb_number+x] = (mb_px[i] - x) * (mb_px[i] - x);
+            mb_vx[i*w+x] = (mb_px[i] - x) * (mb_px[i] - x);
         for (int y = 0; y < h; y++)
-            mb_vy[i*mb_number+y] = (mb_py[i] - y) * (mb_py[i] - y);
+            mb_vy[i*h+y] = (mb_py[i] - y) * (mb_py[i] - y);
     }
     for (int x = 0; x < w; x++)
     {
@@ -116,7 +111,7 @@ static bool LogicEffectMetaBalls(LogicEngineRenderer& r)
             int B = 0;
             for (int i = 0; i < mb_number; i++)
             {
-                double distance = (mb_vx[i*mb_number+x] + mb_vy[i*mb_number+y] + 1);
+                double distance = (mb_vx[i*w+x] + mb_vy[i*h+y] + 1);
                 R += (int)(obj->mb_dia / distance * obj->mb_r_start);
                 G += (int)(obj->mb_dia / distance * obj->mb_g_start);
                 B += (int)(obj->mb_dia / distance * obj->mb_b_start);

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sound — AstroPixels</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons8-r2-d2-color-32.png?v=2">
+  <link rel="shortcut icon" type="image/png" href="/icons8-r2-d2-color-32.png?v=2">
+  <link rel="apple-touch-icon" sizes="192x192" href="/icons8-r2-d2-color-192.png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <h1>Sound Player 🔊</h1>
+  <div class="subtitle">DFPlayer Mini audio configuration</div>
+  <nav>
+    <a href="/">Home</a>
+    <a href="/setup.html">Setup</a>
+  </nav>
+
+  <div class="card">
+    <h3>Sound Module</h3>
+
+    <label class="check-row mb-10" title="Master toggle for AstroPixels local sound actuation. Useful when body controller handles all audio playback.">
+      <input type="checkbox" id="sound-local-enabled" checked title="Enable or disable local sound execution on AstroPixels.">
+      <span>Local sound execution on AstroPixels</span>
+    </label>
+    <div class="desc">Disable when another controller handles audio. Sound commands are still accepted but AstroPixels does not actuate local playback.</div>
+
+    <div class="mb-10">
+      <label class="label-dim">Sound Player</label>
+      <select id="sound-player" class="mt-4">
+        <option value="0">Disabled</option>
+        <option value="1">MP3 Trigger</option>
+        <option value="2">DFMini Player</option>
+        <option value="3">HCR</option>
+      </select>
+    </div>
+
+    <div class="mb-10">
+      <label class="label-dim">Sound Serial Port</label>
+      <select id="sound-serial" class="mt-4">
+        <option value="0">AUX4/AUX5</option>
+        <option value="1">Serial2</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Volume</h3>
+    <div class="row-10">
+      <input type="range" id="sound-volume" min="0" max="1000" value="500"
+             class="sound-range">
+      <span id="vol-label" class="value-label">50%</span>
+    </div>
+    <div class="mt-8">
+      <span class="label-dim">Quick:</span>
+      <button class="btn" onclick="sendCmd('$-')">Vol -</button>
+      <button class="btn" onclick="sendCmd('$m')">Mid</button>
+      <button class="btn" onclick="sendCmd('$+')">Vol +</button>
+      <button class="btn" onclick="sendCmd('$f')">Max</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Startup &amp; Random</h3>
+
+    <div class="mb-10">
+      <label class="label-dim">Startup Sound Track (255=none)</label>
+      <input type="number" id="sound-startup" min="0" max="255" value="255"
+             class="input-full">
+    </div>
+
+    <label class="check-row" title="Allows periodic random local sound playback by AstroPixels when local sound execution is enabled.">
+      <input type="checkbox" id="sound-random" checked title="Enable random local sound scheduling.">
+      <span>Random Sound Enabled</span>
+    </label>
+
+    <div class="row-10 mb-10">
+      <div class="flex-1">
+        <label class="label-dim">Min Interval (ms)</label>
+        <input type="number" id="random-min" min="1000" max="120000" value="5000"
+               class="input-full">
+      </div>
+      <div class="flex-1">
+        <label class="label-dim">Max Interval (ms)</label>
+        <input type="number" id="random-max" min="1000" max="120000" value="30000"
+               class="input-full">
+      </div>
+    </div>
+  </div>
+
+  <button class="btn accent w-100 mt-8" onclick="saveSound()">Save</button>
+
+  <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>
+  <script src="/app.js"></script>
+  <script>
+    document.getElementById('sound-volume').addEventListener('input', function() {
+      document.getElementById('vol-label').textContent = Math.round(this.value / 10) + '%';
+    });
+
+    fetch('/api/pref?keys=msoundlocal,msound,msoundser,mvolume,msoundstart,mrandom,mrandommin,mrandommax').then(function(r){return r.json();}).then(function(d){
+      if (typeof d.msoundlocal !== 'undefined') document.getElementById('sound-local-enabled').checked = d.msoundlocal === 'true' || d.msoundlocal === true || d.msoundlocal === '1';
+      if (d.msound) document.getElementById('sound-player').value = d.msound;
+      if (d.msoundser) document.getElementById('sound-serial').value = d.msoundser;
+      if (d.mvolume) { document.getElementById('sound-volume').value = d.mvolume; document.getElementById('vol-label').textContent = Math.round(d.mvolume/10) + '%'; }
+      if (d.msoundstart) document.getElementById('sound-startup').value = d.msoundstart;
+      if (typeof d.mrandom !== 'undefined') document.getElementById('sound-random').checked = d.mrandom === 'true' || d.mrandom === true || d.mrandom === '1';
+      if (d.mrandommin) document.getElementById('random-min').value = d.mrandommin;
+      if (d.mrandommax) document.getElementById('random-max').value = d.mrandommax;
+    }).catch(function(){});
+
+    function saveSound() {
+      var prefs = [
+        {key:'msoundlocal', val: document.getElementById('sound-local-enabled').checked ? '1' : '0'},
+        {key:'msound', val: document.getElementById('sound-player').value},
+        {key:'msoundser', val: document.getElementById('sound-serial').value},
+        {key:'mvolume', val: document.getElementById('sound-volume').value},
+        {key:'msoundstart', val: document.getElementById('sound-startup').value},
+        {key:'mrandom', val: document.getElementById('sound-random').checked ? '1' : '0'},
+        {key:'mrandommin', val: document.getElementById('random-min').value},
+        {key:'mrandommax', val: document.getElementById('random-max').value}
+      ];
+      var chain = Promise.resolve();
+      prefs.forEach(function(p) {
+        chain = chain.then(function() {
+          return apiPostForm('/api/pref', 'key=' + encodeURIComponent(p.key) + '&val=' + encodeURIComponent(p.val));
+        });
+      });
+      chain.then(function(){ alert('Sound settings saved.'); });
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,537 @@
+/* AstroPixels Web UI — R2-D2 Theme */
+/* White, blue, and silver inspired by R2-D2's iconic color scheme */
+/* Mobile-first, minimal footprint */
+
+:root {
+  /* R2-D2 palette */
+  --bg: #0c1525;              /* deep space navy */
+  --surface: #152238;          /* dark panel blue */
+  --surface-alt: #1a2d4a;     /* slightly lighter panel */
+  --border: #2a4a7a;          /* R2 mid-blue trim */
+  --accent: #4a90d9;          /* R2 signature blue */
+  --accent-bright: #6ab0ff;   /* bright blue highlight */
+  --accent-dim: #2d6cb5;      /* pressed/active blue */
+  --silver: #b8c5d6;          /* R2 silver/aluminum */
+  --silver-bright: #d4dde8;   /* bright silver */
+  --text: #e8edf4;            /* near-white text */
+  --text-dim: #8899b0;        /* muted silver-blue */
+  --danger: #e85454;          /* R2's red indicator */
+  --danger-bg: #3a1a1a;
+  --success: #54c87a;         /* green indicator */
+  --warning: #e8a832;         /* amber indicator */
+  --white: #f0f4f8;           /* R2 white panels */
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  padding: 12px;
+  max-width: 810px;
+  margin: 0 auto;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Header — R2's white dome panel feel */
+h1 {
+  color: var(--white);
+  font-size: 1.4em;
+  margin-bottom: 2px;
+  letter-spacing: 0.5px;
+}
+h2 {
+  color: var(--silver-bright);
+  font-size: 1.1em;
+  margin: 16px 0 8px;
+}
+.subtitle {
+  color: var(--text-dim);
+  font-size: 0.85em;
+  margin-bottom: 16px;
+}
+
+/* Navigation — silver tabs like R2's panel seams */
+nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 16px;
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 10px;
+}
+nav a {
+  padding: 8px 12px;
+  background: var(--surface);
+  color: var(--silver);
+  text-decoration: none;
+  border-radius: 4px 4px 0 0;
+  border: 1px solid var(--border);
+  border-bottom: none;
+  font-size: 0.85em;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+nav a:hover {
+  background: var(--surface-alt);
+  color: var(--accent-bright);
+}
+nav a.active {
+  background: var(--accent);
+  color: var(--white);
+  border-color: var(--accent);
+}
+
+/* Buttons — R2's blue panel buttons */
+.btn {
+  display: inline-block;
+  padding: 10px 14px;
+  margin: 3px;
+  background: var(--surface-alt);
+  color: var(--silver-bright);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.85em;
+  cursor: pointer;
+  text-align: center;
+  min-width: 70px;
+  transition: background 0.15s, border-color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn:hover {
+  background: var(--border);
+  border-color: var(--accent);
+  color: var(--white);
+}
+.btn:active {
+  background: var(--accent-dim);
+  color: var(--white);
+}
+/* Primary action — R2's signature blue */
+.btn.accent {
+  background: var(--accent);
+  color: var(--white);
+  border-color: var(--accent-bright);
+  font-weight: 600;
+}
+.btn.accent:hover {
+  background: var(--accent-bright);
+}
+/* Danger — R2's red indicator light */
+.btn.danger {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border-color: #5a2a2a;
+}
+.btn.danger:hover {
+  background: #4a2020;
+  border-color: var(--danger);
+}
+
+/* Button grid */
+.btn-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.btn-grid .btn {
+  margin: 0;
+}
+
+/* Dropdown select */
+select {
+  padding: 8px 12px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.85em;
+  width: 100%;
+  margin-bottom: 8px;
+}
+select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* Text input */
+input[type="text"], input[type="password"], input[type="number"] {
+  padding: 8px 12px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.85em;
+}
+input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* Section card — like R2's body panels */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+  border-left: 3px solid var(--accent);
+}
+.card h3 {
+  color: var(--accent-bright);
+  font-size: 0.95em;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+/* Status bar — R2's indicator strip */
+.status-bar {
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.8em;
+  color: var(--text-dim);
+  margin-top: 12px;
+}
+.status-bar .dot, .dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+.dot.green { background: var(--success); box-shadow: 0 0 4px var(--success); }
+.dot.red { background: var(--danger); box-shadow: 0 0 4px var(--danger); }
+.dot.yellow { background: var(--warning); box-shadow: 0 0 4px var(--warning); }
+
+/* Descriptions */
+.desc {
+  color: var(--text-dim);
+  font-size: 0.8em;
+  margin-top: 2px;
+  font-style: italic;
+}
+
+.mt-4 { margin-top: 4px; }
+.mt-6 { margin-top: 6px; }
+.mt-8 { margin-top: 8px; }
+.mt-10 { margin-top: 10px; }
+.mt-12 { margin-top: 12px; }
+.mb-0 { margin-bottom: 0; }
+
+.w-100 { width: 100%; }
+.flex-1 { flex: 1; }
+
+.row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.stack-6 {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label-dim {
+  color: var(--text-dim);
+  font-size: 0.8em;
+}
+
+.btn-full-left {
+  width: 100%;
+  text-align: left;
+}
+
+.link-btn {
+  text-decoration: none;
+  text-align: left;
+}
+
+.mb-10 { margin-bottom: 10px; }
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.input-full {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.row-10 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.value-label {
+  min-width: 40px;
+  text-align: right;
+  font-size: 0.85em;
+}
+
+.file-input {
+  color: var(--text);
+  font-size: 0.85em;
+  margin-bottom: 10px;
+}
+
+/* Tables */
+table td {
+  color: var(--silver);
+}
+
+.panel-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85em;
+}
+
+.panel-head {
+  color: var(--text-dim);
+}
+
+.panel-cell {
+  padding: 4px;
+}
+
+.panel-cell-center {
+  padding: 4px;
+  text-align: center;
+}
+
+/* Scrollable table wrapper — prevents overflow on narrow screens */
+.table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 -4px;
+  padding: 0 4px;
+}
+
+/* Holo direction pad — 3x3 CSS Grid */
+.dir-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  max-width: 240px;
+}
+.dir-pad .btn {
+  min-width: 0;
+  width: 100%;
+  padding: 12px 8px;
+  font-size: 1.1em;
+}
+
+/* OTA progress bar overlay */
+.ota-overlay {
+  display: none;
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  left: auto;
+  bottom: auto;
+  background: rgba(28, 45, 73, 0.92);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  z-index: 100;
+  align-items: flex-start; justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--white);
+  font-size: 0.9em;
+  pointer-events: none;
+}
+.ota-overlay.active { display: flex; }
+.ota-bar {
+  width: 220px;
+  max-width: 220px;
+  height: 6px;
+  background: var(--surface-alt); border-radius: 4px; overflow: hidden;
+}
+.ota-bar-fill {
+  height: 100%; background: var(--accent); border-radius: 4px;
+  transition: width 0.3s;
+  width: 0%;
+}
+
+.ui-toast {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  z-index: 200;
+  background: var(--surface-alt);
+  color: var(--white);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 0.8em;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.15s, transform 0.15s;
+  pointer-events: none;
+}
+
+.ui-toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.ui-toast.warn {
+  border-left-color: var(--warning);
+}
+
+.ui-toast.error {
+  border-left-color: var(--danger);
+}
+
+.fw-progress {
+  display: none;
+  margin-bottom: 10px;
+}
+
+.fw-progress-track {
+  background: var(--bg);
+  border-radius: 4px;
+  overflow: hidden;
+  height: 20px;
+}
+
+.fw-progress-bar {
+  background: var(--accent);
+  height: 100%;
+  width: 0%;
+  transition: width 0.3s;
+}
+
+.fw-progress-status {
+  font-size: 0.8em;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+.log-summary-btn {
+  display: inline-block;
+  cursor: pointer;
+  list-style: none;
+}
+
+.log-summary-btn::-webkit-details-marker {
+  display: none;
+}
+
+.health-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.health-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--bg);
+  border-radius: 6px;
+  font-size: 0.85em;
+}
+
+.health-item .indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #555;
+  flex-shrink: 0;
+  transition: background 0.3s, box-shadow 0.3s;
+}
+
+.health-item .indicator.ok {
+  background: var(--success);
+  box-shadow: 0 0 6px var(--success);
+}
+
+.health-item .indicator.fail {
+  background: var(--danger);
+  box-shadow: 0 0 6px var(--danger);
+}
+
+.health-item .indicator.warn {
+  background: var(--warning);
+  box-shadow: 0 0 6px var(--warning);
+}
+
+.i2c-list {
+  font-size: 0.8em;
+  color: var(--text-dim);
+  margin-top: 6px;
+}
+
+.log-wrap {
+  position: relative;
+}
+
+.log-console {
+  background: var(--bg);
+  color: var(--silver);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px;
+  font-size: 0.75em;
+  line-height: 1.4;
+  height: 180px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.log-paused {
+  display: none;
+  position: absolute;
+  top: 4px;
+  right: 12px;
+  background: var(--warning);
+  color: var(--bg);
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 0.7em;
+  font-weight: 600;
+}
+
+.sys-status {
+  font-size: 0.85em;
+  color: var(--text-dim);
+}
+
+.sound-range {
+  flex: 1;
+  accent-color: var(--accent);
+}
+
+/* Responsive: wider screens get more columns */
+@media (min-width: 400px) {
+  .btn { min-width: 74px; }
+  .dir-pad .btn { min-width: 0; }
+}
+
+/* Ensure touch targets meet 44px minimum on small screens */
+@media (max-width: 399px) {
+  .btn { min-height: 44px; }
+  nav a { padding: 10px 10px; }
+}
+
+/* Safe area for modern phones */
+@supports (padding: env(safe-area-inset-bottom)) {
+  body { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+}

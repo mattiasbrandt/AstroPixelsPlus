@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Holos — AstroPixels</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons8-r2-d2-color-32.png?v=2">
+  <link rel="shortcut icon" type="image/png" href="/icons8-r2-d2-color-32.png?v=2">
+  <link rel="apple-touch-icon" sizes="192x192" href="/icons8-r2-d2-color-192.png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <h1>Holo Projectors 💡</h1>
+  <div class="subtitle">RGB LED + servo-positioned holo projectors</div>
+  <nav>
+    <a href="/">Home</a>
+    <a href="/setup.html">Setup</a>
+    <a href="/panels.html">Panels</a>
+    <a href="/holos.html" class="active">Holos</a>
+    <a href="/logics.html">Logics</a>
+    <a href="/sequences.html">Sequences</a>
+  </nav>
+
+  <div class="card" id="holo-health-card">
+    <h3>Holo Servo Controller Status</h3>
+    <div class="desc" id="holo-health-text">Checking controller availability...</div>
+    <div class="i2c-list" id="holo-i2c-list"></div>
+    <div class="i2c-list" id="holo-last-cmd"></div>
+  </div>
+
+  <!-- All Holos -->
+  <div class="card">
+    <h3>All Holos</h3>
+    <div class="btn-grid">
+      <button class="btn accent" onclick="sendCmd('*ON00')">All On</button>
+      <button class="btn danger" onclick="sendCmd('*OF00')">All Off</button>
+      <button class="btn" onclick="sendCmd('*ST00')">Reset All</button>
+    </div>
+    <div class="mt-6">
+      <span class="label-dim">Showcase Modes:</span>
+      <div class="btn-grid mt-4">
+        <button class="btn" title="Wag all three holo servos left/right together" onclick="sendCmd('*HW00')">All Wag</button>
+        <button class="btn" title="Nod all three holo servos up/down together" onclick="sendCmd('*HN00')">All Nod</button>
+        <button class="btn" title="Enable default ReelTwo holo twitch patterns" onclick="sendCmd('*HD08')">Default Twitch</button>
+        <button class="btn" title="Enable randomized ReelTwo holo twitch patterns" onclick="sendCmd('*HD09')">Random Twitch</button>
+        <button class="btn danger" title="Disable holo twitch and force idle state" onclick="sendCmd('*HD07')">Disable Twitch</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Front Holo -->
+  <div class="card">
+    <h3>Front Holo</h3>
+    <div class="btn-grid">
+      <button class="btn accent" onclick="sendCmd('*ON01')">On</button>
+      <button class="btn danger" onclick="sendCmd('*OF01')">Off</button>
+      <button class="btn" onclick="sendCmd('*RD01')">Random Move</button>
+      <button class="btn" onclick="sendCmd('*HW01')">Wag</button>
+      <button class="btn" onclick="sendCmd('*HN01')">Nod</button>
+    </div>
+    <div class="mt-6">
+      <span class="label-dim">LED Effects:</span>
+      <div class="btn-grid mt-4">
+        <button class="btn" onclick="sendCmd('*HPS301')">Pulse</button>
+        <button class="btn" onclick="sendCmd('*HPS601')">Rainbow</button>
+      </div>
+    </div>
+    <div class="mt-6">
+      <span class="label-dim">Position:</span>
+      <div class="dir-pad mt-4">
+        <button class="btn" aria-label="Front holo upper left" onclick="sendCmd('*HP401')">&#x2196;</button>
+        <button class="btn" aria-label="Front holo up" onclick="sendCmd('*HP201')">&#x2191;</button>
+        <button class="btn" aria-label="Front holo upper right" onclick="sendCmd('*HP701')">&#x2197;</button>
+        <button class="btn" aria-label="Front holo left" onclick="sendCmd('*HP301')">&#x2190;</button>
+        <button class="btn accent" aria-label="Front holo center" onclick="sendCmd('*HP101')">&#x25CF;</button>
+        <button class="btn" aria-label="Front holo right" onclick="sendCmd('*HP601')">&#x2192;</button>
+        <button class="btn" aria-label="Front holo lower left" onclick="sendCmd('*HP501')">&#x2199;</button>
+        <button class="btn" aria-label="Front holo down" onclick="sendCmd('*HP001')">&#x2193;</button>
+        <button class="btn" aria-label="Front holo lower right" onclick="sendCmd('*HP801')">&#x2198;</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rear Holo -->
+  <div class="card">
+    <h3>Rear Holo</h3>
+    <div class="btn-grid">
+      <button class="btn accent" onclick="sendCmd('*ON02')">On</button>
+      <button class="btn danger" onclick="sendCmd('*OF02')">Off</button>
+      <button class="btn" onclick="sendCmd('*RD02')">Random Move</button>
+      <button class="btn" onclick="sendCmd('*HW02')">Wag</button>
+      <button class="btn" onclick="sendCmd('*HN02')">Nod</button>
+    </div>
+    <div class="mt-6">
+      <span class="label-dim">LED Effects:</span>
+      <div class="btn-grid mt-4">
+        <button class="btn" onclick="sendCmd('*HPS302')">Pulse</button>
+        <button class="btn" onclick="sendCmd('*HPS602')">Rainbow</button>
+      </div>
+    </div>
+    <div class="mt-6">
+      <span class="label-dim">Position:</span>
+      <div class="dir-pad mt-4">
+        <button class="btn" aria-label="Rear holo upper left" onclick="sendCmd('*HP402')">&#x2196;</button>
+        <button class="btn" aria-label="Rear holo up" onclick="sendCmd('*HP202')">&#x2191;</button>
+        <button class="btn" aria-label="Rear holo upper right" onclick="sendCmd('*HP702')">&#x2197;</button>
+        <button class="btn" aria-label="Rear holo left" onclick="sendCmd('*HP302')">&#x2190;</button>
+        <button class="btn accent" aria-label="Rear holo center" onclick="sendCmd('*HP102')">&#x25CF;</button>
+        <button class="btn" aria-label="Rear holo right" onclick="sendCmd('*HP602')">&#x2192;</button>
+        <button class="btn" aria-label="Rear holo lower left" onclick="sendCmd('*HP502')">&#x2199;</button>
+        <button class="btn" aria-label="Rear holo down" onclick="sendCmd('*HP002')">&#x2193;</button>
+        <button class="btn" aria-label="Rear holo lower right" onclick="sendCmd('*HP802')">&#x2198;</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top Holo -->
+  <div class="card">
+    <h3>Top Holo</h3>
+    <div class="btn-grid">
+      <button class="btn accent" onclick="sendCmd('*ON03')">On</button>
+      <button class="btn danger" onclick="sendCmd('*OF03')">Off</button>
+      <button class="btn" onclick="sendCmd('*RD03')">Random Move</button>
+      <button class="btn" onclick="sendCmd('*HW03')">Wag</button>
+      <button class="btn" onclick="sendCmd('*HN03')">Nod</button>
+    </div>
+    <div class="mt-6">
+      <span class="label-dim">LED Effects:</span>
+      <div class="btn-grid mt-4">
+        <button class="btn" onclick="sendCmd('*HPS303')">Pulse</button>
+        <button class="btn" onclick="sendCmd('*HPS603')">Rainbow</button>
+      </div>
+    </div>
+    <div class="mt-6">
+      <span class="label-dim">Position:</span>
+      <div class="dir-pad mt-4">
+        <button class="btn" aria-label="Top holo upper left" onclick="sendCmd('*HP403')">&#x2196;</button>
+        <button class="btn" aria-label="Top holo up" onclick="sendCmd('*HP203')">&#x2191;</button>
+        <button class="btn" aria-label="Top holo upper right" onclick="sendCmd('*HP703')">&#x2197;</button>
+        <button class="btn" aria-label="Top holo left" onclick="sendCmd('*HP303')">&#x2190;</button>
+        <button class="btn accent" aria-label="Top holo center" onclick="sendCmd('*HP103')">&#x25CF;</button>
+        <button class="btn" aria-label="Top holo right" onclick="sendCmd('*HP603')">&#x2192;</button>
+        <button class="btn" aria-label="Top holo lower left" onclick="sendCmd('*HP503')">&#x2199;</button>
+        <button class="btn" aria-label="Top holo down" onclick="sendCmd('*HP003')">&#x2193;</button>
+        <button class="btn" aria-label="Top holo lower right" onclick="sendCmd('*HP803')">&#x2198;</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Radar Eye -->
+  <div class="card">
+    <h3>Radar Eye</h3>
+    <div class="desc">Standalone LED effects for the radar eye (no servo movement)</div>
+    <div class="btn-grid">
+      <button class="btn" onclick="sendCmd('*HRS3')">Pulse</button>
+      <button class="btn" onclick="sendCmd('*HRSR')">Pulse Red</button>
+      <button class="btn" onclick="sendCmd('*HRS6')">Rainbow</button>
+      <button class="btn" onclick="sendCmd('*HRS4')">Cycle</button>
+      <button class="btn danger" onclick="sendCmd('*OF04')">Off</button>
+    </div>
+  </div>
+
+  <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>
+  <script src="/app.js"></script>
+  <script>
+    (function() {
+      'use strict';
+
+      var healthTextEl = document.getElementById('holo-health-text');
+      var i2cListEl = document.getElementById('holo-i2c-list');
+      var lastCmdEl = document.getElementById('holo-last-cmd');
+      var healthCardEl = document.getElementById('holo-health-card');
+
+      function setHealthText(html) {
+        if (healthTextEl) healthTextEl.innerHTML = html;
+      }
+
+      function updateHoloHealth(h) {
+        if (!h || typeof h.i2c_holos === 'undefined') return;
+
+        if (h.i2c_holos) {
+          if (healthCardEl) healthCardEl.style.borderLeftColor = 'var(--success)';
+          setHealthText('<span class="dot green"></span>Holo servo controller detected at I2C 0x41. Holo movement commands should reach hardware. Holo LED light control remains on the AstroPixels board.');
+        } else {
+          if (healthCardEl) healthCardEl.style.borderLeftColor = 'var(--warning)';
+          setHealthText('<span class="dot yellow"></span>No holo servo controller detected at I2C 0x41. Holo movement features will not actuate until controller power/wiring is restored. Holo LED light commands still run on the AstroPixels board.');
+        }
+
+        if (i2cListEl) {
+          if (h.i2c_devices && h.i2c_devices.length > 0) {
+            i2cListEl.textContent = 'Detected I2C devices: ' + h.i2c_devices.join(', ');
+          } else {
+            i2cListEl.textContent = 'Detected I2C devices: none';
+          }
+        }
+      }
+
+      function setLastCmdStatus(cmd, statusText) {
+        if (!lastCmdEl) return;
+        var ts = new Date().toLocaleTimeString();
+        lastCmdEl.textContent = '[' + ts + '] ' + cmd + ' -> ' + statusText;
+      }
+
+      window.sendCmd = function(cmd) {
+        setLastCmdStatus(cmd, 'sending via /api/cmd');
+        if (typeof window.apiPostForm !== 'function') {
+          setLastCmdStatus(cmd, 'failed: apiPostForm unavailable');
+          return;
+        }
+
+        window.apiPostForm('/api/cmd', 'cmd=' + encodeURIComponent(cmd))
+          .then(function(resp) {
+            if (resp.ok) {
+              setLastCmdStatus(cmd, 'accepted (HTTP ' + resp.status + ')');
+            } else {
+              setLastCmdStatus(cmd, 'rejected (HTTP ' + resp.status + ')');
+            }
+          })
+          .catch(function() {
+            setLastCmdStatus(cmd, 'failed: network error');
+          });
+      };
+
+      fetch('/api/health').then(function(r) { return r.json(); }).then(updateHoloHealth).catch(function() {
+        setHealthText('<span class="dot red"></span>Unable to read /api/health right now.');
+      });
+
+      window.onHealthUpdate = updateHoloHealth;
+    })();
+  </script>
+</body>
+</html>

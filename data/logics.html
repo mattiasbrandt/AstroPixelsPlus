@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logics — AstroPixels</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons8-r2-d2-color-32.png?v=2">
+  <link rel="shortcut icon" type="image/png" href="/icons8-r2-d2-color-32.png?v=2">
+  <link rel="apple-touch-icon" sizes="192x192" href="/icons8-r2-d2-color-192.png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <h1>Logic Displays 🔵</h1>
+  <div class="subtitle">Front Logic, Rear Logic, and PSI indicators</div>
+  <nav>
+    <a href="/">Home</a>
+    <a href="/setup.html">Setup</a>
+    <a href="/panels.html">Panels</a>
+    <a href="/holos.html">Holos</a>
+    <a href="/logics.html" class="active">Logics</a>
+    <a href="/sequences.html">Sequences</a>
+  </nav>
+
+  <!-- Quick Sequences — Both FLD + RLD -->
+  <div class="card">
+    <h3>Both Logics (FLD + RLD)</h3>
+    <div class="desc">Sets both front and rear logic displays simultaneously</div>
+    <div class="btn-grid mt-8">
+      <button class="btn accent" onclick="sendCmd('@0T1')">Normal</button>
+      <button class="btn" onclick="sendCmd('@0T2')">Flash</button>
+      <button class="btn" onclick="sendCmd('@0T3')">Alarm</button>
+      <button class="btn" onclick="sendCmd('@0T4')">Failure</button>
+      <button class="btn danger" onclick="sendCmd('@0T5')">Scream</button>
+      <button class="btn" onclick="sendCmd('@0T6')">Leia</button>
+      <button class="btn" onclick="sendCmd('@0T11')">March</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Showcase Effects</h3>
+    <div class="desc">Extra ReelTwo logic effects while keeping classic Marcduino modes available</div>
+
+    <div class="label-dim mt-8">Both</div>
+    <div class="btn-grid">
+      <button class="btn" title="Set front and rear logics to rainbow effect" onclick="sendCmd('@0T12')">Rainbow</button>
+      <button class="btn" title="Set front and rear logics to fire effect" onclick="sendCmd('@0T22')">Fire</button>
+      <button class="btn" title="Set front and rear logics to pulse effect" onclick="sendCmd('@0T24')">Pulse</button>
+      <button class="btn" title="Fade both logic displays to lights-out mode" onclick="sendCmd('@0T15')">Lights Out</button>
+    </div>
+
+    <div class="label-dim mt-8">Front</div>
+    <div class="btn-grid">
+      <button class="btn" title="Set front logic display to rainbow effect" onclick="sendCmd('@1T12')">Rainbow</button>
+      <button class="btn" title="Set front logic display to fire effect" onclick="sendCmd('@1T22')">Fire</button>
+      <button class="btn" title="Set front logic display to pulse effect" onclick="sendCmd('@1T24')">Pulse</button>
+      <button class="btn" title="Fade front logic display to lights-out mode" onclick="sendCmd('@1T15')">Lights Out</button>
+    </div>
+
+    <div class="label-dim mt-8">Rear</div>
+    <div class="btn-grid mb-0">
+      <button class="btn" title="Set rear logic display to rainbow effect" onclick="sendCmd('@2T12')">Rainbow</button>
+      <button class="btn" title="Set rear logic display to fire effect" onclick="sendCmd('@2T22')">Fire</button>
+      <button class="btn" title="Set rear logic display to pulse effect" onclick="sendCmd('@2T24')">Pulse</button>
+      <button class="btn" title="Fade rear logic display to lights-out mode" onclick="sendCmd('@2T15')">Lights Out</button>
+    </div>
+  </div>
+
+  <!-- Front Logic Display -->
+  <div class="card">
+    <h3>Front Logic Display (FLD)</h3>
+    <div class="btn-grid">
+      <button class="btn accent" onclick="sendCmd('@1T1')">Normal</button>
+      <button class="btn" onclick="sendCmd('@1T2')">Flash</button>
+      <button class="btn" onclick="sendCmd('@1T3')">Alarm</button>
+      <button class="btn" onclick="sendCmd('@1T4')">Failure</button>
+      <button class="btn danger" onclick="sendCmd('@1T5')">Scream</button>
+      <button class="btn" onclick="sendCmd('@1T6')">Leia</button>
+      <button class="btn" onclick="sendCmd('@1T11')">March</button>
+    </div>
+    <div class="mt-8">
+      <span class="label-dim">Scroll Text (Top half):</span>
+      <div class="row mt-4">
+        <input type="text" id="fld-top-text" placeholder="Enter text..." maxlength="58"
+               class="flex-1">
+        <button class="btn" onclick="sendCmd('@1M'+document.getElementById('fld-top-text').value)">Send</button>
+      </div>
+      <span class="label-dim">Scroll Text (Bottom half):</span>
+      <div class="row mt-4">
+        <input type="text" id="fld-bot-text" placeholder="Enter text..." maxlength="58"
+               class="flex-1">
+        <button class="btn" onclick="sendCmd('@2M'+document.getElementById('fld-bot-text').value)">Send</button>
+      </div>
+      <div class="mt-6">
+        <span class="label-dim">Font:</span>
+        <button class="btn" onclick="sendCmd('@1P60');sendCmd('@2P60')">Latin</button>
+        <button class="btn" onclick="sendCmd('@1P61');sendCmd('@2P61')">Aurabesh</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rear Logic Display -->
+  <div class="card">
+    <h3>Rear Logic Display (RLD)</h3>
+    <div class="btn-grid">
+      <button class="btn accent" onclick="sendCmd('@2T1')">Normal</button>
+      <button class="btn" onclick="sendCmd('@2T2')">Flash</button>
+      <button class="btn" onclick="sendCmd('@2T3')">Alarm</button>
+      <button class="btn" onclick="sendCmd('@2T4')">Failure</button>
+      <button class="btn danger" onclick="sendCmd('@2T5')">Scream</button>
+      <button class="btn" onclick="sendCmd('@2T6')">Leia</button>
+      <button class="btn" onclick="sendCmd('@2T11')">March</button>
+    </div>
+    <div class="mt-8">
+      <span class="label-dim">Scroll Text:</span>
+      <div class="row mt-4">
+        <input type="text" id="rld-text" placeholder="Enter text..." maxlength="60"
+               class="flex-1">
+        <button class="btn" onclick="sendCmd('@3M'+document.getElementById('rld-text').value)">Send</button>
+      </div>
+      <div class="mt-6">
+        <span class="label-dim">Font:</span>
+        <button class="btn" onclick="sendCmd('@3P60')">Latin</button>
+        <button class="btn" onclick="sendCmd('@3P61')">Aurabesh</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PSI Indicators -->
+  <div class="card">
+    <h3>PSI Indicators</h3>
+    <div class="desc">Process State Indicators (front and rear)</div>
+
+    <div class="label-dim mt-8">Both</div>
+    <div class="btn-grid">
+      <button class="btn" title="Normal" onclick="sendCmd('@0P1')">Normal</button>
+      <button class="btn" title="Flash" onclick="sendCmd('@0P2')">Flash</button>
+      <button class="btn" title="Alarm" onclick="sendCmd('@0P3')">Alarm</button>
+      <button class="btn" title="Fail" onclick="sendCmd('@0P4')">Fail</button>
+      <button class="btn danger" title="Scream" onclick="sendCmd('@0P5')">Scream</button>
+      <button class="btn" title="Leia" onclick="sendCmd('@0P6')">Leia</button>
+      <button class="btn" title="March" onclick="sendCmd('@0P11')">March</button>
+    </div>
+
+    <div class="label-dim mt-8">Front</div>
+    <div class="btn-grid">
+      <button class="btn" title="Normal" onclick="sendCmd('@1P1')">Normal</button>
+      <button class="btn" title="Flash" onclick="sendCmd('@1P2')">Flash</button>
+      <button class="btn" title="Alarm" onclick="sendCmd('@1P3')">Alarm</button>
+      <button class="btn" title="Fail" onclick="sendCmd('@1P4')">Fail</button>
+      <button class="btn danger" title="Scream" onclick="sendCmd('@1P5')">Scream</button>
+      <button class="btn" title="Leia" onclick="sendCmd('@1P6')">Leia</button>
+      <button class="btn" title="March" onclick="sendCmd('@1P11')">March</button>
+    </div>
+
+    <div class="label-dim mt-8">Rear</div>
+    <div class="btn-grid mb-0">
+      <button class="btn" title="Normal" onclick="sendCmd('@2P1')">Normal</button>
+      <button class="btn" title="Flash" onclick="sendCmd('@2P2')">Flash</button>
+      <button class="btn" title="Alarm" onclick="sendCmd('@2P3')">Alarm</button>
+      <button class="btn" title="Fail" onclick="sendCmd('@2P4')">Fail</button>
+      <button class="btn danger" title="Scream" onclick="sendCmd('@2P5')">Scream</button>
+      <button class="btn" title="Leia" onclick="sendCmd('@2P6')">Leia</button>
+      <button class="btn" title="March" onclick="sendCmd('@2P11')">March</button>
+    </div>
+  </div>
+
+  <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>
+  <script src="/app.js"></script>
+</body>
+</html>

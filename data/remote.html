@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Remote — AstroPixels</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons8-r2-d2-color-32.png?v=2">
+  <link rel="shortcut icon" type="image/png" href="/icons8-r2-d2-color-32.png?v=2">
+  <link rel="apple-touch-icon" sizes="192x192" href="/icons8-r2-d2-color-192.png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <h1>Droid Remote 🎮</h1>
+  <div class="subtitle">ESPNOW wireless remote configuration (not R2 Touch IP/port setup)</div>
+  <nav>
+    <a href="/">Home</a>
+    <a href="/setup.html">Setup</a>
+  </nav>
+
+  <div class="card">
+    <div class="desc"><strong>Important:</strong> This page configures the ESPNOW Droid Remote pairing flow (device name + secret). If you are using the R2 Touch app, use Serial/WiFi settings and connect to controller IP on port <code>2000</code>.</div>
+  </div>
+
+  <div class="card">
+    <h3>ESPNOW Settings</h3>
+    <div class="desc" id="remote-mode-note">Changes require reboot to take effect</div>
+
+    <div class="mt-12">
+      <label class="check-row" title="Enables ESPNOW Droid Remote support. This mode is mutually exclusive with normal WiFi operation in this firmware setup.">
+        <input type="checkbox" id="remote-enabled" title="Enable or disable Droid Remote mode.">
+        <span>Droid Remote Enabled</span>
+      </label>
+
+      <div class="mb-10">
+        <label class="label-dim">Device Name</label>
+        <input type="text" id="remote-host" value="Astro"
+               class="input-full">
+      </div>
+      <div class="mb-10">
+        <label class="label-dim">Pairing Secret</label>
+        <input type="password" id="remote-secret" value="Astromech"
+               class="input-full">
+      </div>
+    </div>
+
+    <button class="btn accent w-100 mt-8" onclick="saveRemote()">Save &amp; Reboot</button>
+  </div>
+
+  <div class="card">
+    <h3>Pairing</h3>
+    <div class="btn-grid">
+      <button class="btn" onclick="sendCmd('#APPAIR')">Start Pairing</button>
+      <button class="btn danger" onclick="sendCmd('#APUNPAIR')">Unpair</button>
+    </div>
+    <div class="desc">Hold the pairing button on your remote, then click Start Pairing</div>
+  </div>
+
+  <div class="card">
+    <div class="desc">Note: Droid Remote uses ESPNOW which cannot run simultaneously with WiFi. Enabling remote disables WiFi and vice versa.</div>
+  </div>
+
+  <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>
+  <script src="/app.js"></script>
+  <script>
+    function setRemoteUiEnabled(enabled) {
+      ['remote-enabled', 'remote-host', 'remote-secret'].forEach(function(id){
+        var el = document.getElementById(id);
+        if (el) el.disabled = !enabled;
+      });
+      var btn = document.querySelector('button[onclick="saveRemote()"]');
+      if (btn) btn.disabled = !enabled;
+    }
+
+    fetch('/api/state').then(function(r){return r.json();}).then(function(s){
+      if (typeof s.remoteSupported !== 'undefined' && !s.remoteSupported) {
+        setRemoteUiEnabled(false);
+        var note = document.getElementById('remote-mode-note');
+        if (note) {
+          note.innerHTML = '<strong>Disabled at build time:</strong> Droid Remote ESPNOW support is compiled out in this firmware build to save memory.';
+        }
+      }
+    }).catch(function(){});
+
+    fetch('/api/pref?keys=remote,rhost,rsecret').then(function(r){return r.json();}).then(function(d){
+      if (typeof d.remote !== 'undefined') document.getElementById('remote-enabled').checked = d.remote === 'true' || d.remote === true || d.remote === '1';
+      if (d.rhost) document.getElementById('remote-host').value = d.rhost;
+      if (d.rsecret) document.getElementById('remote-secret').value = d.rsecret;
+    }).catch(function(){});
+
+    function saveRemote() {
+      var prefs = [
+        {key:'remote', val: document.getElementById('remote-enabled').checked ? '1' : '0'},
+        {key:'rhost', val: document.getElementById('remote-host').value},
+        {key:'rsecret', val: document.getElementById('remote-secret').value}
+      ];
+      var chain = Promise.resolve();
+      prefs.forEach(function(p, i) {
+        chain = chain.then(function() {
+          var body = 'key=' + encodeURIComponent(p.key) + '&val=' + encodeURIComponent(p.val);
+          if (i === prefs.length - 1) body += '&reboot=1';
+          return apiPostForm('/api/pref', body);
+        });
+      });
+      chain.then(function(){
+        document.getElementById('conn-status').innerHTML = '<span class="dot yellow"></span>Rebooting...';
+      });
+    }
+  </script>
+</body>
+</html>

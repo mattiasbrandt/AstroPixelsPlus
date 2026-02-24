@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WiFi — AstroPixels</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons8-r2-d2-color-32.png?v=2">
+  <link rel="shortcut icon" type="image/png" href="/icons8-r2-d2-color-32.png?v=2">
+  <link rel="apple-touch-icon" sizes="192x192" href="/icons8-r2-d2-color-192.png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <h1>WiFi Configuration 📶</h1>
+  <div class="subtitle">Access point and network settings</div>
+  <nav>
+    <a href="/">Home</a>
+    <a href="/setup.html">Setup</a>
+  </nav>
+
+  <div class="card">
+    <h3>WiFi Settings</h3>
+    <div class="desc">Changes require reboot to take effect</div>
+
+    <div class="mt-12">
+      <label class="check-row" title="Turns AstroPixels WiFi services on or off. Required for web UI, REST API, and OTA uploads.">
+        <input type="checkbox" id="wifi-enabled" checked title="Enable or disable controller WiFi services.">
+        <span>WiFi Enabled</span>
+      </label>
+      <label class="check-row" title="When enabled, AstroPixels runs as an access point. When disabled, it attempts to join the configured SSID as a station.">
+        <input type="checkbox" id="wifi-ap" checked title="Use AP mode instead of station mode.">
+        <span>Access Point Mode</span>
+      </label>
+      <div class="desc mb-10">Uncheck to join an existing WiFi network instead</div>
+
+      <div class="mb-10">
+        <label class="label-dim">SSID</label>
+        <input type="text" id="wifi-ssid" value="AstroPixels"
+               class="input-full">
+      </div>
+      <div class="mb-10">
+        <label class="label-dim">Password</label>
+        <input type="password" id="wifi-pass" value="Astromech"
+               class="input-full">
+      </div>
+    </div>
+
+    <button class="btn accent w-100 mt-8" onclick="saveWifi()">Save &amp; Reboot</button>
+  </div>
+
+  <div class="card">
+    <div class="desc">Note: Enabling WiFi disables the Droid Remote (ESPNOW). They cannot run simultaneously.</div>
+  </div>
+
+  <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>
+  <script src="/app.js"></script>
+  <script>
+    // Load current settings
+    fetch('/api/pref?keys=wifi,ap,ssid,pass').then(function(r){return r.json();}).then(function(d){
+      if (typeof d.wifi !== 'undefined') document.getElementById('wifi-enabled').checked = (d.wifi === true || d.wifi === 'true' || d.wifi === '1');
+      if (typeof d.ap !== 'undefined') document.getElementById('wifi-ap').checked = (d.ap === true || d.ap === 'true' || d.ap === '1');
+      if (d.ssid) document.getElementById('wifi-ssid').value = d.ssid;
+      if (d.pass) document.getElementById('wifi-pass').value = d.pass;
+    }).catch(function(){});
+
+    function saveWifi() {
+      var prefs = [
+        {key:'wifi', val: document.getElementById('wifi-enabled').checked ? '1' : '0'},
+        {key:'ap', val: document.getElementById('wifi-ap').checked ? '1' : '0'},
+        {key:'ssid', val: document.getElementById('wifi-ssid').value},
+        {key:'pass', val: document.getElementById('wifi-pass').value}
+      ];
+      // Also set remote opposite of wifi
+      prefs.push({key:'remote', val: document.getElementById('wifi-enabled').checked ? '0' : '1'});
+
+      var chain = Promise.resolve();
+      prefs.forEach(function(p, i) {
+        chain = chain.then(function() {
+          var body = 'key=' + encodeURIComponent(p.key) + '&val=' + encodeURIComponent(p.val);
+          if (i === prefs.length - 1) body += '&reboot=1';
+          return apiPostForm('/api/pref', body);
+        });
+      });
+      chain.then(function(){
+        document.getElementById('conn-status').innerHTML = '<span class="dot yellow"></span>Rebooting...';
+      });
+    }
+  </script>
+</body>
+</html>

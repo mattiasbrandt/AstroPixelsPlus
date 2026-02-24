@@ -169,6 +169,94 @@ MARCDUINO_ACTION(MarchSequence, @0T11, ({
 
 ////////////////
 
+MARCDUINO_ACTION(FLDRainbowSequence, @1T12, ({
+                     // Front logic display rainbow showcase
+                     FLD.selectSequence(LogicEngineRenderer::RAINBOW);
+                 }))
+
+////////////////
+
+MARCDUINO_ACTION(RLDRainbowSequence, @2T12, ({
+                     // Rear logic display rainbow showcase
+                     RLD.selectSequence(LogicEngineRenderer::RAINBOW);
+                 }))
+
+////////////////
+
+MARCDUINO_ACTION(RainbowSequence, @0T12, ({
+                     // Combined front/rear rainbow showcase
+                     FLD.selectSequence(LogicEngineRenderer::RAINBOW);
+                     RLD.selectSequence(LogicEngineRenderer::RAINBOW);
+                 }))
+
+////////////////
+
+MARCDUINO_ACTION(FLDLightsOutSequence, @1T15, ({
+                     // Front logic fade-to-dark mode
+                     FLD.selectSequence(LogicEngineRenderer::LIGHTSOUT);
+                 }))
+
+////////////////
+
+MARCDUINO_ACTION(RLDLightsOutSequence, @2T15, ({
+                     // Rear logic fade-to-dark mode
+                     RLD.selectSequence(LogicEngineRenderer::LIGHTSOUT);
+                 }))
+
+////////////////
+
+MARCDUINO_ACTION(LightsOutSequence, @0T15, ({
+                     // Combined front/rear fade-to-dark mode
+                     FLD.selectSequence(LogicEngineRenderer::LIGHTSOUT);
+                     RLD.selectSequence(LogicEngineRenderer::LIGHTSOUT);
+                 }))
+
+////////////////
+
+MARCDUINO_ACTION(FLDFireSequence, @1T22, ({
+                     // Front logic fire renderer showcase
+                     FLD.selectSequence(LogicEngineRenderer::FIRE);
+                 }))
+
+////////////////
+
+MARCDUINO_ACTION(RLDFireSequence, @2T22, ({
+                     // Rear logic fire renderer showcase
+                     RLD.selectSequence(LogicEngineRenderer::FIRE);
+                 }))
+
+////////////////
+
+MARCDUINO_ACTION(FireSequence, @0T22, ({
+                     // Combined front/rear fire renderer showcase
+                     FLD.selectSequence(LogicEngineRenderer::FIRE);
+                     RLD.selectSequence(LogicEngineRenderer::FIRE);
+                 }))
+
+////////////////
+
+MARCDUINO_ACTION(FLDPulseSequence, @1T24, ({
+                     // Front logic pulse renderer showcase
+                     FLD.selectSequence(LogicEngineRenderer::PULSE);
+                 }))
+
+////////////////
+
+MARCDUINO_ACTION(RLDPulseSequence, @2T24, ({
+                     // Rear logic pulse renderer showcase
+                     RLD.selectSequence(LogicEngineRenderer::PULSE);
+                 }))
+
+////////////////
+
+MARCDUINO_ACTION(PulseSequence, @0T24, ({
+                     // Combined front/rear pulse renderer showcase
+                     FLD.selectSequence(LogicEngineRenderer::PULSE);
+                     RLD.selectSequence(LogicEngineRenderer::PULSE);
+                 }))
+
+////////////////
+
 static char sMTFLDText[128];
 static char sMBFLDText[128];
 static char sMFLDText[256];

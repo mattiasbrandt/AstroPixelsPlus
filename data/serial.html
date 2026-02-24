@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Serial — AstroPixels</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons8-r2-d2-color-32.png?v=2">
+  <link rel="shortcut icon" type="image/png" href="/icons8-r2-d2-color-32.png?v=2">
+  <link rel="apple-touch-icon" sizes="192x192" href="/icons8-r2-d2-color-192.png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <h1>Serial / Marcduino 🔌</h1>
+  <div class="subtitle">Serial communication and JawaLite settings</div>
+  <nav>
+    <a href="/">Home</a>
+    <a href="/setup.html">Setup</a>
+  </nav>
+
+  <div class="card">
+    <h3>R2 Touch App Connection</h3>
+    <div class="desc">R2 Touch uses Marcduino command transport over WiFi (IP + port), not ESPNOW host/secret pairing.</div>
+    <div class="sys-status mt-8" id="r2touch-status">Loading controller IP...</div>
+    <div class="desc mt-8">Required setting for the app:</div>
+    <ul class="mt-4" style="margin:0 0 0 18px;padding:0;">
+      <li><code>IP</code>: controller WiFi IP (shown above)</li>
+      <li><code>Port</code>: <code>2000</code></li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>Serial2 (Marcduino Input)</h3>
+
+    <div class="mb-10">
+      <label class="label-dim">Baud Rate</label>
+      <select id="serial2-baud" class="mt-4">
+        <option value="2400">2400</option>
+        <option value="9600">9600</option>
+      </select>
+    </div>
+
+    <label class="check-row" title="When enabled, bytes received on USB serial are echoed to Serial2 toward Marcduino/Artoo-side equipment.">
+      <input type="checkbox" id="serial-pass" checked title="Pass USB serial input through to Serial2 output.">
+      <span>Serial pass-through to Serial2</span>
+    </label>
+  </div>
+
+  <div class="card">
+    <h3>Artoo Controller Communication</h3>
+    <div class="desc">Telemetry profile for body-to-dome serial traffic over the slip ring when using an Artoo body controller.</div>
+    <div class="desc mt-8">Artoo controller reference: <a href="https://www.artoo.uk/artooinventions" target="_blank" rel="noopener noreferrer">artoo.uk/artooinventions</a></div>
+
+    <label class="check-row mt-8" title="Enables Artoo-profile telemetry fields and health indicators for body-to-dome serial traffic observation.">
+      <input type="checkbox" id="artoo-enabled" title="Enable Artoo telemetry profile (no command remapping).">
+      <span>Enable Artoo serial telemetry profile</span>
+    </label>
+
+    <div class="mb-10 mt-8">
+      <label class="label-dim">Expected Artoo Baud</label>
+      <select id="artoo-baud" class="mt-4">
+        <option value="2400">2400</option>
+        <option value="9600">9600</option>
+        <option value="19200">19200</option>
+        <option value="38400">38400</option>
+        <option value="57600">57600</option>
+        <option value="115200">115200</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>JawaLite Protocol</h3>
+
+    <label class="check-row" title="Enables JawaLite/Marcduino command parsing on Serial2 input.">
+      <input type="checkbox" id="jawalite-serial" checked title="Accept commands arriving on Serial2.">
+      <span>JawaLite on Serial2</span>
+    </label>
+    <label class="check-row" title="Enables the WiFi Marcduino socket listener on port 2000.">
+      <input type="checkbox" id="jawalite-wifi" checked title="Accept commands from WiFi socket port 2000.">
+      <span>JawaLite on WiFi (port 2000)</span>
+    </label>
+    <label class="check-row" title="When enabled, commands received on WiFi socket are forwarded to Serial2 for chained controllers.">
+      <input type="checkbox" id="wifi-serial-pass" checked title="Forward WiFi Marcduino commands to Serial2 output.">
+      <span>WiFi JawaLite pass-through to Serial2</span>
+    </label>
+  </div>
+
+  <button class="btn accent w-100 mt-8" onclick="saveSerial()">Save</button>
+
+  <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>
+  <script src="/app.js"></script>
+  <script>
+    fetch('/api/pref?keys=mserial2,mserialpass,mserial,mwifi,mwifipass,artoo,artoobaud').then(function(r){return r.json();}).then(function(d){
+      if (d.mserial2) document.getElementById('serial2-baud').value = d.mserial2;
+      if (typeof d.mserialpass !== 'undefined') document.getElementById('serial-pass').checked = d.mserialpass === 'true' || d.mserialpass === true || d.mserialpass === '1';
+      if (typeof d.mserial !== 'undefined') document.getElementById('jawalite-serial').checked = d.mserial === 'true' || d.mserial === true || d.mserial === '1';
+      if (typeof d.mwifi !== 'undefined') document.getElementById('jawalite-wifi').checked = d.mwifi === 'true' || d.mwifi === true || d.mwifi === '1';
+      if (typeof d.mwifipass !== 'undefined') document.getElementById('wifi-serial-pass').checked = d.mwifipass === 'true' || d.mwifipass === true || d.mwifipass === '1';
+      if (typeof d.artoo !== 'undefined') document.getElementById('artoo-enabled').checked = d.artoo === 'true' || d.artoo === true || d.artoo === '1';
+      if (d.artoobaud) document.getElementById('artoo-baud').value = d.artoobaud;
+    }).catch(function(){});
+
+    fetch('/api/state').then(function(r){return r.json();}).then(function(s){
+      var ip = s.wifiIP || 'unknown';
+      var mode = s.wifiAP ? 'AP' : 'STA';
+      document.getElementById('r2touch-status').innerHTML =
+        '<div>Controller IP: <strong>' + ip + '</strong> (' + mode + ' mode)</div>' +
+        '<div>Marcduino WiFi Port: <strong>2000</strong></div>';
+    }).catch(function(){
+      document.getElementById('r2touch-status').textContent = 'Unable to read controller IP right now.';
+    });
+
+    function saveSerial() {
+      var prefs = [
+        {key:'mserial2', val: document.getElementById('serial2-baud').value},
+        {key:'mserialpass', val: document.getElementById('serial-pass').checked ? '1' : '0'},
+        {key:'mserial', val: document.getElementById('jawalite-serial').checked ? '1' : '0'},
+        {key:'mwifi', val: document.getElementById('jawalite-wifi').checked ? '1' : '0'},
+        {key:'mwifipass', val: document.getElementById('wifi-serial-pass').checked ? '1' : '0'},
+        {key:'artoo', val: document.getElementById('artoo-enabled').checked ? '1' : '0'},
+        {key:'artoobaud', val: document.getElementById('artoo-baud').value}
+      ];
+      var chain = Promise.resolve();
+      prefs.forEach(function(p) {
+        chain = chain.then(function() {
+          return apiPostForm('/api/pref', 'key=' + encodeURIComponent(p.key) + '&val=' + encodeURIComponent(p.val));
+        });
+      });
+      chain.then(function(){ alert('Settings saved. Some changes may require reboot.'); });
+    }
+  </script>
+</body>
+</html>

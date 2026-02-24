@@ -29,8 +29,15 @@
 #define USE_DEBUG // Define to enable debug diagnostic
 #define USE_WIFI  // Define to enable Wifi support
 #define USE_SPIFFS
+
+#ifndef AP_ENABLE_DROID_REMOTE
+#define AP_ENABLE_DROID_REMOTE 0
+#endif
+
 #ifdef USE_WIFI
+#if AP_ENABLE_DROID_REMOTE
 #define USE_DROID_REMOTE // Define for droid remote support
+#endif
 #define USE_MDNS
 #define USE_OTA
 #define USE_WIFI_WEB
@@ -85,6 +92,9 @@
 #define PREFERENCE_MARCWIFI_ENABLED "mwifi"
 #define PREFERENCE_MARCWIFI_SERIAL_PASS "mwifipass"
 
+#define PREFERENCE_ARTOO_ENABLED "artoo"
+#define PREFERENCE_ARTOO_BAUD "artoobaud"
+
 #define PREFERENCE_MARCSOUND "msound"
 #define PREFERENCE_MARCSOUND_SERIAL "msoundser"
 #define PREFERENCE_MARCSOUND_VOLUME "mvolume"
@@ -92,6 +102,7 @@
 #define PREFERENCE_MARCSOUND_RANDOM "mrandom"
 #define PREFERENCE_MARCSOUND_RANDOM_MIN "mrandommin"
 #define PREFERENCE_MARCSOUND_RANDOM_MAX "mrandommax"
+#define PREFERENCE_MARCSOUND_LOCAL_ENABLED "msoundlocal"
 
 ////////////////////////////////
 
@@ -145,6 +156,8 @@
 #define MARC_SERIAL_ENABLED true
 #define MARC_WIFI_ENABLED true
 #define MARC_WIFI_SERIAL_PASS true
+#define ARTOO_ENABLED false
+#define ARTOO_BAUD 2400
 #define MARC_SOUND_PLAYER MarcSound::kDisabled
 #define MARC_SOUND_SERIAL 0
 #define MARC_SOUND_VOLUME 500 // 0 - 1000
@@ -152,6 +165,7 @@
 #define MARC_SOUND_RANDOM true
 #define MARC_SOUND_RANDOM_MIN 5000
 #define MARC_SOUND_RANDOM_MAX 30000
+#define MARC_SOUND_LOCAL_ENABLED true
 
 #include "wifi/WifiAccess.h"
 
@@ -161,7 +175,7 @@
 #include <ESPmDNS.h>
 #endif
 #ifdef USE_WIFI_WEB
-#include "wifi/WifiWebServer.h"
+#include <ESPAsyncWebServer.h>
 #endif
 #ifdef USE_WIFI_MARCDUINO
 #include "wifi/WifiMarcduinoReceiver.h"
@@ -171,13 +185,10 @@
 #endif
 #ifdef USE_SPIFFS
 #include "SPIFFS.h"
-#define USE_FS SPIFFS
 #elif defined(USE_FATFS)
 #include "FFat.h"
-#define USE_FS FFat
 #elif defined(USE_LITTLEFS)
 #include "LITTLEFS.h"
-#define USE_FS LITTLEFS
 #endif
 #include "FS.h"
 
@@ -402,7 +413,6 @@ void reboot()
 #endif
     unmountFileSystems();
     preferences.end();
-    delay(1000);
     ESP.restart();
 }
 
@@ -477,9 +487,23 @@ bool wifiEnabled;
 bool wifiActive;
 bool remoteEnabled;
 bool remoteActive;
+bool artooEnabled;
+int artooBaud;
 TaskHandle_t eventTask;
 bool otaInProgress;
+volatile uint32_t sArtooLastSignalMs;
+volatile uint32_t sArtooSignalBursts;
+portMUX_TYPE sArtooTelemetryMux = portMUX_INITIALIZER_UNLOCKED;
 #endif
+
+bool soundLocalEnabled;
+uint32_t sMinFreeHeap = 0;
+static bool sSoundInitPending;
+static uint32_t sSoundInitAtMs;
+static uint8_t sSoundInitAttempts;
+static MarcSound::Module sSoundInitModule;
+static int sSoundInitStartup;
+static float sSoundInitVolume;
 
 #ifdef USE_WIFI_MARCDUINO
 WifiMarcduinoReceiver wifiMarcduinoReceiver(wifiAccess);
@@ -525,21 +549,27 @@ CommandScreenHandlerSMQ sDisplay;
 ////////////////////////////////
 
 #ifdef USE_WIFI_WEB
-#include "WebPages.h"
+#include "AsyncWebInterface.h"
 #endif
 
 #ifdef USE_DROID_REMOTE
-static bool sRemoteConnected;
-static bool sRemoteConnecting;
-static SMQAddress sRemoteAddress;
+bool sRemoteConnected;
+bool sRemoteConnecting;
+SMQAddress sRemoteAddress;
 #endif
+
+static bool sArtooSignalActive;
 
 ////////////////////////////////
 
 void scan_i2c()
 {
     unsigned nDevices = 0;
+    Serial.println("===========================================");
     Serial.println("Scanning I2C addresses 0x01-0x7E...");
+    Serial.println("Expected: 0x40 (Panels), 0x41 (Holos)");
+    Serial.println("===========================================");
+    
     for (byte address = 1; address < 127; address++)
     {
         String name = "<unknown>";
@@ -553,12 +583,12 @@ void scan_i2c()
         if (address == 0x40)
         {
             // Adafruit PCA9685 - Panels Controller
-            name = "PCA9685 (Panels)";
+            name = "PCA9685 (Panels) ← EXPECTED";
         }
         if (address == 0x41)
         {
             // Adafruit PCA9685 - Holos Controller
-            name = "PCA9685 (Holos)";
+            name = "PCA9685 (Holos) ← EXPECTED";
         }
         if (address == 0x14)
         {
@@ -578,7 +608,7 @@ void scan_i2c()
 
         if (error == 0)
         {
-            Serial.print("I2C device found at address 0x");
+            Serial.print("✓ I2C device found at address 0x");
             if (address < 16)
                 Serial.print("0");
             Serial.print(address, HEX);
@@ -588,16 +618,22 @@ void scan_i2c()
         }
         else if (error == 4)
         {
-            Serial.print("Unknown error at address 0x");
+            Serial.print("✗ Unknown error at address 0x");
             if (address < 16)
                 Serial.print("0");
             Serial.println(address, HEX);
         }
     }
+    Serial.println("===========================================");
     if (nDevices == 0)
-        Serial.println("No I2C devices found\n");
+        Serial.println("❌ NO I2C DEVICES FOUND!");
     else
-        Serial.println("done\n");
+    {
+        Serial.print("✓ Found ");
+        Serial.print(nDevices);
+        Serial.println(" I2C device(s)");
+    }
+    Serial.println("===========================================\n");
 }
 
 ////////////////////////////////
@@ -612,8 +648,16 @@ void setup()
     }
 #ifdef USE_WIFI
     wifiEnabled = wifiActive = preferences.getBool(PREFERENCE_WIFI_ENABLED, WIFI_ENABLED);
+#ifdef USE_DROID_REMOTE
     remoteEnabled = remoteActive = preferences.getBool(PREFERENCE_REMOTE_ENABLED, REMOTE_ENABLED);
+#else
+    remoteEnabled = remoteActive = false;
 #endif
+    artooEnabled = preferences.getBool(PREFERENCE_ARTOO_ENABLED, ARTOO_ENABLED);
+    artooBaud = preferences.getInt(PREFERENCE_ARTOO_BAUD, ARTOO_BAUD);
+#endif
+    soundLocalEnabled = preferences.getBool(PREFERENCE_MARCSOUND_LOCAL_ENABLED, MARC_SOUND_LOCAL_ENABLED);
+    sMinFreeHeap = ESP.getFreeHeap();
     PrintReelTwoInfo(Serial, "AstroPixelsPlus");
 
     if (preferences.getBool(PREFERENCE_MARCSERIAL_ENABLED, MARC_SERIAL_ENABLED))
@@ -630,8 +674,12 @@ void setup()
 
 #ifndef USE_I2C_ADDRESS
     Wire.begin();
+    Serial.println("\n=== I2C DIAGNOSTICS ===");
+    Serial.println("Initializing I2C on SDA=21, SCL=22");
+    delay(100); // Give I2C time to settle
+    scan_i2c();
+    Serial.println("=== END I2C DIAGNOSTICS ===\n");
 #endif
-    // scan_i2c();
     SetupEvent::ready();
 
     // dataPanel.setSequence(DataPanel::kDisabled);
@@ -648,16 +696,21 @@ void setup()
 #endif
     MarcSound::Module soundPlayer = (MarcSound::Module)preferences.getInt(PREFERENCE_MARCSOUND, MARC_SOUND_PLAYER);
     int soundStartup = preferences.getInt(PREFERENCE_MARCSOUND_STARTUP, MARC_SOUND_STARTUP);
-    if (soundPlayer != MarcSound::kDisabled)
+    sSoundInitPending = false;
+    sSoundInitAttempts = 0;
+    if (!soundLocalEnabled)
+    {
+        DEBUG_PRINTLN("Local sound execution disabled by preference");
+    }
+    else if (soundPlayer != MarcSound::kDisabled)
     {
         SOUND_SERIAL.begin(SOUND_BAUD, SERIAL_8N1, SOUND_RX_PIN, SOUND_TX_PIN);
-        // Need to wait 3 seconds for sound modules to power up
-        delay(3000);
-        if (!sMarcSound.begin(soundPlayer, SOUND_SERIAL, soundStartup))
-        {
-            DEBUG_PRINTLN("FAILED TO INITALIZE SOUND MODULE");
-        }
-        sMarcSound.setVolume(preferences.getInt(PREFERENCE_MARCSOUND_VOLUME, MARC_SOUND_VOLUME) / 1000.0);
+        sSoundInitPending = true;
+        sSoundInitAtMs = millis() + 3000;
+        sSoundInitModule = soundPlayer;
+        sSoundInitStartup = soundStartup;
+        sSoundInitVolume = preferences.getInt(PREFERENCE_MARCSOUND_VOLUME, MARC_SOUND_VOLUME) / 1000.0f;
+        DEBUG_PRINTLN("Sound module initialization scheduled (deferred)");
     }
     // Assign servos to holo projectors
     frontHolo.assignServos(&servoDispatch, 13, 14);
@@ -799,7 +852,7 @@ void setup()
             wifiMarcduinoReceiver.setCommandHandler([](const char *cmd)
                                                     {
                 printf("cmd: %s\n", cmd);
-                Marcduino::processCommand(player, cmd);
+                processMarcduinoCommandWithSourceMain("wifi-marcduino", cmd);
                 if (preferences.getBool(PREFERENCE_MARCWIFI_SERIAL_PASS, MARC_WIFI_SERIAL_PASS))
                 {
                     COMMAND_SERIAL.print(cmd); COMMAND_SERIAL.print('\r');
@@ -861,11 +914,8 @@ void setup()
     }
 #endif
 #ifdef USE_WIFI_WEB
-    // For safety we will stop the motors if the web client is connected
-    webServer.setConnect([]()
-                         {
-                             // Callback for each connected web client
-                         });
+    // Initialize async web server (serves SPIFFS files + REST API + WebSocket)
+    initAsyncWeb();
 #endif
 
     // DEBUG TEMP: Deferring web server creation until WiFi connected
@@ -881,11 +931,14 @@ void setup()
         0);
 #endif
     DEBUG_PRINTLN("Ready");
-    sMarcSound.playStartSound();
-    sMarcSound.setRandomMin(preferences.getInt(PREFERENCE_MARCSOUND_RANDOM_MIN, MARC_SOUND_RANDOM_MIN));
-    sMarcSound.setRandomMax(preferences.getInt(PREFERENCE_MARCSOUND_RANDOM_MAX, MARC_SOUND_RANDOM_MAX));
-    if (preferences.getInt(PREFERENCE_MARCSOUND_RANDOM, MARC_SOUND_RANDOM))
-        sMarcSound.startRandomInSeconds(13);
+    if (soundLocalEnabled && !sSoundInitPending)
+    {
+        sMarcSound.playStartSound();
+        sMarcSound.setRandomMin(preferences.getInt(PREFERENCE_MARCSOUND_RANDOM_MIN, MARC_SOUND_RANDOM_MIN));
+        sMarcSound.setRandomMax(preferences.getInt(PREFERENCE_MARCSOUND_RANDOM_MAX, MARC_SOUND_RANDOM_MAX));
+        if (preferences.getInt(PREFERENCE_MARCSOUND_RANDOM, MARC_SOUND_RANDOM))
+            sMarcSound.startRandomInSeconds(13);
+    }
 }
 
 ////////////////
@@ -975,10 +1028,10 @@ MARCDUINO_ACTION(RemoteToggle, #APREMOTE, ({
 ////////////////
 
 MARCDUINO_ACTION(RemoteName, #APRNAME, ({
-                     String newSecret = String(Marcduino::getCommand());
-                     if (preferences.getString(PREFERENCE_REMOTE_SECRET, SMQ_HOSTNAME) != newSecret)
+                     String newHostname = String(Marcduino::getCommand());
+                     if (preferences.getString(PREFERENCE_REMOTE_HOSTNAME, SMQ_HOSTNAME) != newHostname)
                      {
-                         preferences.putString(PREFERENCE_REMOTE_SECRET, newSecret);
+                         preferences.putString(PREFERENCE_REMOTE_HOSTNAME, newHostname);
                          printf("Changed.\n");
                          reboot();
                      }
@@ -988,7 +1041,7 @@ MARCDUINO_ACTION(RemoteName, #APRNAME, ({
 
 MARCDUINO_ACTION(RemoteSecret, #APRSECRET, ({
                      String newSecret = String(Marcduino::getCommand());
-                     if (preferences.getString(PREFERENCE_REMOTE_SECRET, SMQ_HOSTNAME) != newSecret)
+                     if (preferences.getString(PREFERENCE_REMOTE_SECRET, SMQ_SECRET) != newSecret)
                      {
                          preferences.putString(PREFERENCE_REMOTE_SECRET, newSecret);
                          printf("Changed.\n");
@@ -1090,6 +1143,13 @@ static void DisconnectRemote()
 static unsigned sPos;
 static char sBuffer[CONSOLE_BUFFER_SIZE];
 
+static void processMarcduinoCommandWithSourceMain(const char *source, const char *cmd)
+{
+    if (cmd == nullptr || cmd[0] == '\0') return;
+    Serial.printf("[CMD][%s] %s\n", source, cmd);
+    Marcduino::processCommand(player, cmd);
+}
+
 ////////////////
 
 #ifdef USE_I2C_ADDRESS
@@ -1098,7 +1158,7 @@ I2CReceiverBase<CONSOLE_BUFFER_SIZE> i2cReceiver(USE_I2C_ADDRESS, [](char *cmd)
     DEBUG_PRINT("[I2C] RECEIVED=\"");
     DEBUG_PRINT(cmd);
     DEBUG_PRINTLN("\"");
-    Marcduino::processCommand(player, cmd); });
+    processMarcduinoCommandWithSourceMain("i2c-slave", cmd); });
 #endif
 
 ////////////////
@@ -1106,10 +1166,58 @@ I2CReceiverBase<CONSOLE_BUFFER_SIZE> i2cReceiver(USE_I2C_ADDRESS, [](char *cmd)
 void mainLoop()
 {
     AnimatedEvent::process();
+
+    uint32_t freeHeapNow = ESP.getFreeHeap();
+    if (sMinFreeHeap == 0 || freeHeapNow < sMinFreeHeap)
+    {
+        sMinFreeHeap = freeHeapNow;
+    }
+
+    if (sSoundInitPending && (int32_t)(millis() - sSoundInitAtMs) >= 0)
+    {
+        if (sMarcSound.begin(sSoundInitModule, SOUND_SERIAL, sSoundInitStartup))
+        {
+            sMarcSound.setVolume(sSoundInitVolume);
+            sMarcSound.playStartSound();
+            sMarcSound.setRandomMin(preferences.getInt(PREFERENCE_MARCSOUND_RANDOM_MIN, MARC_SOUND_RANDOM_MIN));
+            sMarcSound.setRandomMax(preferences.getInt(PREFERENCE_MARCSOUND_RANDOM_MAX, MARC_SOUND_RANDOM_MAX));
+            if (preferences.getInt(PREFERENCE_MARCSOUND_RANDOM, MARC_SOUND_RANDOM))
+                sMarcSound.startRandomInSeconds(13);
+            sSoundInitPending = false;
+            DEBUG_PRINTLN("Sound module initialized (deferred)");
+        }
+        else
+        {
+            sSoundInitAttempts++;
+            if (sSoundInitAttempts >= 5)
+            {
+                sSoundInitPending = false;
+                DEBUG_PRINTLN("FAILED TO INITALIZE SOUND MODULE");
+            }
+            else
+            {
+                sSoundInitAtMs = millis() + 1000;
+            }
+        }
+    }
+
     sMarcSound.idle();
 #ifdef USE_MENUS
     sDisplay.process();
 #endif
+
+    bool artooSignal = (COMMAND_SERIAL.available() > 0);
+    if (artooSignal)
+    {
+        portENTER_CRITICAL(&sArtooTelemetryMux);
+        sArtooLastSignalMs = millis();
+        if (!sArtooSignalActive)
+        {
+            sArtooSignalBursts++;
+        }
+        portEXIT_CRITICAL(&sArtooTelemetryMux);
+    }
+    sArtooSignalActive = artooSignal;
 
     if (Serial.available())
     {
@@ -1123,7 +1231,7 @@ void mainLoop()
         // ================================================================
         if (ch == 0x0A || ch == 0x0D)
         {
-            Marcduino::processCommand(player, sBuffer);
+            processMarcduinoCommandWithSourceMain("usb-serial", sBuffer);
             sPos = 0;
         }
         else if (sPos < SizeOfArray(sBuffer) - 1)
@@ -1146,7 +1254,7 @@ void eventLoopTask(void *)
             ArduinoOTA.handle();
 #endif
 #ifdef USE_WIFI_WEB
-            webServer.handle();
+            asyncWebLoop();
 #endif
         }
         if (remoteActive)
@@ -1158,7 +1266,7 @@ void eventLoopTask(void *)
 #ifdef USE_LVGL_DISPLAY
         statusDisplay.refresh();
 #endif
-        vTaskDelay(1);
+        vTaskDelay(pdMS_TO_TICKS(5));
     }
 }
 #endif

@@ -1,6 +1,18 @@
 # AstroPixelsPlus Firmware
 Alternative firmware sketch for the AstroPixels boards
 
+---
+
+## Fork Notes (mattiasbrandt)
+
+This fork contains an async web migration and ongoing UI/UX hardening work that differs from upstream-focused docs.
+
+See detailed fork-specific notes in:
+
+`FORK_IMPROVEMENTS.md`
+
+---
+
 ![AstroPixels](https://we-make-things.co.uk/wp-content/uploads/2022/10/PXL_20220423_103855938-scaled.jpg)
 
 You can order AstroPixels boards here:
