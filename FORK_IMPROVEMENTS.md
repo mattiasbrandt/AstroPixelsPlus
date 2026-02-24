@@ -68,6 +68,24 @@ Feature-toggle UX clarification in same cycle:
   - `wifi.html`: WiFi enable, AP mode
   - `remote.html`: Droid Remote enable
 
+### 2026-02 Static-Analysis Hardening Pass (Correctness + Runtime Safety)
+
+A focused static-analysis-driven hardening pass was applied to first-party firmware code.
+
+- Correctness fixes:
+  - Fixed MetaBalls buffer stride indexing in `effects/MeatBallsEffect.h` to match allocated 2D layout (`i*w+x` and `i*h+y`) and prevent out-of-bounds access.
+  - Fixed remote preference command handlers in `AstroPixelsPlus.ino`:
+    - `#APRNAME` now reads/writes `PREFERENCE_REMOTE_HOSTNAME` (was incorrectly using secret key)
+    - `#APRSECRET` now uses `SMQ_SECRET` as comparison default (was `SMQ_HOSTNAME`)
+
+- Runtime-safety fixes:
+  - Removed blocking `delay()` in reboot path (`reboot()` now restarts immediately after cleanup).
+  - Replaced blocking async route delays in `AsyncWebInterface.h` with deferred reboot scheduling handled by the async loop.
+  - Added cached I2C health scan data to avoid full bus scans on every `/api/health` request.
+
+- Concurrency hardening:
+  - Added `portMUX_TYPE` critical-section protection for Artoo telemetry shared state (`sArtooLastSignalMs`, `sArtooSignalBursts`) across main loop updates and async web reads.
+
 ### Why We Switched From ReelTwo WebPages
 
 The old ReelTwo web UI (`WebPages.h` + `WifiWebServer` + `WButton`) allocated heap during static initialization. On ESP32 this led to a practical button/UI size ceiling and boot instability as the page set grew.
