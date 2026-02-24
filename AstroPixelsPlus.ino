@@ -29,8 +29,15 @@
 #define USE_DEBUG // Define to enable debug diagnostic
 #define USE_WIFI  // Define to enable Wifi support
 #define USE_SPIFFS
+
+#ifndef AP_ENABLE_DROID_REMOTE
+#define AP_ENABLE_DROID_REMOTE 0
+#endif
+
 #ifdef USE_WIFI
+#if AP_ENABLE_DROID_REMOTE
 #define USE_DROID_REMOTE // Define for droid remote support
+#endif
 #define USE_MDNS
 #define USE_OTA
 #define USE_WIFI_WEB
@@ -490,6 +497,7 @@ portMUX_TYPE sArtooTelemetryMux = portMUX_INITIALIZER_UNLOCKED;
 #endif
 
 bool soundLocalEnabled;
+uint32_t sMinFreeHeap = 0;
 static bool sSoundInitPending;
 static uint32_t sSoundInitAtMs;
 static uint8_t sSoundInitAttempts;
@@ -640,11 +648,16 @@ void setup()
     }
 #ifdef USE_WIFI
     wifiEnabled = wifiActive = preferences.getBool(PREFERENCE_WIFI_ENABLED, WIFI_ENABLED);
+#ifdef USE_DROID_REMOTE
     remoteEnabled = remoteActive = preferences.getBool(PREFERENCE_REMOTE_ENABLED, REMOTE_ENABLED);
+#else
+    remoteEnabled = remoteActive = false;
+#endif
     artooEnabled = preferences.getBool(PREFERENCE_ARTOO_ENABLED, ARTOO_ENABLED);
     artooBaud = preferences.getInt(PREFERENCE_ARTOO_BAUD, ARTOO_BAUD);
 #endif
     soundLocalEnabled = preferences.getBool(PREFERENCE_MARCSOUND_LOCAL_ENABLED, MARC_SOUND_LOCAL_ENABLED);
+    sMinFreeHeap = ESP.getFreeHeap();
     PrintReelTwoInfo(Serial, "AstroPixelsPlus");
 
     if (preferences.getBool(PREFERENCE_MARCSERIAL_ENABLED, MARC_SERIAL_ENABLED))
@@ -1153,6 +1166,12 @@ I2CReceiverBase<CONSOLE_BUFFER_SIZE> i2cReceiver(USE_I2C_ADDRESS, [](char *cmd)
 void mainLoop()
 {
     AnimatedEvent::process();
+
+    uint32_t freeHeapNow = ESP.getFreeHeap();
+    if (sMinFreeHeap == 0 || freeHeapNow < sMinFreeHeap)
+    {
+        sMinFreeHeap = freeHeapNow;
+    }
 
     if (sSoundInitPending && (int32_t)(millis() - sSoundInitAtMs) >= 0)
     {

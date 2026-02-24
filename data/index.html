@@ -110,6 +110,8 @@
 
   <script src="/app.js"></script>
   <script>
+    var remoteSupported = true;
+
     function setIndicator(id, ok) {
       var el = document.getElementById(id);
       if (el) { el.className = 'indicator ' + (ok ? 'ok' : 'fail'); }
@@ -127,6 +129,79 @@
         el.parentElement.style.display = visible ? '' : 'none';
       }
     }
+    function renderHeapStatus(freeHeapBytes) {
+      var kb = freeHeapBytes / 1024;
+      var label = 'Healthy';
+      var color = 'var(--success)';
+      if (kb < 80) {
+        label = 'Critical';
+        color = 'var(--danger)';
+      } else if (kb < 120) {
+        label = 'Low';
+        color = 'var(--warning)';
+      }
+      return 'Free Heap: <span style="color:' + color + ';font-weight:700" title="Thresholds: Healthy >= 120 KB, Low 80-119 KB, Critical < 80 KB">' + kb.toFixed(1) + ' KB (' + label + ')</span>';
+    }
+    function renderMinHeapStatus(minHeapBytes) {
+      var kb = minHeapBytes / 1024;
+      var label = 'Good';
+      var color = 'var(--success)';
+      if (kb < 64) {
+        label = 'Critical';
+        color = 'var(--danger)';
+      } else if (kb < 96) {
+        label = 'Watch';
+        color = 'var(--warning)';
+      }
+      return 'Min Free Heap: <span style="color:' + color + ';font-weight:700" title="Thresholds: Good >= 96 KB, Watch 64-95 KB, Critical < 64 KB">' + kb.toFixed(1) + ' KB (' + label + ')</span>';
+    }
+    function renderSerial2Health(lastSeenMs, uptimeSec) {
+      var nowMs = uptimeSec * 1000;
+      var ageMs = (lastSeenMs > 0 && nowMs >= lastSeenMs) ? (nowMs - lastSeenMs) : 0xFFFFFFFF;
+      var text = 'No traffic';
+      var color = 'var(--danger)';
+      if (ageMs <= 5000) {
+        text = 'Active';
+        color = 'var(--success)';
+      } else if (ageMs <= 30000) {
+        text = 'Idle';
+        color = 'var(--warning)';
+      }
+      return 'Serial2 Activity: <span style="color:' + color + ';font-weight:700" title="Thresholds: Active <= 5s, Idle 5-30s, No traffic > 30s">' + text + '</span>';
+    }
+    function renderWifiQuality(rssi, apMode) {
+      if (apMode) {
+        return 'WiFi Quality: <span style="color:var(--warning);font-weight:700">AP mode</span>';
+      }
+      if (!rssi) {
+        return 'WiFi Quality: <span style="color:var(--danger);font-weight:700">Unknown</span>';
+      }
+      var quality = 'Poor';
+      var color = 'var(--danger)';
+      if (rssi >= -67) {
+        quality = 'Excellent';
+        color = 'var(--success)';
+      } else if (rssi >= -75) {
+        quality = 'Good';
+        color = 'var(--success)';
+      } else if (rssi >= -85) {
+        quality = 'Fair';
+        color = 'var(--warning)';
+      }
+      return 'WiFi Quality: <span style="color:' + color + ';font-weight:700" title="Thresholds: Excellent >= -67 dBm, Good -68..-75 dBm, Fair -76..-85 dBm, Poor < -85 dBm">' + quality + ' (' + rssi + ' dBm)</span>';
+    }
+    function renderI2CProbeHealth(failures) {
+      var label = 'Clean';
+      var color = 'var(--success)';
+      if (failures > 10) {
+        label = 'Unstable';
+        color = 'var(--danger)';
+      } else if (failures > 0) {
+        label = 'Warning';
+        color = 'var(--warning)';
+      }
+      return 'I2C Probe Errors: <span style="color:' + color + ';font-weight:700" title="Thresholds: Clean 0, Warning 1-10, Unstable > 10 since boot">' + failures + ' (' + label + ')</span>';
+    }
     function updateHealth(h) {
       setIndicator('h-panels', h.i2c_panels);
       setIndicator('h-holos', h.i2c_holos);
@@ -134,7 +209,12 @@
       setIndicatorWarn('h-artoo', h.artoo, h.artoo_enabled);
       setHealthItemVisible('h-artoo', !!h.artoo_enabled);
       setIndicator('h-wifi', h.wifi);
-      setIndicatorWarn('h-remote', h.remote, h.remote_enabled);
+      if (remoteSupported) {
+        setIndicatorWarn('h-remote', h.remote, h.remote_enabled);
+        setHealthItemVisible('h-remote', true);
+      } else {
+        setHealthItemVisible('h-remote', false);
+      }
       setIndicator('h-spiffs', h.spiffs);
 
       if (h.i2c_devices && h.i2c_devices.length > 0) {
@@ -143,14 +223,31 @@
     }
 
     function updateStatus(s) {
+      if (typeof s.remoteSupported !== 'undefined') {
+        remoteSupported = !!s.remoteSupported;
+        setHealthItemVisible('h-remote', remoteSupported);
+      }
+
       var html = '';
       html += '<div>Uptime: ' + Math.floor(s.uptime/60) + 'm ' + (s.uptime%60) + 's</div>';
-      html += '<div>Free Heap: ' + (s.freeHeap/1024).toFixed(1) + ' KB</div>';
+      html += '<div>' + renderHeapStatus(s.freeHeap) + '</div>';
+      if (typeof s.minFreeHeap !== 'undefined') {
+        html += '<div>' + renderMinHeapStatus(s.minFreeHeap) + '</div>';
+      }
+      if (typeof s.serial2LastSeenMs !== 'undefined') {
+        html += '<div>' + renderSerial2Health(s.serial2LastSeenMs, s.uptime) + '</div>';
+      }
+      if (typeof s.i2c_probe_failures !== 'undefined') {
+        html += '<div>' + renderI2CProbeHealth(s.i2c_probe_failures) + '</div>';
+      }
       html += '<div>WiFi: ' + (s.wifiEnabled ? '<span class="dot green"></span>Enabled' : '<span class="dot red"></span>Disabled');
       if (s.wifiIP) html += ' (' + s.wifiIP + ')';
       if (s.wifiRSSI && !s.wifiAP) html += ' ' + s.wifiRSSI + ' dBm';
       html += '</div>';
-      if (typeof s.remoteConnected !== 'undefined') {
+      html += '<div>' + renderWifiQuality(s.wifiRSSI, s.wifiAP) + '</div>';
+      if (typeof s.remoteSupported !== 'undefined' && !s.remoteSupported) {
+        html += '<div>Droid Remote: <span class="dot yellow"></span>Disabled (build-time)</div>';
+      } else if (typeof s.remoteConnected !== 'undefined') {
         html += '<div>Droid Remote: ' + (s.remoteConnected ? '<span class="dot green"></span>Connected' : '<span class="dot red"></span>Disconnected') + '</div>';
       }
       if (typeof s.artooEnabled !== 'undefined') {

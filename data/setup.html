@@ -26,7 +26,7 @@
       <a href="/wifi.html" class="btn link-btn">WiFi Configuration</a>
       <a href="/serial.html" class="btn link-btn">Serial / Marcduino</a>
       <a href="/sound.html" class="btn link-btn">Sound Player</a>
-      <a href="/remote.html" class="btn link-btn">Droid Remote (ESPNOW)</a>
+      <a href="/remote.html" class="btn link-btn" id="remote-link">Droid Remote (ESPNOW only)</a>
       <a href="/firmware.html" class="btn link-btn">Firmware Update</a>
     </div>
   </div>
@@ -45,6 +45,18 @@
   <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>
   <script src="/app.js"></script>
   <script>
+    fetch('/api/state').then(function(r){return r.json();}).then(function(s){
+      var link = document.getElementById('remote-link');
+      if (!link) return;
+      if (typeof s.remoteSupported !== 'undefined' && !s.remoteSupported) {
+        link.textContent = 'Droid Remote (Disabled in this build)';
+        link.title = 'Droid Remote ESPNOW support is compiled out in this firmware build.';
+      } else {
+        link.textContent = 'Droid Remote (ESPNOW only)';
+        link.title = 'Configure ESPNOW Droid Remote pairing.';
+      }
+    }).catch(function(){});
+
     function refreshTokenStatus() {
       var token = getApiToken();
       var el = document.getElementById('api-token-status');

@@ -26,6 +26,7 @@ extern bool otaInProgress;
 extern bool artooEnabled;
 extern int artooBaud;
 extern bool soundLocalEnabled;
+extern uint32_t sMinFreeHeap;
 extern volatile uint32_t sArtooLastSignalMs;
 extern volatile uint32_t sArtooSignalBursts;
 extern portMUX_TYPE sArtooTelemetryMux;
@@ -53,6 +54,7 @@ static uint32_t lastI2CScanMs = 0;
 static bool cachedPanelsOk = false;
 static bool cachedHolosOk = false;
 static String cachedI2CDevicesJson = "[]";
+static uint32_t i2cProbeFailures = 0;
 
 // Forward declarations
 static void broadcastState();
@@ -201,6 +203,13 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
 // ---------------------------------------------------------------
 static String buildStateJson()
 {
+    uint32_t serial2LastSeenMs;
+    uint32_t serial2SignalBursts;
+    portENTER_CRITICAL(&sArtooTelemetryMux);
+    serial2LastSeenMs = sArtooLastSignalMs;
+    serial2SignalBursts = sArtooSignalBursts;
+    portEXIT_CRITICAL(&sArtooTelemetryMux);
+
     String json = "{";
     json += "\"wifiEnabled\":" + String(wifiEnabled ? "true" : "false");
     json += ",\"remoteEnabled\":" + String(remoteEnabled ? "true" : "false");
@@ -209,10 +218,18 @@ static String buildStateJson()
     json += ",\"soundLocalEnabled\":" + String(soundLocalEnabled ? "true" : "false");
 #ifdef USE_DROID_REMOTE
     json += ",\"remoteConnected\":" + String(sRemoteConnected ? "true" : "false");
+    json += ",\"remoteSupported\":true";
+#else
+    json += ",\"remoteConnected\":false";
+    json += ",\"remoteSupported\":false";
 #endif
     json += ",\"otaInProgress\":" + String(otaInProgress ? "true" : "false");
     json += ",\"uptime\":" + String(millis() / 1000);
     json += ",\"freeHeap\":" + String(ESP.getFreeHeap());
+    json += ",\"minFreeHeap\":" + String(sMinFreeHeap);
+    json += ",\"serial2LastSeenMs\":" + String(serial2LastSeenMs);
+    json += ",\"serial2SignalBursts\":" + String(serial2SignalBursts);
+    json += ",\"i2c_probe_failures\":" + String(i2cProbeFailures);
 
     // WiFi details
     json += ",\"wifiAP\":" + String((WiFi.getMode() & WIFI_MODE_AP) ? "true" : "false");
@@ -237,7 +254,9 @@ static String buildStateJson()
 static bool probeI2C(uint8_t addr)
 {
     Wire.beginTransmission(addr);
-    return (Wire.endTransmission() == 0);
+    bool ok = (Wire.endTransmission() == 0);
+    if (!ok) i2cProbeFailures++;
+    return ok;
 }
 
 static void refreshI2CHealthCache(bool force = false)
@@ -330,6 +349,8 @@ static String buildHealthJson()
     json += ",\"uptime\":" + String(millis() / 1000);
 
     json += ",\"i2c_devices\":" + cachedI2CDevicesJson;
+    json += ",\"min_free_heap\":" + String(sMinFreeHeap);
+    json += ",\"i2c_probe_failures\":" + String(i2cProbeFailures);
 
     json += "}";
     return json;

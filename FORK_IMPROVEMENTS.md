@@ -136,6 +136,33 @@ Compatibility policy for this fork:
 - Prefer additive aliases over replacing/removing established command tokens.
 - Keep backend support for common legacy mappings, while improving discoverability in modern web UI pages.
 
+### 2026-02 Remote UX Clarification: R2 Touch (IP/Port) vs Droid Remote (ESPNOW)
+
+To reduce configuration confusion, setup pages now explicitly separate the two remote/control paths:
+
+- `remote.html` is clearly marked as **ESPNOW Droid Remote pairing** (host + secret), and explicitly notes this is not the R2 Touch IP/port setup path.
+- `serial.html` includes an **R2 Touch App Connection** block with:
+  - current controller IP (from `/api/state`)
+  - fixed Marcduino WiFi socket port (`2000`)
+  - guidance that R2 Touch uses WiFi command transport rather than ESPNOW pairing fields.
+- `setup.html` link label updated to `Droid Remote (ESPNOW only)` for immediate context.
+
+### 2026-02 Build-Time Remote Toggle (Memory-Focused)
+
+Added a build-time switch to fully compile out Droid Remote (SMQ/ESPNOW) support when not needed.
+
+- New build flag in `platformio.ini`:
+  - `-DAP_ENABLE_DROID_REMOTE=0` (default in this fork)
+- Firmware behavior:
+  - `USE_DROID_REMOTE` is now enabled only when `AP_ENABLE_DROID_REMOTE=1`
+  - when disabled, remote runtime state is forced off (`remoteEnabled=false`)
+  - `/api/state` now reports `remoteSupported` to indicate compile-time availability
+- UI behavior when compiled out:
+  - `setup.html` hides the Droid Remote settings link
+  - `remote.html` disables pairing fields/buttons and shows a clear build-time disabled message
+
+This keeps the feature available for builders who need it (`AP_ENABLE_DROID_REMOTE=1`) while allowing memory savings and reduced complexity for serial/body-controller-first setups.
+
 ### Why We Switched From ReelTwo WebPages
 
 The old ReelTwo web UI (`WebPages.h` + `WifiWebServer` + `WButton`) allocated heap during static initialization. On ESP32 this led to a practical button/UI size ceiling and boot instability as the page set grew.

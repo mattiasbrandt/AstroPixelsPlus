@@ -18,6 +18,17 @@
   </nav>
 
   <div class="card">
+    <h3>R2 Touch App Connection</h3>
+    <div class="desc">R2 Touch uses Marcduino command transport over WiFi (IP + port), not ESPNOW host/secret pairing.</div>
+    <div class="sys-status mt-8" id="r2touch-status">Loading controller IP...</div>
+    <div class="desc mt-8">Required setting for the app:</div>
+    <ul class="mt-4" style="margin:0 0 0 18px;padding:0;">
+      <li><code>IP</code>: controller WiFi IP (shown above)</li>
+      <li><code>Port</code>: <code>2000</code></li>
+    </ul>
+  </div>
+
+  <div class="card">
     <h3>Serial2 (Marcduino Input)</h3>
 
     <div class="mb-10">
@@ -88,6 +99,16 @@
       if (typeof d.artoo !== 'undefined') document.getElementById('artoo-enabled').checked = d.artoo === 'true' || d.artoo === true || d.artoo === '1';
       if (d.artoobaud) document.getElementById('artoo-baud').value = d.artoobaud;
     }).catch(function(){});
+
+    fetch('/api/state').then(function(r){return r.json();}).then(function(s){
+      var ip = s.wifiIP || 'unknown';
+      var mode = s.wifiAP ? 'AP' : 'STA';
+      document.getElementById('r2touch-status').innerHTML =
+        '<div>Controller IP: <strong>' + ip + '</strong> (' + mode + ' mode)</div>' +
+        '<div>Marcduino WiFi Port: <strong>2000</strong></div>';
+    }).catch(function(){
+      document.getElementById('r2touch-status').textContent = 'Unable to read controller IP right now.';
+    });
 
     function saveSerial() {
       var prefs = [
