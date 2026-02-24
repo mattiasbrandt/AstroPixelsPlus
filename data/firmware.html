@@ -20,6 +20,7 @@
   <div class="card">
     <h3>Upload Firmware</h3>
     <div class="desc">Select a .bin firmware file to flash over-the-air</div>
+    <div class="desc mt-8">Note: OTA here updates firmware only. Web UI file changes (HTML/CSS/JS/assets) require SPIFFS upload over USB (`pio run -e astropixelsplus -t uploadfs`).</div>
 
     <div class="mt-12">
       <input type="file" id="fw-file" accept=".bin"
@@ -44,9 +45,65 @@
     </div>
   </div>
 
+  <div class="card">
+    <details>
+      <summary class="btn log-summary-btn">Live Log Console</summary>
+      <div class="desc mt-8">Debug output from the controller while uploading/rebooting</div>
+      <div class="log-wrap mt-8">
+        <pre id="fw-log-console" class="log-console" title="Recent runtime logs from the controller"></pre>
+      </div>
+    </details>
+  </div>
+
   <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>
   <script src="/app.js"></script>
   <script>
+    var fwLogEl = null;
+    var FW_LOG_MAX_LINES = 300;
+
+    function appendFirmwareLogLine(text) {
+      if (!fwLogEl) {
+        fwLogEl = document.getElementById('fw-log-console');
+      }
+      if (!fwLogEl) return;
+      fwLogEl.textContent += text + '\n';
+      var lines = fwLogEl.textContent.split('\n');
+      if (lines.length > FW_LOG_MAX_LINES + 50) {
+        fwLogEl.textContent = lines.slice(lines.length - FW_LOG_MAX_LINES).join('\n');
+      }
+      fwLogEl.scrollTop = fwLogEl.scrollHeight;
+    }
+
+    window.onLogLine = appendFirmwareLogLine;
+
+    fetch('/api/logs').then(function(r){return r.json();}).then(function(data){
+      if (data.lines) {
+        data.lines.forEach(function(line) { appendFirmwareLogLine(line); });
+      }
+    }).catch(function(){});
+
+    function waitForDeviceBackOnline(onOk, onTimeout) {
+      var attempts = 0;
+      var maxAttempts = 45; // ~90 seconds
+      function probe() {
+        fetch('/api/state?t=' + Date.now()).then(function(r){
+          if (r.ok) {
+            onOk();
+            return;
+          }
+          throw new Error('not ready');
+        }).catch(function(){
+          attempts++;
+          if (attempts >= maxAttempts) {
+            onTimeout();
+            return;
+          }
+          setTimeout(probe, 2000);
+        });
+      }
+      setTimeout(probe, 1500);
+    }
+
     function uploadFirmware() {
       var file = document.getElementById('fw-file').files[0];
       if (!file) { alert('Select a firmware file first.'); return; }
@@ -56,6 +113,26 @@
       var bar = document.getElementById('fw-bar');
       var status = document.getElementById('fw-status');
       prog.style.display = 'block';
+      bar.style.background = 'var(--accent)';
+      bar.style.width = '0%';
+      status.textContent = 'Uploading...';
+
+      var likelyCompletedUpload = false;
+      var finalized = false;
+      function markSuccessAndWaitReboot() {
+        if (finalized) return;
+        finalized = true;
+        if (parseInt(bar.style.width || '0', 10) < 99) bar.style.width = '99%';
+        status.textContent = 'Finalizing... waiting for reboot';
+        waitForDeviceBackOnline(function() {
+          bar.style.width = '100%';
+          bar.style.background = 'var(--success)';
+          status.textContent = 'Update complete. Device back online.';
+        }, function() {
+          bar.style.background = 'var(--warning)';
+          status.textContent = 'Upload likely completed, but reconnect timed out.';
+        });
+      }
 
       var xhr = new XMLHttpRequest();
       xhr.open('POST', '/upload/firmware');
@@ -65,16 +142,18 @@
       xhr.upload.onprogress = function(e) {
         if (e.lengthComputable) {
           var pct = Math.round((e.loaded / e.total) * 100);
-          bar.style.width = pct + '%';
-          status.textContent = 'Uploading... ' + pct + '%';
+          if (pct >= 95) likelyCompletedUpload = true;
+          bar.style.width = Math.min(pct, 99) + '%';
+          status.textContent = pct >= 95 ? 'Uploading... ' + pct + '% (finalizing soon)' : ('Uploading... ' + pct + '%');
         }
       };
 
       xhr.onload = function() {
         if (xhr.status === 200) {
-          bar.style.width = '100%';
-          bar.style.background = 'var(--success)';
-          status.textContent = 'Update complete. Rebooting...';
+          markSuccessAndWaitReboot();
+        } else if (xhr.status === 401) {
+          bar.style.background = 'var(--danger)';
+          status.textContent = 'Unauthorized: check API token';
         } else {
           bar.style.background = 'var(--danger)';
           status.textContent = 'Update failed: ' + xhr.responseText;
@@ -82,8 +161,31 @@
       };
 
       xhr.onerror = function() {
-        bar.style.background = 'var(--danger)';
-        status.textContent = 'Upload error — connection lost';
+        if (likelyCompletedUpload) {
+          markSuccessAndWaitReboot();
+        } else {
+          bar.style.background = 'var(--danger)';
+          status.textContent = 'Upload error — connection lost';
+        }
+      };
+
+      xhr.onabort = function() {
+        if (likelyCompletedUpload) {
+          markSuccessAndWaitReboot();
+        } else {
+          bar.style.background = 'var(--danger)';
+          status.textContent = 'Upload aborted';
+        }
+      };
+
+      xhr.timeout = 180000;
+      xhr.ontimeout = function() {
+        if (likelyCompletedUpload) {
+          markSuccessAndWaitReboot();
+        } else {
+          bar.style.background = 'var(--danger)';
+          status.textContent = 'Upload timed out';
+        }
       };
 
       var formData = new FormData();

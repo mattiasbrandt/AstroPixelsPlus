@@ -131,6 +131,9 @@
       }
       if (s.otaInProgress) {
         html += '<div><span class="dot yellow"></span>Firmware update in progress</div>';
+      } else {
+        var overlay = document.getElementById('ota-overlay');
+        if (overlay) overlay.classList.remove('active');
       }
       document.getElementById('sys-status').innerHTML = html;
     }

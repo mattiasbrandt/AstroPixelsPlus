@@ -15,3 +15,6 @@
 .Trashes
 .vs/
 /build
+
+# Local bench testing notes (user-specific)
+tasks/bench-testing.md

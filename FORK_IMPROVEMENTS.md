@@ -51,6 +51,30 @@ So REST/WebSocket is a new input layer on top of existing ReelTwo-era behavior.
 | `/upload/firmware` | POST | existing `Update.*` OTA flow + logic progress rendering |
 | `/api/state` `/api/health` `/api/logs` | GET | snapshot/broadcast wrappers over current runtime state |
 
+### OTA vs SPIFFS Update Scope (Important)
+
+The firmware page OTA upload (`/upload/firmware`) updates the ESP32 application binary only.
+
+- OTA updates: `.bin` firmware image in app partition
+- Not updated by OTA: SPIFFS web files (`data/*.html`, `data/style.css`, `data/app.js`, image assets)
+
+If web UI files change, deploy them with SPIFFS upload over USB:
+
+```bash
+pio run -e astropixelsplus -t uploadfs --upload-port /dev/ttyUSB0
+```
+
+This distinction is now shown on the firmware page to reduce confusion during bench testing.
+
+### OTA UX Improvement (2026-02)
+
+Firmware-page upload UX was improved for real-world reboot behavior:
+
+- Handles connection reset during reboot without falsely showing a failed/stuck state
+- Waits for `/api/state` reconnect before final "device back online" success message
+- Added collapsible Live Log Console on firmware page for OTA/debug visibility
+- Home-page OTA indicator changed from full-screen dim overlay to non-blocking status panel
+
 ### What This Enables
 
 - Removes compile-time widget count limits from firmware code
