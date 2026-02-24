@@ -491,6 +491,10 @@ static void initAsyncWeb()
             {
                 bool bval = (val == "1" || val == "true");
                 preferences.putBool(key.c_str(), bval);
+                if (key == "msoundlocal")
+                {
+                    soundLocalEnabled = bval;
+                }
                 logCapture.printf("[API] pref (bool): %s = %s\n", key.c_str(), bval ? "true" : "false");
             }
             else
