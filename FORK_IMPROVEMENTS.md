@@ -92,6 +92,22 @@ Validation snapshot after this hardening cycle:
 - `pio run -e astropixelsplus` passes.
 - `pio test -e astropixelsplus` currently reports no `test/` directory in this repository, so there are no PlatformIO unit tests to execute yet.
 
+### 2026-02 Sequence Expansion for Dome Feature Showcase
+
+Added additional Marcduino-compatible sequence modes to broaden demo/showcase coverage and improve compatibility with common external controller mappings.
+
+- New behavior/reset command handlers in `MarcduinoSequence.h`:
+  - `:SE10` Quiet reset (stop sound, holos off, panels close, logic normal)
+  - `:SE11` Full-awake reset (random sound + holo movement baseline + panels close)
+  - `:SE12` Top-panel showcase (top panel choreography + holo cycle)
+  - `:SE13` Mid-awake reset
+  - `:SE14` Awake+ reset
+  - `:SE15` Scream without panel movement (alias style command)
+  - `:SE16` Panel wiggle
+  - `:SE58` Panel "bye-bye" wave with holo pulse accent
+
+- Updated `data/sequences.html` to expose these new modes with operator-facing descriptions.
+
 ### Why We Switched From ReelTwo WebPages
 
 The old ReelTwo web UI (`WebPages.h` + `WifiWebServer` + `WButton`) allocated heap during static initialization. On ESP32 this led to a practical button/UI size ceiling and boot instability as the page set grew.

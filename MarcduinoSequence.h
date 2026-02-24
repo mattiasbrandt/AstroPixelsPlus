@@ -171,6 +171,69 @@ MARCDUINO_ANIMATION(DiscoSequence, :SE09)
 
 ////////////////
 
+MARCDUINO_ACTION(QuietModeReset, :SE10, ({
+    sMarcSound.handleCommand("$s");
+    CommandEvent::process(F("HPA096"));
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, ALL_DOME_PANELS_MASK);
+    FLD.selectSequence(LogicEngineRenderer::NORMAL);
+    RLD.selectSequence(LogicEngineRenderer::NORMAL);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(FullAwakeModeReset, :SE11, ({
+    sMarcSound.handleCommand("$R");
+    CommandEvent::process(F("HPF104\nHPR104\nHPT104\n"));
+    CommandEvent::process(F("HPA096"));
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, ALL_DOME_PANELS_MASK);
+    FLD.selectSequence(LogicEngineRenderer::NORMAL);
+    RLD.selectSequence(LogicEngineRenderer::NORMAL);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(TopPanelsShowcase, :SE12, ({
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpenClose, PIE_PANEL);
+    CommandEvent::process(F("HPA0040"));
+}))
+
+////////////////
+
+MARCDUINO_ACTION(MidAwakeModeReset, :SE13, ({
+    sMarcSound.handleCommand("$R");
+    CommandEvent::process(F("HPA0000"));
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, ALL_DOME_PANELS_MASK);
+    FLD.selectSequence(LogicEngineRenderer::NORMAL);
+    RLD.selectSequence(LogicEngineRenderer::NORMAL);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(AwakePlusModeReset, :SE14, ({
+    sMarcSound.handleCommand("$R");
+    CommandEvent::process(F("HPF104\nHPR104\nHPT104\n"));
+    CommandEvent::process(F("HPA0040"));
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, ALL_DOME_PANELS_MASK);
+    FLD.selectSequence(LogicEngineRenderer::NORMAL);
+    RLD.selectSequence(LogicEngineRenderer::NORMAL);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(ScreamNoPanelsAlias, :SE15, ({
+    CommandEvent::process("LE3010003");
+    CommandEvent::process("LE1010003");
+    sMarcSound.handleCommand("$S");
+}))
+
+////////////////
+
+MARCDUINO_ACTION(PanelWiggleSequence, :SE16, ({
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAlternate, ALL_DOME_PANELS_MASK);
+}))
+
+////////////////
+
 MARCDUINO_ACTION(ScreamNoPanelSequence, :SE50, ({
     CommandEvent::process("LE3010003");
     CommandEvent::process("LE1010003");
@@ -218,6 +281,13 @@ MARCDUINO_ACTION(FaintPanelSequence, :SE56, ({
 
 MARCDUINO_ACTION(RythmicPanelSequence, :SE57, ({
     SEQUENCE_PLAY_ONCE_SPEED(servoSequencer, SeqPanelAllOpenCloseLong, ALL_DOME_PANELS_MASK, 900);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(PanelWaveByeByeSequence, :SE58, ({
+    SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelWave, ALL_DOME_PANELS_MASK, 8, 18);
+    CommandEvent::process(F("HPA0030"));
 }))
 
 ////////////////
@@ -321,4 +391,3 @@ MARCDUINO_ANIMATION(YodaClearMind, $720)
 }
 
 ////////////////
-

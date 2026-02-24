@@ -94,6 +94,19 @@
     <h3>Special Sequences</h3>
 
     <div class="mt-4">
+      <button class="btn btn-full-left" onclick="sendCmd(':SE16')">
+        <strong>Panel Wiggle</strong>
+        <div class="desc">Fast alternating panel movement for quick dome reaction showcase</div>
+      </button>
+    </div>
+    <div class="mt-4">
+      <button class="btn btn-full-left" onclick="sendCmd(':SE58')">
+        <strong>Panel Bye Bye</strong>
+        <div class="desc">Variable-speed panel wave with holo pulse for a short farewell gesture</div>
+      </button>
+    </div>
+
+    <div class="mt-4">
       <button class="btn btn-full-left" onclick="sendCmd('$815')">
         <strong>Harlem Shake</strong>
         <div class="desc">Fire logics + holo circuit + shake panels + random steps (26.5s)</div>
@@ -126,11 +139,14 @@
   <div class="card">
     <h3>Behaviour Modes</h3>
     <div class="btn-grid">
-      <button class="btn" onclick="sendCmd(':SE13')">Quiet</button>
-      <button class="btn" onclick="sendCmd(':SE14')">Mid-Awake</button>
-      <button class="btn accent" onclick="sendCmd(':SE15')">Full-Awake</button>
+      <button class="btn" onclick="sendCmd(':SE10')">Quiet Reset</button>
+      <button class="btn" onclick="sendCmd(':SE13')">Mid-Awake Reset</button>
+      <button class="btn accent" onclick="sendCmd(':SE11')">Full-Awake Reset</button>
+      <button class="btn" onclick="sendCmd(':SE14')">Awake+</button>
+      <button class="btn" onclick="sendCmd(':SE12')">Top Panel Showcase</button>
+      <button class="btn danger" onclick="sendCmd(':SE15')">Scream (No Panels)</button>
     </div>
-    <div class="desc">Controls random animation frequency</div>
+    <div class="desc">Showcase/reset presets for panel state, holo behavior, and sound routing</div>
   </div>
 
   <!-- Sound Quick Access -->
