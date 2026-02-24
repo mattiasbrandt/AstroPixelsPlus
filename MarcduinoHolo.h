@@ -13,7 +13,7 @@ MARCDUINO_ACTION(AllHoloOn, *ON00, ({
 
 MARCDUINO_ACTION(AllHoloOFF, *OF00, ({
                      // All Holo off
-                     CommandEvent::process(F("HPA0000"));
+                     CommandEvent::process(F("HPA096"));
                  }))
 
 ////////////////
@@ -27,7 +27,7 @@ MARCDUINO_ACTION(FrontHoloOn, *ON01, ({
 
 MARCDUINO_ACTION(FrontHoloOff, *OF01, ({
                      // Front Holo Off
-                     CommandEvent::process(F("HPF0000"));
+                     CommandEvent::process(F("HPF096"));
                  }))
 
 ////////////////
@@ -41,7 +41,7 @@ MARCDUINO_ACTION(RearHoloOn, *ON02, ({
 
 MARCDUINO_ACTION(RearHoloOff, *OF02, ({
                      // Rear Holo Off
-                     CommandEvent::process(F("HPR0000"));
+                     CommandEvent::process(F("HPR096"));
                  }))
 
 ////////////////
@@ -55,7 +55,7 @@ MARCDUINO_ACTION(TopHoloOn, *ON03, ({
 
 MARCDUINO_ACTION(TopHoloOff, *OF03, ({
                      // Top Holo Off
-                     CommandEvent::process(F("HPT0000"));
+                     CommandEvent::process(F("HPT096"));
                  }))
 
 ////////////////
@@ -118,7 +118,7 @@ MARCDUINO_ACTION(RadarEyeCycle, *HRS4, ({
 
 MARCDUINO_ACTION(RadarEyeOff, *OF04, ({
                      // Radar Eye Off
-                     CommandEvent::process(F("HPD0000"));
+                     CommandEvent::process(F("HPD096"));
                  }))
 
 ////////////////

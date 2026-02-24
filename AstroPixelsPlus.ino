@@ -813,7 +813,7 @@ void setup()
             wifiMarcduinoReceiver.setCommandHandler([](const char *cmd)
                                                     {
                 printf("cmd: %s\n", cmd);
-                Marcduino::processCommand(player, cmd);
+                processMarcduinoCommandWithSourceMain("wifi-marcduino", cmd);
                 if (preferences.getBool(PREFERENCE_MARCWIFI_SERIAL_PASS, MARC_WIFI_SERIAL_PASS))
                 {
                     COMMAND_SERIAL.print(cmd); COMMAND_SERIAL.print('\r');
@@ -1101,6 +1101,13 @@ static void DisconnectRemote()
 static unsigned sPos;
 static char sBuffer[CONSOLE_BUFFER_SIZE];
 
+static void processMarcduinoCommandWithSourceMain(const char *source, const char *cmd)
+{
+    if (cmd == nullptr || cmd[0] == '\0') return;
+    Serial.printf("[CMD][%s] %s\n", source, cmd);
+    Marcduino::processCommand(player, cmd);
+}
+
 ////////////////
 
 #ifdef USE_I2C_ADDRESS
@@ -1109,7 +1116,7 @@ I2CReceiverBase<CONSOLE_BUFFER_SIZE> i2cReceiver(USE_I2C_ADDRESS, [](char *cmd)
     DEBUG_PRINT("[I2C] RECEIVED=\"");
     DEBUG_PRINT(cmd);
     DEBUG_PRINTLN("\"");
-    Marcduino::processCommand(player, cmd); });
+    processMarcduinoCommandWithSourceMain("i2c-slave", cmd); });
 #endif
 
 ////////////////
@@ -1134,7 +1141,7 @@ void mainLoop()
         // ================================================================
         if (ch == 0x0A || ch == 0x0D)
         {
-            Marcduino::processCommand(player, sBuffer);
+            processMarcduinoCommandWithSourceMain("usb-serial", sBuffer);
             sPos = 0;
         }
         else if (sPos < SizeOfArray(sBuffer) - 1)

@@ -13,6 +13,32 @@ This document summarizes all improvements made to the AstroPixelsPlus project to
 
 ## 0. 2026 Async Web Migration (Current Architecture)
 
+### 2026-02 Command Traceability + Holo Off Semantics Validation
+
+Recent bench validation added command-source observability and corrected holo LED off semantics to align with current ReelTwo behavior.
+
+- Added source-tagged command logs at ingress points so mixed-controller operation is diagnosable:
+  - Web API: `[CMD][astropixel-web-api] ...`
+  - WebSocket: `[CMD][astropixel-web-ws] ...`
+  - WiFi Marcduino socket: `[CMD][wifi-marcduino] ...`
+  - USB serial: `[CMD][usb-serial] ...`
+  - I2C slave input: `[CMD][i2c-slave] ...`
+- `/api/cmd` logging now includes command text (not only length), improving click-to-dispatch verification during live tests.
+- Holos page dispatch path now shows per-command send/accept state to remove ambiguity between UI click, API acceptance, and downstream hardware actuation.
+- Updated holo OFF mappings from `HP?0000` to ReelTwo clear command `HP?096` (`D096`) for all holo targets:
+  - `*OF00 -> HPA096`
+  - `*OF01 -> HPF096`
+  - `*OF02 -> HPR096`
+  - `*OF03 -> HPT096`
+  - `*OF04 -> HPD096`
+
+Bench outcome from this cycle:
+- Software path confirmed: web button -> API/WS -> Marcduino -> Holo command handler.
+- A reproduced front-channel mismatch was isolated as local wiring/channel mapping on the test rig, not a command parser collision.
+
+UI consistency update in same cycle:
+- Added `Setup` nav link on pages that previously omitted it (`panels`, `logics`, `holos`, `sequences`) so setup is reachable from all primary control screens.
+
 ### Why We Switched From ReelTwo WebPages
 
 The old ReelTwo web UI (`WebPages.h` + `WifiWebServer` + `WButton`) allocated heap during static initialization. On ESP32 this led to a practical button/UI size ceiling and boot instability as the page set grew.
@@ -258,7 +284,7 @@ MARCDUINO_ACTION(AllHoloOn, *ON00, ({
 }))
 
 MARCDUINO_ACTION(AllHoloOFF, *OF00, ({
-    CommandEvent::process(F("HPA0000")); // All Holo off
+    CommandEvent::process(F("HPA096")); // All Holo off (clear LEDs)
 }))
 ```
 

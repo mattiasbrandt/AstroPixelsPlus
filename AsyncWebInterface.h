@@ -73,6 +73,13 @@ static bool parseWsCommand(const uint8_t *data, size_t len, char *out, size_t ou
     return true;
 }
 
+static void processMarcduinoCommandWithSource(const char *source, const char *cmd)
+{
+    if (cmd == nullptr || cmd[0] == '\0') return;
+    logCapture.printf("[CMD][%s] %s\n", source, cmd);
+    Marcduino::processCommand(player, cmd);
+}
+
 static bool isSensitivePrefKey(const String &key)
 {
     return key == "pass" || key == "rsecret";
@@ -167,7 +174,7 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
             char cmd[64];
             if (parseWsCommand(data, len, cmd, sizeof(cmd)))
             {
-                Marcduino::processCommand(player, cmd);
+                processMarcduinoCommandWithSource("astropixel-web-ws", cmd);
                 broadcastState();
             }
         }
@@ -304,8 +311,8 @@ static void initAsyncWeb()
                 request->send(400, "application/json", "{\"error\":\"invalid cmd\"}");
                 return;
             }
-            logCapture.printf("[API] cmd len=%u\n", (unsigned int)cmd.length());
-            Marcduino::processCommand(player, cmd.c_str());
+            logCapture.printf("[API] cmd=%s len=%u\n", cmd.c_str(), (unsigned int)cmd.length());
+            processMarcduinoCommandWithSource("astropixel-web-api", cmd.c_str());
             request->send(200, "application/json", "{\"ok\":true}");
         }
         else

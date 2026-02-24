@@ -14,11 +14,19 @@
   <div class="subtitle">RGB LED + servo-positioned holo projectors</div>
   <nav>
     <a href="/">Home</a>
+    <a href="/setup.html">Setup</a>
     <a href="/panels.html">Panels</a>
     <a href="/holos.html" class="active">Holos</a>
     <a href="/logics.html">Logics</a>
     <a href="/sequences.html">Sequences</a>
   </nav>
+
+  <div class="card" id="holo-health-card">
+    <h3>Holo Servo Controller Status</h3>
+    <div class="desc" id="holo-health-text">Checking controller availability...</div>
+    <div class="i2c-list" id="holo-i2c-list"></div>
+    <div class="i2c-list" id="holo-last-cmd"></div>
+  </div>
 
   <!-- All Holos -->
   <div class="card">
@@ -144,5 +152,71 @@
 
   <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>
   <script src="/app.js"></script>
+  <script>
+    (function() {
+      'use strict';
+
+      var healthTextEl = document.getElementById('holo-health-text');
+      var i2cListEl = document.getElementById('holo-i2c-list');
+      var lastCmdEl = document.getElementById('holo-last-cmd');
+      var healthCardEl = document.getElementById('holo-health-card');
+
+      function setHealthText(html) {
+        if (healthTextEl) healthTextEl.innerHTML = html;
+      }
+
+      function updateHoloHealth(h) {
+        if (!h || typeof h.i2c_holos === 'undefined') return;
+
+        if (h.i2c_holos) {
+          if (healthCardEl) healthCardEl.style.borderLeftColor = 'var(--success)';
+          setHealthText('<span class="dot green"></span>Holo servo controller detected at I2C 0x41. Holo movement commands should reach hardware. Holo LED light control remains on the AstroPixels board.');
+        } else {
+          if (healthCardEl) healthCardEl.style.borderLeftColor = 'var(--warning)';
+          setHealthText('<span class="dot yellow"></span>No holo servo controller detected at I2C 0x41. Holo movement features will not actuate until controller power/wiring is restored. Holo LED light commands still run on the AstroPixels board.');
+        }
+
+        if (i2cListEl) {
+          if (h.i2c_devices && h.i2c_devices.length > 0) {
+            i2cListEl.textContent = 'Detected I2C devices: ' + h.i2c_devices.join(', ');
+          } else {
+            i2cListEl.textContent = 'Detected I2C devices: none';
+          }
+        }
+      }
+
+      function setLastCmdStatus(cmd, statusText) {
+        if (!lastCmdEl) return;
+        var ts = new Date().toLocaleTimeString();
+        lastCmdEl.textContent = '[' + ts + '] ' + cmd + ' -> ' + statusText;
+      }
+
+      window.sendCmd = function(cmd) {
+        setLastCmdStatus(cmd, 'sending via /api/cmd');
+        if (typeof window.apiPostForm !== 'function') {
+          setLastCmdStatus(cmd, 'failed: apiPostForm unavailable');
+          return;
+        }
+
+        window.apiPostForm('/api/cmd', 'cmd=' + encodeURIComponent(cmd))
+          .then(function(resp) {
+            if (resp.ok) {
+              setLastCmdStatus(cmd, 'accepted (HTTP ' + resp.status + ')');
+            } else {
+              setLastCmdStatus(cmd, 'rejected (HTTP ' + resp.status + ')');
+            }
+          })
+          .catch(function() {
+            setLastCmdStatus(cmd, 'failed: network error');
+          });
+      };
+
+      fetch('/api/health').then(function(r) { return r.json(); }).then(updateHoloHealth).catch(function() {
+        setHealthText('<span class="dot red"></span>Unable to read /api/health right now.');
+      });
+
+      window.onHealthUpdate = updateHoloHealth;
+    })();
+  </script>
 </body>
 </html>
