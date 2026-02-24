@@ -108,6 +108,34 @@ Added additional Marcduino-compatible sequence modes to broaden demo/showcase co
 
 - Updated `data/sequences.html` to expose these new modes with operator-facing descriptions.
 
+### 2026-02 Compatibility-Focused Marcduino Overlay Commands
+
+To improve compatibility with legacy controller mappings while offering richer web showcase controls, this fork now layers additive command aliases over existing handlers (no removal of prior commands).
+
+- Holo compatibility overlays (existing commands unchanged):
+  - Added all-holo movement wrappers:
+    - `*HW00` (all wag)
+    - `*HN00` (all nod)
+  - Added holo twitch mode wrappers:
+    - `*HD07` disable twitch (`HPS7`)
+    - `*HD08` default twitch (`HPS8`)
+    - `*HD09` random twitch (`HPS9`)
+
+- Logic-display compatibility overlays (existing `@0T1-6,11` and `@1T/@2T` commands unchanged):
+  - Added additional quick effect shortcuts:
+    - Rainbow: `@0T12`, `@1T12`, `@2T12`
+    - Lights Out: `@0T15`, `@1T15`, `@2T15`
+    - Fire: `@0T22`, `@1T22`, `@2T22`
+    - Pulse: `@0T24`, `@1T24`, `@2T24`
+
+- Web UI overlap strategy:
+  - `logics.html` now exposes these new shortcut effects under a dedicated Showcase section while keeping classic mode controls.
+  - `holos.html` now exposes all-holo movement/twitch showcase controls while retaining original per-holo controls.
+
+Compatibility policy for this fork:
+- Prefer additive aliases over replacing/removing established command tokens.
+- Keep backend support for common legacy mappings, while improving discoverability in modern web UI pages.
+
 ### Why We Switched From ReelTwo WebPages
 
 The old ReelTwo web UI (`WebPages.h` + `WifiWebServer` + `WButton`) allocated heap during static initialization. On ESP32 this led to a practical button/UI size ceiling and boot instability as the page set grew.

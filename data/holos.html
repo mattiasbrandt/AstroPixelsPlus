@@ -36,6 +36,16 @@
       <button class="btn danger" onclick="sendCmd('*OF00')">All Off</button>
       <button class="btn" onclick="sendCmd('*ST00')">Reset All</button>
     </div>
+    <div class="mt-6">
+      <span class="label-dim">Showcase Modes:</span>
+      <div class="btn-grid mt-4">
+        <button class="btn" title="Wag all three holo servos left/right together" onclick="sendCmd('*HW00')">All Wag</button>
+        <button class="btn" title="Nod all three holo servos up/down together" onclick="sendCmd('*HN00')">All Nod</button>
+        <button class="btn" title="Enable default ReelTwo holo twitch patterns" onclick="sendCmd('*HD08')">Default Twitch</button>
+        <button class="btn" title="Enable randomized ReelTwo holo twitch patterns" onclick="sendCmd('*HD09')">Random Twitch</button>
+        <button class="btn danger" title="Disable holo twitch and force idle state" onclick="sendCmd('*HD07')">Disable Twitch</button>
+      </div>
+    </div>
   </div>
 
   <!-- Front Holo -->

@@ -172,6 +172,7 @@ MARCDUINO_ANIMATION(DiscoSequence, :SE09)
 ////////////////
 
 MARCDUINO_ACTION(QuietModeReset, :SE10, ({
+    // Stop sound, disable holo LEDs, close panels, and return logic displays to normal
     sMarcSound.handleCommand("$s");
     CommandEvent::process(F("HPA096"));
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, ALL_DOME_PANELS_MASK);
@@ -182,6 +183,7 @@ MARCDUINO_ACTION(QuietModeReset, :SE10, ({
 ////////////////
 
 MARCDUINO_ACTION(FullAwakeModeReset, :SE11, ({
+    // Resume random chatter baseline with holo movement while keeping holo LEDs off
     sMarcSound.handleCommand("$R");
     CommandEvent::process(F("HPF104\nHPR104\nHPT104\n"));
     CommandEvent::process(F("HPA096"));
@@ -193,6 +195,7 @@ MARCDUINO_ACTION(FullAwakeModeReset, :SE11, ({
 ////////////////
 
 MARCDUINO_ACTION(TopPanelsShowcase, :SE12, ({
+    // Demo top-panel choreography with a coordinated holo LED cycle
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpenClose, PIE_PANEL);
     CommandEvent::process(F("HPA0040"));
 }))
@@ -200,6 +203,7 @@ MARCDUINO_ACTION(TopPanelsShowcase, :SE12, ({
 ////////////////
 
 MARCDUINO_ACTION(MidAwakeModeReset, :SE13, ({
+    // Mid-awake mode: random sound baseline, holos stopped, panels closed
     sMarcSound.handleCommand("$R");
     CommandEvent::process(F("HPA0000"));
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, ALL_DOME_PANELS_MASK);
@@ -210,6 +214,7 @@ MARCDUINO_ACTION(MidAwakeModeReset, :SE13, ({
 ////////////////
 
 MARCDUINO_ACTION(AwakePlusModeReset, :SE14, ({
+    // Awake+ mode: random sound baseline, holo movement enabled, holo LEDs active
     sMarcSound.handleCommand("$R");
     CommandEvent::process(F("HPF104\nHPR104\nHPT104\n"));
     CommandEvent::process(F("HPA0040"));
@@ -221,6 +226,7 @@ MARCDUINO_ACTION(AwakePlusModeReset, :SE14, ({
 ////////////////
 
 MARCDUINO_ACTION(ScreamNoPanelsAlias, :SE15, ({
+    // Compatibility alias for scream logic+sound without panel movement
     CommandEvent::process("LE3010003");
     CommandEvent::process("LE1010003");
     sMarcSound.handleCommand("$S");
@@ -229,6 +235,7 @@ MARCDUINO_ACTION(ScreamNoPanelsAlias, :SE15, ({
 ////////////////
 
 MARCDUINO_ACTION(PanelWiggleSequence, :SE16, ({
+    // Quick panel wiggle showcase using alternating panel sequence
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAlternate, ALL_DOME_PANELS_MASK);
 }))
 
@@ -286,6 +293,7 @@ MARCDUINO_ACTION(RythmicPanelSequence, :SE57, ({
 ////////////////
 
 MARCDUINO_ACTION(PanelWaveByeByeSequence, :SE58, ({
+    // Farewell-style panel wave with a brief holo pulse accent
     SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelWave, ALL_DOME_PANELS_MASK, 8, 18);
     CommandEvent::process(F("HPA0030"));
 }))

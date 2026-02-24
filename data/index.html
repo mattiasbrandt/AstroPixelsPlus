@@ -25,11 +25,26 @@
   <div class="card">
     <h3>Quick Actions</h3>
     <div class="btn-grid">
-      <button class="btn accent" onclick="sendCmd(':SE01')" title="Run sequence 01: scream-style attention mode">Scream</button>
-      <button class="btn" onclick="sendCmd(':SE07')" title="Run sequence 07: cantina-style movement pattern">Cantina</button>
-      <button class="btn" onclick="sendCmd(':SE09')" title="Run sequence 09: disco-style animation pattern">Disco</button>
-      <button class="btn" onclick="sendCmd(':SE08')" title="Run sequence 08: Leia-style animation pattern">Leia</button>
-      <button class="btn danger" onclick="sendCmd(':SE00')" title="Stop active panel sequence and return to idle">Stop</button>
+      <button class="btn accent" onclick="sendCmd(':SE09')" title="Disco showcase: panels + rainbow logic + holo sync">Disco Showcase</button>
+      <button class="btn" onclick="sendCmd(':SE07')" title="Cantina choreography with synchronized panel/logic/holo activity">Cantina Sync</button>
+      <button class="btn" onclick="sendCmd(':SE08')" title="Leia showcase with synchronized logic and holo message behavior">Leia Sync</button>
+      <button class="btn danger" onclick="sendCmd(':SE06')" title="Electrocute/faint sequence with short-circuit effects across logic, holo, smoke, and panels">Electrocute / Faint</button>
+      <button class="btn" onclick="sendCmd('$821')" title="Girl On Fire: high-intensity multi-subsystem sequence">Girl On Fire</button>
+      <button class="btn" onclick="sendCmd('$815')" title="Harlem Shake: rhythmic dance-style synchronized sequence">Harlem Shake</button>
+      <button class="btn" onclick="sendCmd(':SE14')" title="Awake+ reset profile with movement and active holo LEDs">Awake+</button>
+      <button class="btn danger" onclick="sendCmd(':SE10')" title="Quiet reset: stop sound, holos idle, panels closed">Quiet Reset</button>
+      <button class="btn danger" onclick="sendCmd(':SE00')" title="Stop active panel choreography and return to idle">Stop Sequence</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Mood Presets</h3>
+    <div class="desc">Set the idle behavior profile for chatter, holo activity, and visual intensity.</div>
+    <div class="btn-grid mt-8">
+      <button class="btn" onclick="sendCmd(':SE10')" title="Quiet profile: stop sounds, holos idle, panels closed, logic normal">Quiet</button>
+      <button class="btn" onclick="sendCmd(':SE13')" title="Mid-awake profile: balanced idle activity with restrained motion">Mid-Awake</button>
+      <button class="btn accent" onclick="sendCmd(':SE11')" title="Full-awake profile: active idle chatter with holo movement baseline">Full-Awake</button>
+      <button class="btn" onclick="sendCmd(':SE14')" title="Awake+ profile: full-awake plus active holo LED behavior">Awake+</button>
     </div>
   </div>
 

@@ -67,6 +67,27 @@ MARCDUINO_ACTION(ResetAllHolos, *ST00, ({
 
 ////////////////
 
+MARCDUINO_ACTION(AllHolosDisableTwitch, *HD07, ({
+                     // Disable holo twitch modes and force all holo channels to idle
+                     CommandEvent::process(F("HPS7"));
+                 }))
+
+////////////////
+
+MARCDUINO_ACTION(AllHolosEnableDefaultTwitch, *HD08, ({
+                     // Enable default holo twitch choreography pattern set
+                     CommandEvent::process(F("HPS8"));
+                 }))
+
+////////////////
+
+MARCDUINO_ACTION(AllHolosEnableRandomTwitch, *HD09, ({
+                     // Enable randomized holo twitch choreography pattern set
+                     CommandEvent::process(F("HPS9"));
+                 }))
+
+////////////////
+
 MARCDUINO_ACTION(FrontHoloRandomMove, *RD01, ({
                      // Front Holo Move Random
                      CommandEvent::process(F("HPF104"));
@@ -383,6 +404,13 @@ MARCDUINO_ACTION(TopHoloWag, *HW03, ({
 
 ////////////////
 
+MARCDUINO_ACTION(AllHoloWag, *HW00, ({
+                     // Move all three holos left/right wag pattern together
+                     CommandEvent::process(F("HPA105|5"));
+                 }))
+
+////////////////
+
 MARCDUINO_ACTION(FrontHoloNod, *HN01, ({
                      // Front Holo Nods Up/Down 5 times
                      CommandEvent::process(F("HPF106|5"));
@@ -400,6 +428,13 @@ MARCDUINO_ACTION(RearHoloNod, *HN02, ({
 MARCDUINO_ACTION(TopHoloNod, *HN03, ({
                      // Top Holo Nods Up/Down 5 times
                      CommandEvent::process(F("HPT106|5"));
+                 }))
+
+////////////////
+
+MARCDUINO_ACTION(AllHoloNod, *HN00, ({
+                     // Move all three holos up/down nod pattern together
+                     CommandEvent::process(F("HPA106|5"));
                  }))
 
 ////////////////

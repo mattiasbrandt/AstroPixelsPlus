@@ -36,6 +36,35 @@
     </div>
   </div>
 
+  <div class="card">
+    <h3>Showcase Effects</h3>
+    <div class="desc">Extra ReelTwo logic effects while keeping classic Marcduino modes available</div>
+
+    <div class="label-dim mt-8">Both</div>
+    <div class="btn-grid">
+      <button class="btn" title="Set front and rear logics to rainbow effect" onclick="sendCmd('@0T12')">Rainbow</button>
+      <button class="btn" title="Set front and rear logics to fire effect" onclick="sendCmd('@0T22')">Fire</button>
+      <button class="btn" title="Set front and rear logics to pulse effect" onclick="sendCmd('@0T24')">Pulse</button>
+      <button class="btn" title="Fade both logic displays to lights-out mode" onclick="sendCmd('@0T15')">Lights Out</button>
+    </div>
+
+    <div class="label-dim mt-8">Front</div>
+    <div class="btn-grid">
+      <button class="btn" title="Set front logic display to rainbow effect" onclick="sendCmd('@1T12')">Rainbow</button>
+      <button class="btn" title="Set front logic display to fire effect" onclick="sendCmd('@1T22')">Fire</button>
+      <button class="btn" title="Set front logic display to pulse effect" onclick="sendCmd('@1T24')">Pulse</button>
+      <button class="btn" title="Fade front logic display to lights-out mode" onclick="sendCmd('@1T15')">Lights Out</button>
+    </div>
+
+    <div class="label-dim mt-8">Rear</div>
+    <div class="btn-grid mb-0">
+      <button class="btn" title="Set rear logic display to rainbow effect" onclick="sendCmd('@2T12')">Rainbow</button>
+      <button class="btn" title="Set rear logic display to fire effect" onclick="sendCmd('@2T22')">Fire</button>
+      <button class="btn" title="Set rear logic display to pulse effect" onclick="sendCmd('@2T24')">Pulse</button>
+      <button class="btn" title="Fade rear logic display to lights-out mode" onclick="sendCmd('@2T15')">Lights Out</button>
+    </div>
+  </div>
+
   <!-- Front Logic Display -->
   <div class="card">
     <h3>Front Logic Display (FLD)</h3>
