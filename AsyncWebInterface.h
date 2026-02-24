@@ -28,6 +28,7 @@ extern int artooBaud;
 extern bool soundLocalEnabled;
 extern volatile uint32_t sArtooLastSignalMs;
 extern volatile uint32_t sArtooSignalBursts;
+extern portMUX_TYPE sArtooTelemetryMux;
 
 #ifdef USE_DROID_REMOTE
 extern bool sRemoteConnected;
@@ -45,6 +46,13 @@ static uint32_t lastLogCount = 0;
 static uint32_t lastStateBroadcast = 0;
 static uint32_t lastHealthBroadcast = 0;
 static bool authWarningLogged = false;
+static bool rebootScheduled = false;
+static uint32_t rebootAtMs = 0;
+static bool otaUploadFailed = false;
+static uint32_t lastI2CScanMs = 0;
+static bool cachedPanelsOk = false;
+static bool cachedHolosOk = false;
+static String cachedI2CDevicesJson = "[]";
 
 // Forward declarations
 static void broadcastState();
@@ -232,6 +240,38 @@ static bool probeI2C(uint8_t addr)
     return (Wire.endTransmission() == 0);
 }
 
+static void refreshI2CHealthCache(bool force = false)
+{
+    uint32_t now = millis();
+    if (!force && (now - lastI2CScanMs) < 30000u)
+        return;
+
+    cachedPanelsOk = probeI2C(0x40);
+    cachedHolosOk = probeI2C(0x41);
+
+    String devices = "[";
+    bool firstDev = true;
+    for (uint8_t addr = 1; addr < 127; addr++)
+    {
+        Wire.beginTransmission(addr);
+        if (Wire.endTransmission() == 0)
+        {
+            if (!firstDev) devices += ",";
+            firstDev = false;
+            devices += "\"0x" + String(addr, HEX) + "\"";
+        }
+    }
+    devices += "]";
+    cachedI2CDevicesJson = devices;
+    lastI2CScanMs = now;
+}
+
+static void scheduleReboot(uint32_t delayMs)
+{
+    rebootScheduled = true;
+    rebootAtMs = millis() + delayMs;
+}
+
 // ---------------------------------------------------------------
 // Build health JSON string
 // ---------------------------------------------------------------
@@ -240,8 +280,9 @@ static String buildHealthJson()
     String json = "{";
 
     // I2C device probes
-    bool panelsOk = probeI2C(0x40);   // PCA9685 — dome panels
-    bool holosOk  = probeI2C(0x41);   // PCA9685 — holo servos
+    refreshI2CHealthCache();
+    bool panelsOk = cachedPanelsOk;
+    bool holosOk  = cachedHolosOk;
     json += "\"i2c_panels\":" + String(panelsOk ? "true" : "false");
     json += ",\"i2c_holos\":" + String(holosOk ? "true" : "false");
 
@@ -258,14 +299,19 @@ static String buildHealthJson()
     json += ",\"wifi\":" + String(wifiEnabled ? "true" : "false");
 
     uint32_t nowMs = millis();
-    uint32_t lastMs = sArtooLastSignalMs;
+    uint32_t lastMs;
+    uint32_t artooBursts;
+    portENTER_CRITICAL(&sArtooTelemetryMux);
+    lastMs = sArtooLastSignalMs;
+    artooBursts = sArtooSignalBursts;
+    portEXIT_CRITICAL(&sArtooTelemetryMux);
     uint32_t deltaMs = (lastMs > 0 && nowMs >= lastMs) ? (nowMs - lastMs) : 0xFFFFFFFFu;
     bool artooLink = artooEnabled && (deltaMs <= 5000u);
     json += ",\"artoo\":" + String(artooLink ? "true" : "false");
     json += ",\"artoo_enabled\":" + String(artooEnabled ? "true" : "false");
     json += ",\"artoo_baud\":" + String(artooBaud);
     json += ",\"artoo_last_seen_ms\":" + String(lastMs);
-    json += ",\"artoo_signal_bursts\":" + String(sArtooSignalBursts);
+    json += ",\"artoo_signal_bursts\":" + String(artooBursts);
 
     // Droid Remote
 #ifdef USE_DROID_REMOTE
@@ -283,20 +329,7 @@ static String buildHealthJson()
     json += ",\"freeHeap\":" + String(ESP.getFreeHeap());
     json += ",\"uptime\":" + String(millis() / 1000);
 
-    // I2C scan — list all responding addresses
-    json += ",\"i2c_devices\":[";
-    bool firstDev = true;
-    for (uint8_t addr = 1; addr < 127; addr++)
-    {
-        Wire.beginTransmission(addr);
-        if (Wire.endTransmission() == 0)
-        {
-            if (!firstDev) json += ",";
-            firstDev = false;
-            json += "\"0x" + String(addr, HEX) + "\"";
-        }
-    }
-    json += "]";
+    json += ",\"i2c_devices\":" + cachedI2CDevicesJson;
 
     json += "}";
     return json;
@@ -474,8 +507,7 @@ static void initAsyncWeb()
             request->send(200, "application/json", "{\"ok\":true}");
             if (needsReboot)
             {
-                delay(500);
-                reboot();
+                scheduleReboot(500);
             }
         }
         else
@@ -493,8 +525,7 @@ static void initAsyncWeb()
             return;
         }
         request->send(200, "application/json", "{\"ok\":true,\"msg\":\"rebooting\"}");
-        delay(500);
-        reboot();
+        scheduleReboot(500);
     });
 
     // ---- Firmware upload (OTA via web) ----
@@ -508,7 +539,7 @@ static void initAsyncWeb()
                 return;
             }
             otaInProgress = false;
-            if (Update.hasError())
+            if (otaUploadFailed || Update.hasError())
             {
                 request->send(500, "text/plain", "Update FAILED");
                 FLD.selectSequence(LogicEngineDefaults::FAILURE);
@@ -519,9 +550,7 @@ static void initAsyncWeb()
             else
             {
                 request->send(200, "text/plain", "Update OK - Rebooting...");
-                delay(1000);
-                preferences.end();
-                ESP.restart();
+                scheduleReboot(1000);
             }
         },
         // Upload handler (called for each chunk)
@@ -532,6 +561,7 @@ static void initAsyncWeb()
             {
                 // First chunk — start the update
                 otaInProgress = true;
+                otaUploadFailed = false;
                 unmountFileSystems();
                 FLD.selectSequence(LogicEngineDefaults::NORMAL);
                 RLD.selectSequence(LogicEngineDefaults::NORMAL);
@@ -541,13 +571,23 @@ static void initAsyncWeb()
                 if (!Update.begin(request->contentLength()))
                 {
                     Update.printError(Serial);
+                    logCapture.println("Update begin failed");
+                    otaUploadFailed = true;
+                    return;
                 }
+            }
+            if (otaUploadFailed)
+            {
+                return;
             }
             if (len)
             {
                 if (Update.write(data, len) != len)
                 {
                     Update.printError(Serial);
+                    logCapture.println("Update write failed");
+                    otaUploadFailed = true;
+                    return;
                 }
                 // Show progress on logic displays + broadcast to WS clients
                 if (request->contentLength() > 0)
@@ -561,6 +601,11 @@ static void initAsyncWeb()
             if (final)
             {
                 logCapture.printf("Update complete: %u bytes\n", index + len);
+                if (otaUploadFailed)
+                {
+                    logCapture.println("Update aborted after previous write error");
+                    return;
+                }
                 if (Update.end(true))
                 {
                     logCapture.println("Update Success. Rebooting...");
@@ -568,6 +613,7 @@ static void initAsyncWeb()
                 else
                 {
                     Update.printError(Serial);
+                    otaUploadFailed = true;
                 }
             }
         });
@@ -584,6 +630,13 @@ static void initAsyncWeb()
 static void asyncWebLoop()
 {
     ws.cleanupClients();
+
+    if (rebootScheduled && (int32_t)(millis() - rebootAtMs) >= 0)
+    {
+        rebootScheduled = false;
+        reboot();
+        return;
+    }
 
     if (ws.count() == 0)
         return;
@@ -618,6 +671,7 @@ static void asyncWebLoop()
     // (I2C scan takes ~100ms so keep interval long)
     if (now - lastHealthBroadcast >= 30000)
     {
+        refreshI2CHealthCache(true);
         String json = "{\"type\":\"health\",\"data\":" + buildHealthJson() + "}";
         ws.textAll(json);
         lastHealthBroadcast = now;

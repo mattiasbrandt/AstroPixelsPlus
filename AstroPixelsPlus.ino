@@ -178,13 +178,10 @@
 #endif
 #ifdef USE_SPIFFS
 #include "SPIFFS.h"
-#define USE_FS SPIFFS
 #elif defined(USE_FATFS)
 #include "FFat.h"
-#define USE_FS FFat
 #elif defined(USE_LITTLEFS)
 #include "LITTLEFS.h"
-#define USE_FS LITTLEFS
 #endif
 #include "FS.h"
 
@@ -409,7 +406,6 @@ void reboot()
 #endif
     unmountFileSystems();
     preferences.end();
-    delay(1000);
     ESP.restart();
 }
 
@@ -490,9 +486,16 @@ TaskHandle_t eventTask;
 bool otaInProgress;
 volatile uint32_t sArtooLastSignalMs;
 volatile uint32_t sArtooSignalBursts;
+portMUX_TYPE sArtooTelemetryMux = portMUX_INITIALIZER_UNLOCKED;
 #endif
 
 bool soundLocalEnabled;
+static bool sSoundInitPending;
+static uint32_t sSoundInitAtMs;
+static uint8_t sSoundInitAttempts;
+static MarcSound::Module sSoundInitModule;
+static int sSoundInitStartup;
+static float sSoundInitVolume;
 
 #ifdef USE_WIFI_MARCDUINO
 WifiMarcduinoReceiver wifiMarcduinoReceiver(wifiAccess);
@@ -680,6 +683,8 @@ void setup()
 #endif
     MarcSound::Module soundPlayer = (MarcSound::Module)preferences.getInt(PREFERENCE_MARCSOUND, MARC_SOUND_PLAYER);
     int soundStartup = preferences.getInt(PREFERENCE_MARCSOUND_STARTUP, MARC_SOUND_STARTUP);
+    sSoundInitPending = false;
+    sSoundInitAttempts = 0;
     if (!soundLocalEnabled)
     {
         DEBUG_PRINTLN("Local sound execution disabled by preference");
@@ -687,13 +692,12 @@ void setup()
     else if (soundPlayer != MarcSound::kDisabled)
     {
         SOUND_SERIAL.begin(SOUND_BAUD, SERIAL_8N1, SOUND_RX_PIN, SOUND_TX_PIN);
-        // Need to wait 3 seconds for sound modules to power up
-        delay(3000);
-        if (!sMarcSound.begin(soundPlayer, SOUND_SERIAL, soundStartup))
-        {
-            DEBUG_PRINTLN("FAILED TO INITALIZE SOUND MODULE");
-        }
-        sMarcSound.setVolume(preferences.getInt(PREFERENCE_MARCSOUND_VOLUME, MARC_SOUND_VOLUME) / 1000.0);
+        sSoundInitPending = true;
+        sSoundInitAtMs = millis() + 3000;
+        sSoundInitModule = soundPlayer;
+        sSoundInitStartup = soundStartup;
+        sSoundInitVolume = preferences.getInt(PREFERENCE_MARCSOUND_VOLUME, MARC_SOUND_VOLUME) / 1000.0f;
+        DEBUG_PRINTLN("Sound module initialization scheduled (deferred)");
     }
     // Assign servos to holo projectors
     frontHolo.assignServos(&servoDispatch, 13, 14);
@@ -914,7 +918,7 @@ void setup()
         0);
 #endif
     DEBUG_PRINTLN("Ready");
-    if (soundLocalEnabled)
+    if (soundLocalEnabled && !sSoundInitPending)
     {
         sMarcSound.playStartSound();
         sMarcSound.setRandomMin(preferences.getInt(PREFERENCE_MARCSOUND_RANDOM_MIN, MARC_SOUND_RANDOM_MIN));
@@ -1011,10 +1015,10 @@ MARCDUINO_ACTION(RemoteToggle, #APREMOTE, ({
 ////////////////
 
 MARCDUINO_ACTION(RemoteName, #APRNAME, ({
-                     String newSecret = String(Marcduino::getCommand());
-                     if (preferences.getString(PREFERENCE_REMOTE_SECRET, SMQ_HOSTNAME) != newSecret)
+                     String newHostname = String(Marcduino::getCommand());
+                     if (preferences.getString(PREFERENCE_REMOTE_HOSTNAME, SMQ_HOSTNAME) != newHostname)
                      {
-                         preferences.putString(PREFERENCE_REMOTE_SECRET, newSecret);
+                         preferences.putString(PREFERENCE_REMOTE_HOSTNAME, newHostname);
                          printf("Changed.\n");
                          reboot();
                      }
@@ -1024,7 +1028,7 @@ MARCDUINO_ACTION(RemoteName, #APRNAME, ({
 
 MARCDUINO_ACTION(RemoteSecret, #APRSECRET, ({
                      String newSecret = String(Marcduino::getCommand());
-                     if (preferences.getString(PREFERENCE_REMOTE_SECRET, SMQ_HOSTNAME) != newSecret)
+                     if (preferences.getString(PREFERENCE_REMOTE_SECRET, SMQ_SECRET) != newSecret)
                      {
                          preferences.putString(PREFERENCE_REMOTE_SECRET, newSecret);
                          printf("Changed.\n");
@@ -1149,6 +1153,35 @@ I2CReceiverBase<CONSOLE_BUFFER_SIZE> i2cReceiver(USE_I2C_ADDRESS, [](char *cmd)
 void mainLoop()
 {
     AnimatedEvent::process();
+
+    if (sSoundInitPending && (int32_t)(millis() - sSoundInitAtMs) >= 0)
+    {
+        if (sMarcSound.begin(sSoundInitModule, SOUND_SERIAL, sSoundInitStartup))
+        {
+            sMarcSound.setVolume(sSoundInitVolume);
+            sMarcSound.playStartSound();
+            sMarcSound.setRandomMin(preferences.getInt(PREFERENCE_MARCSOUND_RANDOM_MIN, MARC_SOUND_RANDOM_MIN));
+            sMarcSound.setRandomMax(preferences.getInt(PREFERENCE_MARCSOUND_RANDOM_MAX, MARC_SOUND_RANDOM_MAX));
+            if (preferences.getInt(PREFERENCE_MARCSOUND_RANDOM, MARC_SOUND_RANDOM))
+                sMarcSound.startRandomInSeconds(13);
+            sSoundInitPending = false;
+            DEBUG_PRINTLN("Sound module initialized (deferred)");
+        }
+        else
+        {
+            sSoundInitAttempts++;
+            if (sSoundInitAttempts >= 5)
+            {
+                sSoundInitPending = false;
+                DEBUG_PRINTLN("FAILED TO INITALIZE SOUND MODULE");
+            }
+            else
+            {
+                sSoundInitAtMs = millis() + 1000;
+            }
+        }
+    }
+
     sMarcSound.idle();
 #ifdef USE_MENUS
     sDisplay.process();
@@ -1157,11 +1190,13 @@ void mainLoop()
     bool artooSignal = (COMMAND_SERIAL.available() > 0);
     if (artooSignal)
     {
+        portENTER_CRITICAL(&sArtooTelemetryMux);
         sArtooLastSignalMs = millis();
         if (!sArtooSignalActive)
         {
             sArtooSignalBursts++;
         }
+        portEXIT_CRITICAL(&sArtooTelemetryMux);
     }
     sArtooSignalActive = artooSignal;
 
@@ -1212,7 +1247,7 @@ void eventLoopTask(void *)
 #ifdef USE_LVGL_DISPLAY
         statusDisplay.refresh();
 #endif
-        vTaskDelay(1);
+        vTaskDelay(pdMS_TO_TICKS(5));
     }
 }
 #endif

@@ -581,7 +581,7 @@ private:
     uint32_t fRandomMaxDelay = 10000;
     int fStartupSound = -1;
     // global variables, current indexes to banks
-    uint8_t fBankIndexes[MP3_MAX_BANKS];
+    uint8_t fBankIndexes[MP3_MAX_BANKS] = {};
     const uint8_t fMaxSounds[MP3_MAX_BANKS] =
     {
         MP3_BANK1_SOUNDS,

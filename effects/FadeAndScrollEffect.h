@@ -47,7 +47,7 @@ static bool LogicEffectFadeAndScroll(LogicEngineRenderer& r)
         int fs_index = 0;
         Type fs_scroll_type = kRandomType;
         Direction fs_dir = kRandomDirection;
-        Palette fs_palette = random(1) ? kPaletteRGB : random(1) ? kPaletteHalf : Palette(random(kPaletteLast));
+        Palette fs_palette = Palette(random(int(kPaletteLast) + 1));
         int* fs_height = NULL;
         CRGB* fs_lut = NULL;
         int fs_lut_len = 0;
