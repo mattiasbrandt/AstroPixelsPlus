@@ -22,12 +22,12 @@
     <div class="desc">Changes require reboot to take effect</div>
 
     <div class="mt-12">
-      <label class="check-row">
-        <input type="checkbox" id="wifi-enabled" checked>
+      <label class="check-row" title="Turns AstroPixels WiFi services on or off. Required for web UI, REST API, and OTA uploads.">
+        <input type="checkbox" id="wifi-enabled" checked title="Enable or disable controller WiFi services.">
         <span>WiFi Enabled</span>
       </label>
-      <label class="check-row">
-        <input type="checkbox" id="wifi-ap" checked>
+      <label class="check-row" title="When enabled, AstroPixels runs as an access point. When disabled, it attempts to join the configured SSID as a station.">
+        <input type="checkbox" id="wifi-ap" checked title="Use AP mode instead of station mode.">
         <span>Access Point Mode</span>
       </label>
       <div class="desc mb-10">Uncheck to join an existing WiFi network instead</div>

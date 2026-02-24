@@ -39,6 +39,35 @@ Bench outcome from this cycle:
 UI consistency update in same cycle:
 - Added `Setup` nav link on pages that previously omitted it (`panels`, `logics`, `holos`, `sequences`) so setup is reachable from all primary control screens.
 
+### 2026-02 Artoo-Style Serial Telemetry + Local Sound Execution Toggle
+
+To support common split-controller body/dome setups, the fork now includes first-slice readiness for an external body controller serial profile (for example Artoo-style wiring over a slip ring) while keeping command compatibility unchanged.
+
+- Added Artoo serial profile preferences:
+  - `artoo` (enable/disable telemetry profile)
+  - `artoobaud` (expected upstream baud for operator visibility)
+- Added runtime telemetry surfaced in health/state APIs:
+  - link activity (`artoo`)
+  - enabled flag (`artoo_enabled`)
+  - configured baud (`artoo_baud`)
+  - last seen timestamp and burst counter (`artoo_last_seen_ms`, `artoo_signal_bursts`)
+- Added UI controls on `serial.html` for Artoo profile enable + expected baud.
+- Added dashboard health/status visibility for Artoo link on `index.html`.
+
+Sound handling now supports deployments where audio is orchestrated by another controller:
+
+- Added `msoundlocal` preference (`Local sound execution on AstroPixels`).
+- When disabled, AstroPixels still accepts commands but does not initialize/actuate local sound playback or startup/random local sound behavior.
+- Dashboard now distinguishes sound-module state from local-sound execution enablement.
+
+Feature-toggle UX clarification in same cycle:
+
+- Added explicit hover tooltips (`title`) on toggle controls in setup pages so operators can understand effect and scope before saving:
+  - `serial.html`: Serial pass-through, JawaLite serial/WiFi input, WiFi->Serial pass-through, Artoo telemetry profile
+  - `sound.html`: local sound execution, random sound enable
+  - `wifi.html`: WiFi enable, AP mode
+  - `remote.html`: Droid Remote enable
+
 ### Why We Switched From ReelTwo WebPages
 
 The old ReelTwo web UI (`WebPages.h` + `WifiWebServer` + `WButton`) allocated heap during static initialization. On ESP32 this led to a practical button/UI size ceiling and boot instability as the page set grew.

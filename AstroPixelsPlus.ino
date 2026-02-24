@@ -85,6 +85,9 @@
 #define PREFERENCE_MARCWIFI_ENABLED "mwifi"
 #define PREFERENCE_MARCWIFI_SERIAL_PASS "mwifipass"
 
+#define PREFERENCE_ARTOO_ENABLED "artoo"
+#define PREFERENCE_ARTOO_BAUD "artoobaud"
+
 #define PREFERENCE_MARCSOUND "msound"
 #define PREFERENCE_MARCSOUND_SERIAL "msoundser"
 #define PREFERENCE_MARCSOUND_VOLUME "mvolume"
@@ -92,6 +95,7 @@
 #define PREFERENCE_MARCSOUND_RANDOM "mrandom"
 #define PREFERENCE_MARCSOUND_RANDOM_MIN "mrandommin"
 #define PREFERENCE_MARCSOUND_RANDOM_MAX "mrandommax"
+#define PREFERENCE_MARCSOUND_LOCAL_ENABLED "msoundlocal"
 
 ////////////////////////////////
 
@@ -145,6 +149,8 @@
 #define MARC_SERIAL_ENABLED true
 #define MARC_WIFI_ENABLED true
 #define MARC_WIFI_SERIAL_PASS true
+#define ARTOO_ENABLED false
+#define ARTOO_BAUD 2400
 #define MARC_SOUND_PLAYER MarcSound::kDisabled
 #define MARC_SOUND_SERIAL 0
 #define MARC_SOUND_VOLUME 500 // 0 - 1000
@@ -152,6 +158,7 @@
 #define MARC_SOUND_RANDOM true
 #define MARC_SOUND_RANDOM_MIN 5000
 #define MARC_SOUND_RANDOM_MAX 30000
+#define MARC_SOUND_LOCAL_ENABLED true
 
 #include "wifi/WifiAccess.h"
 
@@ -477,9 +484,15 @@ bool wifiEnabled;
 bool wifiActive;
 bool remoteEnabled;
 bool remoteActive;
+bool artooEnabled;
+int artooBaud;
 TaskHandle_t eventTask;
 bool otaInProgress;
+volatile uint32_t sArtooLastSignalMs;
+volatile uint32_t sArtooSignalBursts;
 #endif
+
+bool soundLocalEnabled;
 
 #ifdef USE_WIFI_MARCDUINO
 WifiMarcduinoReceiver wifiMarcduinoReceiver(wifiAccess);
@@ -533,6 +546,8 @@ bool sRemoteConnected;
 bool sRemoteConnecting;
 SMQAddress sRemoteAddress;
 #endif
+
+static bool sArtooSignalActive;
 
 ////////////////////////////////
 
@@ -623,7 +638,10 @@ void setup()
 #ifdef USE_WIFI
     wifiEnabled = wifiActive = preferences.getBool(PREFERENCE_WIFI_ENABLED, WIFI_ENABLED);
     remoteEnabled = remoteActive = preferences.getBool(PREFERENCE_REMOTE_ENABLED, REMOTE_ENABLED);
+    artooEnabled = preferences.getBool(PREFERENCE_ARTOO_ENABLED, ARTOO_ENABLED);
+    artooBaud = preferences.getInt(PREFERENCE_ARTOO_BAUD, ARTOO_BAUD);
 #endif
+    soundLocalEnabled = preferences.getBool(PREFERENCE_MARCSOUND_LOCAL_ENABLED, MARC_SOUND_LOCAL_ENABLED);
     PrintReelTwoInfo(Serial, "AstroPixelsPlus");
 
     if (preferences.getBool(PREFERENCE_MARCSERIAL_ENABLED, MARC_SERIAL_ENABLED))
@@ -662,7 +680,11 @@ void setup()
 #endif
     MarcSound::Module soundPlayer = (MarcSound::Module)preferences.getInt(PREFERENCE_MARCSOUND, MARC_SOUND_PLAYER);
     int soundStartup = preferences.getInt(PREFERENCE_MARCSOUND_STARTUP, MARC_SOUND_STARTUP);
-    if (soundPlayer != MarcSound::kDisabled)
+    if (!soundLocalEnabled)
+    {
+        DEBUG_PRINTLN("Local sound execution disabled by preference");
+    }
+    else if (soundPlayer != MarcSound::kDisabled)
     {
         SOUND_SERIAL.begin(SOUND_BAUD, SERIAL_8N1, SOUND_RX_PIN, SOUND_TX_PIN);
         // Need to wait 3 seconds for sound modules to power up
@@ -892,11 +914,14 @@ void setup()
         0);
 #endif
     DEBUG_PRINTLN("Ready");
-    sMarcSound.playStartSound();
-    sMarcSound.setRandomMin(preferences.getInt(PREFERENCE_MARCSOUND_RANDOM_MIN, MARC_SOUND_RANDOM_MIN));
-    sMarcSound.setRandomMax(preferences.getInt(PREFERENCE_MARCSOUND_RANDOM_MAX, MARC_SOUND_RANDOM_MAX));
-    if (preferences.getInt(PREFERENCE_MARCSOUND_RANDOM, MARC_SOUND_RANDOM))
-        sMarcSound.startRandomInSeconds(13);
+    if (soundLocalEnabled)
+    {
+        sMarcSound.playStartSound();
+        sMarcSound.setRandomMin(preferences.getInt(PREFERENCE_MARCSOUND_RANDOM_MIN, MARC_SOUND_RANDOM_MIN));
+        sMarcSound.setRandomMax(preferences.getInt(PREFERENCE_MARCSOUND_RANDOM_MAX, MARC_SOUND_RANDOM_MAX));
+        if (preferences.getInt(PREFERENCE_MARCSOUND_RANDOM, MARC_SOUND_RANDOM))
+            sMarcSound.startRandomInSeconds(13);
+    }
 }
 
 ////////////////
@@ -1128,6 +1153,17 @@ void mainLoop()
 #ifdef USE_MENUS
     sDisplay.process();
 #endif
+
+    bool artooSignal = (COMMAND_SERIAL.available() > 0);
+    if (artooSignal)
+    {
+        sArtooLastSignalMs = millis();
+        if (!sArtooSignalActive)
+        {
+            sArtooSignalBursts++;
+        }
+    }
+    sArtooSignalActive = artooSignal;
 
     if (Serial.available())
     {

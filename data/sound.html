@@ -20,6 +20,12 @@
   <div class="card">
     <h3>Sound Module</h3>
 
+    <label class="check-row mb-10" title="Master toggle for AstroPixels local sound actuation. Useful when body controller handles all audio playback.">
+      <input type="checkbox" id="sound-local-enabled" checked title="Enable or disable local sound execution on AstroPixels.">
+      <span>Local sound execution on AstroPixels</span>
+    </label>
+    <div class="desc">Disable when another controller handles audio. Sound commands are still accepted but AstroPixels does not actuate local playback.</div>
+
     <div class="mb-10">
       <label class="label-dim">Sound Player</label>
       <select id="sound-player" class="mt-4">
@@ -64,8 +70,8 @@
              class="input-full">
     </div>
 
-    <label class="check-row">
-      <input type="checkbox" id="sound-random" checked>
+    <label class="check-row" title="Allows periodic random local sound playback by AstroPixels when local sound execution is enabled.">
+      <input type="checkbox" id="sound-random" checked title="Enable random local sound scheduling.">
       <span>Random Sound Enabled</span>
     </label>
 
@@ -92,7 +98,8 @@
       document.getElementById('vol-label').textContent = Math.round(this.value / 10) + '%';
     });
 
-    fetch('/api/pref?keys=msound,msoundser,mvolume,msoundstart,mrandom,mrandommin,mrandommax').then(function(r){return r.json();}).then(function(d){
+    fetch('/api/pref?keys=msoundlocal,msound,msoundser,mvolume,msoundstart,mrandom,mrandommin,mrandommax').then(function(r){return r.json();}).then(function(d){
+      if (typeof d.msoundlocal !== 'undefined') document.getElementById('sound-local-enabled').checked = d.msoundlocal === 'true' || d.msoundlocal === true || d.msoundlocal === '1';
       if (d.msound) document.getElementById('sound-player').value = d.msound;
       if (d.msoundser) document.getElementById('sound-serial').value = d.msoundser;
       if (d.mvolume) { document.getElementById('sound-volume').value = d.mvolume; document.getElementById('vol-label').textContent = Math.round(d.mvolume/10) + '%'; }
@@ -104,6 +111,7 @@
 
     function saveSound() {
       var prefs = [
+        {key:'msoundlocal', val: document.getElementById('sound-local-enabled').checked ? '1' : '0'},
         {key:'msound', val: document.getElementById('sound-player').value},
         {key:'msoundser', val: document.getElementById('sound-serial').value},
         {key:'mvolume', val: document.getElementById('sound-volume').value},

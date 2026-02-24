@@ -40,6 +40,7 @@
       <div class="health-item" title="Panel servo controller at I2C address 0x40 (dome panel movement)"><div class="indicator" id="h-panels"></div><span>Servo Panels</span></div>
       <div class="health-item" title="Holo servo controller at I2C address 0x41 (holo pitch/yaw movement)"><div class="indicator" id="h-holos"></div><span>Servo Holos</span></div>
       <div class="health-item" title="Sound output availability based on sound module preference state"><div class="indicator" id="h-sound"></div><span>Sound Module</span></div>
+      <div class="health-item" title="Body-to-dome serial traffic telemetry profile for Artoo-style controllers"><div class="indicator" id="h-artoo"></div><span>Artoo Link</span></div>
       <div class="health-item" title="Current WiFi service state on this controller"><div class="indicator" id="h-wifi"></div><span>WiFi</span></div>
       <div class="health-item" title="Droid remote link state (warn means remote feature disabled)"><div class="indicator" id="h-remote"></div><span>Droid Remote</span></div>
       <div class="health-item" title="SPI flash file system mount state used by web UI files"><div class="indicator" id="h-spiffs"></div><span>SPIFFS</span></div>
@@ -108,7 +109,8 @@
     function updateHealth(h) {
       setIndicator('h-panels', h.i2c_panels);
       setIndicator('h-holos', h.i2c_holos);
-      setIndicator('h-sound', h.sound_module);
+      setIndicatorWarn('h-sound', h.sound_module, h.sound_local_enabled);
+      setIndicatorWarn('h-artoo', h.artoo, h.artoo_enabled);
       setIndicator('h-wifi', h.wifi);
       setIndicatorWarn('h-remote', h.remote, h.remote_enabled);
       setIndicator('h-spiffs', h.spiffs);
@@ -128,6 +130,12 @@
       html += '</div>';
       if (typeof s.remoteConnected !== 'undefined') {
         html += '<div>Droid Remote: ' + (s.remoteConnected ? '<span class="dot green"></span>Connected' : '<span class="dot red"></span>Disconnected') + '</div>';
+      }
+      if (typeof s.artooEnabled !== 'undefined') {
+        html += '<div>Artoo Profile: ' + (s.artooEnabled ? '<span class="dot green"></span>Enabled' : '<span class="dot yellow"></span>Disabled') + ' (' + s.artooBaud + ' baud)</div>';
+      }
+      if (typeof s.soundLocalEnabled !== 'undefined') {
+        html += '<div>Local Sound Execution: ' + (s.soundLocalEnabled ? '<span class="dot green"></span>Enabled' : '<span class="dot yellow"></span>Disabled') + '</div>';
       }
       if (s.otaInProgress) {
         html += '<div><span class="dot yellow"></span>Firmware update in progress</div>';

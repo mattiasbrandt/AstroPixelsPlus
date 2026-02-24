@@ -23,6 +23,11 @@ extern Preferences preferences;
 extern bool wifiEnabled;
 extern bool remoteEnabled;
 extern bool otaInProgress;
+extern bool artooEnabled;
+extern int artooBaud;
+extern bool soundLocalEnabled;
+extern volatile uint32_t sArtooLastSignalMs;
+extern volatile uint32_t sArtooSignalBursts;
 
 #ifdef USE_DROID_REMOTE
 extern bool sRemoteConnected;
@@ -89,15 +94,17 @@ static bool isAllowedPrefKey(const String &key)
 {
     return key == "wifi" || key == "ap" || key == "ssid" || key == "pass" ||
            key == "remote" || key == "rhost" || key == "rsecret" ||
+           key == "artoo" || key == "artoobaud" ||
            key == "mserial2" || key == "mserialpass" || key == "mserial" ||
            key == "mwifi" || key == "mwifipass" ||
            key == "msound" || key == "msoundser" || key == "mvolume" ||
            key == "msoundstart" || key == "mrandom" || key == "mrandommin" ||
-           key == "mrandommax" || key == "apitoken";
+           key == "mrandommax" || key == "msoundlocal" || key == "apitoken";
 }
 
 static size_t maxPrefValueLen(const String &key)
 {
+    if (key == "artoobaud") return 8;
     if (key == "ssid" || key == "rhost") return 32;
     if (key == "pass" || key == "rsecret" || key == "apitoken") return 64;
     return 16;
@@ -189,6 +196,9 @@ static String buildStateJson()
     String json = "{";
     json += "\"wifiEnabled\":" + String(wifiEnabled ? "true" : "false");
     json += ",\"remoteEnabled\":" + String(remoteEnabled ? "true" : "false");
+    json += ",\"artooEnabled\":" + String(artooEnabled ? "true" : "false");
+    json += ",\"artooBaud\":" + String(artooBaud);
+    json += ",\"soundLocalEnabled\":" + String(soundLocalEnabled ? "true" : "false");
 #ifdef USE_DROID_REMOTE
     json += ",\"remoteConnected\":" + String(sRemoteConnected ? "true" : "false");
 #endif
@@ -240,11 +250,22 @@ static String buildHealthJson()
     // We can't easily check module state from here without another extern,
     // so we report it based on preference config
     String soundPref = preferences.getString("msound", "0");
-    bool soundEnabled = (soundPref != "0");
+    bool soundEnabled = (soundLocalEnabled && soundPref != "0");
     json += ",\"sound_module\":" + String(soundEnabled ? "true" : "false");
+    json += ",\"sound_local_enabled\":" + String(soundLocalEnabled ? "true" : "false");
 
     // WiFi
     json += ",\"wifi\":" + String(wifiEnabled ? "true" : "false");
+
+    uint32_t nowMs = millis();
+    uint32_t lastMs = sArtooLastSignalMs;
+    uint32_t deltaMs = (lastMs > 0 && nowMs >= lastMs) ? (nowMs - lastMs) : 0xFFFFFFFFu;
+    bool artooLink = artooEnabled && (deltaMs <= 5000u);
+    json += ",\"artoo\":" + String(artooLink ? "true" : "false");
+    json += ",\"artoo_enabled\":" + String(artooEnabled ? "true" : "false");
+    json += ",\"artoo_baud\":" + String(artooBaud);
+    json += ",\"artoo_last_seen_ms\":" + String(lastMs);
+    json += ",\"artoo_signal_bursts\":" + String(sArtooSignalBursts);
 
     // Droid Remote
 #ifdef USE_DROID_REMOTE
@@ -379,7 +400,7 @@ static void initAsyncWeb()
                 if (!first) json += ",";
                 first = false;
                 // Boolean keys: firmware uses getBool/putBool for these
-                if (key == "wifi" || key == "ap" || key == "remote")
+                if (key == "wifi" || key == "ap" || key == "remote" || key == "artoo" || key == "msoundlocal")
                 {
                     bool val = preferences.getBool(key.c_str(), false);
                     json += "\"" + jsonEscape(key) + "\":" + (val ? "true" : "false");
@@ -433,7 +454,7 @@ static void initAsyncWeb()
                 return;
             }
             // Boolean keys — firmware uses getBool/putBool
-            else if (key == "wifi" || key == "ap" || key == "remote")
+            else if (key == "wifi" || key == "ap" || key == "remote" || key == "artoo" || key == "msoundlocal")
             {
                 bool bval = (val == "1" || val == "true");
                 preferences.putBool(key.c_str(), bval);
