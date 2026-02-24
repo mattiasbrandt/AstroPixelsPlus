@@ -86,6 +86,12 @@ A focused static-analysis-driven hardening pass was applied to first-party firmw
 - Concurrency hardening:
   - Added `portMUX_TYPE` critical-section protection for Artoo telemetry shared state (`sArtooLastSignalMs`, `sArtooSignalBursts`) across main loop updates and async web reads.
 
+Validation snapshot after this hardening cycle:
+
+- `pio run -e astropixelsplus -t buildfs` passes.
+- `pio run -e astropixelsplus` passes.
+- `pio test -e astropixelsplus` currently reports no `test/` directory in this repository, so there are no PlatformIO unit tests to execute yet.
+
 ### Why We Switched From ReelTwo WebPages
 
 The old ReelTwo web UI (`WebPages.h` + `WifiWebServer` + `WButton`) allocated heap during static initialization. On ESP32 this led to a practical button/UI size ceiling and boot instability as the page set grew.
