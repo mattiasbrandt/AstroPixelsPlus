@@ -1,639 +1,136 @@
-# AstroPixelsPlus Fork Improvements Documentation
+# AstroPixelsPlus Fork Improvements
 
-This document summarizes all improvements made to the AstroPixelsPlus project to enhance usability, organization, and stability.
+This file tracks fork-specific behavior and feature changes that differ from upstream usage or are important for builders/operators.
 
----
+## 2026-02 Core Platform and Web Stack
 
-## 🎯 Summary of Changes
+### Async Web migration (transport layer only)
+- Migrated UI transport from static ReelTwo `WebPages.h` patterns to async REST/WS + SPIFFS pages.
+- Core control path remains unchanged: all command sources still route into `Marcduino::processCommand(...)`.
+- Added/maintained API endpoints for state/health/logs, command posting, preferences, reboot, and OTA upload.
 
-**Total Lines Modified:** ~822 additions, ~522 deletions across 7 files  
-**Focus Areas:** Web interface reorganization, memory optimization, credenda fork integration, code documentation
+### OTA scope and UX
+- OTA firmware page updates app firmware only.
+- SPIFFS web assets (`data/*`) still require filesystem upload (`uploadfs`).
+- OTA UX improved to handle reconnect/reboot transition cleanly.
 
----
+## 2026-02 Command and Sequence Enhancements
 
-## 0. 2026 Async Web Migration (Current Architecture)
+### Command traceability
+- Added source-tagged command logging for ingress paths:
+  - `astropixel-web-api`
+  - `astropixel-web-ws`
+  - `wifi-marcduino`
+  - `usb-serial`
+  - `i2c-slave`
 
-### 2026-02 Command Traceability + Holo Off Semantics Validation
-
-Recent bench validation added command-source observability and corrected holo LED off semantics to align with current ReelTwo behavior.
-
-- Added source-tagged command logs at ingress points so mixed-controller operation is diagnosable:
-  - Web API: `[CMD][astropixel-web-api] ...`
-  - WebSocket: `[CMD][astropixel-web-ws] ...`
-  - WiFi Marcduino socket: `[CMD][wifi-marcduino] ...`
-  - USB serial: `[CMD][usb-serial] ...`
-  - I2C slave input: `[CMD][i2c-slave] ...`
-- `/api/cmd` logging now includes command text (not only length), improving click-to-dispatch verification during live tests.
-- Holos page dispatch path now shows per-command send/accept state to remove ambiguity between UI click, API acceptance, and downstream hardware actuation.
-- Updated holo OFF mappings from `HP?0000` to ReelTwo clear command `HP?096` (`D096`) for all holo targets:
+### Holo command corrections
+- Corrected holo OFF semantics to ReelTwo clear command form:
   - `*OF00 -> HPA096`
   - `*OF01 -> HPF096`
   - `*OF02 -> HPR096`
   - `*OF03 -> HPT096`
   - `*OF04 -> HPD096`
 
-Bench outcome from this cycle:
-- Software path confirmed: web button -> API/WS -> Marcduino -> Holo command handler.
-- A reproduced front-channel mismatch was isolated as local wiring/channel mapping on the test rig, not a command parser collision.
-
-UI consistency update in same cycle:
-- Added `Setup` nav link on pages that previously omitted it (`panels`, `logics`, `holos`, `sequences`) so setup is reachable from all primary control screens.
-
-### 2026-02 Artoo-Style Serial Telemetry + Local Sound Execution Toggle
-
-To support common split-controller body/dome setups, the fork now includes first-slice readiness for an external body controller serial profile (for example Artoo-style wiring over a slip ring) while keeping command compatibility unchanged.
-
-- Added Artoo serial profile preferences:
-  - `artoo` (enable/disable telemetry profile)
-  - `artoobaud` (expected upstream baud for operator visibility)
-- Added runtime telemetry surfaced in health/state APIs:
-  - link activity (`artoo`)
-  - enabled flag (`artoo_enabled`)
-  - configured baud (`artoo_baud`)
-  - last seen timestamp and burst counter (`artoo_last_seen_ms`, `artoo_signal_bursts`)
-- Added UI controls on `serial.html` for Artoo profile enable + expected baud.
-- Added dashboard health/status visibility for Artoo link on `index.html`.
-
-Sound handling now supports deployments where audio is orchestrated by another controller:
-
-- Added `msoundlocal` preference (`Local sound execution on AstroPixels`).
-- When disabled, AstroPixels still accepts commands but does not initialize/actuate local sound playback or startup/random local sound behavior.
-- Dashboard now distinguishes sound-module state from local-sound execution enablement.
-
-Feature-toggle UX clarification in same cycle:
-
-- Added explicit hover tooltips (`title`) on toggle controls in setup pages so operators can understand effect and scope before saving:
-  - `serial.html`: Serial pass-through, JawaLite serial/WiFi input, WiFi->Serial pass-through, Artoo telemetry profile
-  - `sound.html`: local sound execution, random sound enable
-  - `wifi.html`: WiFi enable, AP mode
-  - `remote.html`: Droid Remote enable
-
-### 2026-02 Static-Analysis Hardening Pass (Correctness + Runtime Safety)
-
-A focused static-analysis-driven hardening pass was applied to first-party firmware code.
-
-- Correctness fixes:
-  - Fixed MetaBalls buffer stride indexing in `effects/MeatBallsEffect.h` to match allocated 2D layout (`i*w+x` and `i*h+y`) and prevent out-of-bounds access.
-  - Fixed remote preference command handlers in `AstroPixelsPlus.ino`:
-    - `#APRNAME` now reads/writes `PREFERENCE_REMOTE_HOSTNAME` (was incorrectly using secret key)
-    - `#APRSECRET` now uses `SMQ_SECRET` as comparison default (was `SMQ_HOSTNAME`)
-
-- Runtime-safety fixes:
-  - Removed blocking `delay()` in reboot path (`reboot()` now restarts immediately after cleanup).
-  - Replaced blocking async route delays in `AsyncWebInterface.h` with deferred reboot scheduling handled by the async loop.
-  - Added cached I2C health scan data to avoid full bus scans on every `/api/health` request.
-
-- Concurrency hardening:
-  - Added `portMUX_TYPE` critical-section protection for Artoo telemetry shared state (`sArtooLastSignalMs`, `sArtooSignalBursts`) across main loop updates and async web reads.
-
-Validation snapshot after this hardening cycle:
-
-- `pio run -e astropixelsplus -t buildfs` passes.
-- `pio run -e astropixelsplus` passes.
-- `pio test -e astropixelsplus` currently reports no `test/` directory in this repository, so there are no PlatformIO unit tests to execute yet.
-
-### 2026-02 Sequence Expansion for Dome Feature Showcase
-
-Added additional Marcduino-compatible sequence modes to broaden demo/showcase coverage and improve compatibility with common external controller mappings.
-
-- New behavior/reset command handlers in `MarcduinoSequence.h`:
-  - `:SE10` Quiet reset (stop sound, holos off, panels close, logic normal)
-  - `:SE11` Full-awake reset (random sound + holo movement baseline + panels close)
-  - `:SE12` Top-panel showcase (top panel choreography + holo cycle)
-  - `:SE13` Mid-awake reset
-  - `:SE14` Awake+ reset
-  - `:SE15` Scream without panel movement (alias style command)
-  - `:SE16` Panel wiggle
-  - `:SE58` Panel "bye-bye" wave with holo pulse accent
-
-- Updated `data/sequences.html` to expose these new modes with operator-facing descriptions.
-
-### 2026-02 Compatibility-Focused Marcduino Overlay Commands
-
-To improve compatibility with legacy controller mappings while offering richer web showcase controls, this fork now layers additive command aliases over existing handlers (no removal of prior commands).
-
-- Holo compatibility overlays (existing commands unchanged):
-  - Added all-holo movement wrappers:
-    - `*HW00` (all wag)
-    - `*HN00` (all nod)
-  - Added holo twitch mode wrappers:
-    - `*HD07` disable twitch (`HPS7`)
-    - `*HD08` default twitch (`HPS8`)
-    - `*HD09` random twitch (`HPS9`)
-
-- Logic-display compatibility overlays (existing `@0T1-6,11` and `@1T/@2T` commands unchanged):
-  - Added additional quick effect shortcuts:
-    - Rainbow: `@0T12`, `@1T12`, `@2T12`
-    - Lights Out: `@0T15`, `@1T15`, `@2T15`
-    - Fire: `@0T22`, `@1T22`, `@2T22`
-    - Pulse: `@0T24`, `@1T24`, `@2T24`
-
-- Web UI overlap strategy:
-  - `logics.html` now exposes these new shortcut effects under a dedicated Showcase section while keeping classic mode controls.
-  - `holos.html` now exposes all-holo movement/twitch showcase controls while retaining original per-holo controls.
-
-Compatibility policy for this fork:
-- Prefer additive aliases over replacing/removing established command tokens.
-- Keep backend support for common legacy mappings, while improving discoverability in modern web UI pages.
-
-### 2026-02 Remote UX Clarification: R2 Touch (IP/Port) vs Droid Remote (ESPNOW)
-
-To reduce configuration confusion, setup pages now explicitly separate the two remote/control paths:
-
-- `remote.html` is clearly marked as **ESPNOW Droid Remote pairing** (host + secret), and explicitly notes this is not the R2 Touch IP/port setup path.
-- `serial.html` includes an **R2 Touch App Connection** block with:
-  - current controller IP (from `/api/state`)
-  - fixed Marcduino WiFi socket port (`2000`)
-  - guidance that R2 Touch uses WiFi command transport rather than ESPNOW pairing fields.
-- `setup.html` link label updated to `Droid Remote (ESPNOW only)` for immediate context.
-
-### 2026-02 Build-Time Remote Toggle (Memory-Focused)
-
-Added a build-time switch to fully compile out Droid Remote (SMQ/ESPNOW) support when not needed.
-
-- New build flag in `platformio.ini`:
-  - `-DAP_ENABLE_DROID_REMOTE=0` (default in this fork)
-- Firmware behavior:
-  - `USE_DROID_REMOTE` is now enabled only when `AP_ENABLE_DROID_REMOTE=1`
-  - when disabled, remote runtime state is forced off (`remoteEnabled=false`)
-  - `/api/state` now reports `remoteSupported` to indicate compile-time availability
-- UI behavior when compiled out:
-  - `setup.html` hides the Droid Remote settings link
-  - `remote.html` disables pairing fields/buttons and shows a clear build-time disabled message
-
-This keeps the feature available for builders who need it (`AP_ENABLE_DROID_REMOTE=1`) while allowing memory savings and reduced complexity for serial/body-controller-first setups.
-
-### Why We Switched From ReelTwo WebPages
-
-The old ReelTwo web UI (`WebPages.h` + `WifiWebServer` + `WButton`) allocated heap during static initialization. On ESP32 this led to a practical button/UI size ceiling and boot instability as the page set grew.
-
-The migration replaced only the web transport/presentation layer with `ESPAsyncWebServer` + SPIFFS UI files:
-
-- `AsyncWebInterface.h` now serves REST + WebSocket endpoints
-- `data/*.html`, `data/style.css`, `data/app.js` now hold UI structure/behavior
-- `WebPages.h` is now legacy/archived (`WebPages.h.bak`)
-
-### Important Clarification: Core Robot Behavior Was Not Rewritten
-
-This migration did **not** replace ReelTwo command handling. It wrapped the existing control path.
-
-All control paths still converge on the same dispatcher:
-
-```
-Serial2 (Marcduino hardware)
-WiFi socket (port 2000)
-REST /api/cmd + WebSocket /ws
-  -> Marcduino::processCommand(player, cmd)
-  -> existing MARCDUINO_ACTION handlers
-  -> existing ReelTwo hardware drivers
-```
-
-So REST/WebSocket is a new input layer on top of existing ReelTwo-era behavior.
-
-### Endpoint Mapping to Existing Runtime/Core Calls
-
-| Endpoint | Method | Runtime/Core Integration |
-|----------|--------|--------------------------|
-| `/api/cmd` | POST | `Marcduino::processCommand(player, cmd)` |
-| `/ws` | WS text | `Marcduino::processCommand(player, cmd)` |
-| `/api/pref` | GET/POST | existing `Preferences` read/write (`get*`, `put*`) |
-| `/api/reboot` | POST | existing `reboot()` path |
-| `/upload/firmware` | POST | existing `Update.*` OTA flow + logic progress rendering |
-| `/api/state` `/api/health` `/api/logs` | GET | snapshot/broadcast wrappers over current runtime state |
-
-### OTA vs SPIFFS Update Scope (Important)
-
-The firmware page OTA upload (`/upload/firmware`) updates the ESP32 application binary only.
-
-- OTA updates: `.bin` firmware image in app partition
-- Not updated by OTA: SPIFFS web files (`data/*.html`, `data/style.css`, `data/app.js`, image assets)
-
-If web UI files change, deploy them with SPIFFS upload over USB:
-
-```bash
-pio run -e astropixelsplus -t uploadfs --upload-port /dev/ttyUSB0
-```
-
-This distinction is now shown on the firmware page to reduce confusion during bench testing.
-
-### OTA UX Improvement (2026-02)
-
-Firmware-page upload UX was improved for real-world reboot behavior:
-
-- Handles connection reset during reboot without falsely showing a failed/stuck state
-- Waits for `/api/state` reconnect before final "device back online" success message
-- Added collapsible Live Log Console on firmware page for OTA/debug visibility
-- Home-page OTA indicator changed from full-screen dim overlay to non-blocking status panel
-
-### What This Enables
-
-- Removes compile-time widget count limits from firmware code
-- Scales UI by editing SPIFFS web files rather than adding static `WButton` objects
-- Keeps command behavior consistent across Serial2, socket, and web clients
-- Simplifies future UI iteration/testing (`python3 -m http.server 8080 --directory data`)
-
----
-
-## 1. ESP32 Memory Optimization & Crash Prevention
-
-### Problem Solved
-- **Root Cause:** WButton constructors call `appendBodyf()` → `FormatString()` → `malloc()` during static initialization
-- **Symptoms:** Boot crashes with error: `assert failed: vApplicationGetIdleTaskMemory port_common.c:195`
-- **Impact:** ESP32 heap not fully initialized during global object construction; exceeding ~12-15KB causes failure
-
-### Solution Implemented
-- Reduced WButton count from **97 → 27 instances** (70 buttons eliminated)
-- Consolidated controls into WSelect dropdowns (more memory efficient)
-- Removed non-moving panel buttons (P5, P6, P8, P9, P13)
-- Removed redundant Back/Home navigation buttons from all pages
-
-### Memory Limits Documented (WebPages.h lines 1-47)
-```cpp
-// PROVEN LIMITS (tested Dec 2025):
-// - Maximum ~50 WButton instances in static arrays (each ≈200 bytes heap)
-// - Maximum 6-7 String arrays (cumulative size matters)
-// - Combined limit: WButtons + String arrays must stay under ~12-15KB total heap
-//
-// Current Config (STABLE):
-// - 27 WButton instances
-// - 8 String arrays (panelSequences, holoLights, holoMovements, logicsSeq, 
-//   logicsColors, swBaudRates, soundPlayer, soundSerial)
-```
-
-### Test Results Documented
-| WButtons | String Arrays | Result |
-|----------|---------------|--------|
-| 44 | 6 | ✅ BOOTS |
-| 52 | 6 | ✅ BOOTS |
-| 37 | 7 | ✅ BOOTS |
-| 27 | 8 | ✅ BOOTS (current) |
-| 65 | 6 | ❌ CRASH |
-| 54 | 7 (large) | ❌ CRASH |
-
-### Safe vs Unsafe Patterns Documented
-**SAFE:**
-- W1, WLabel, WHR, WSlider, WTextField, WSelect, WHorizontalAlign, WVerticalAlign
-- const char* arrays (no heap allocation)
-- int/bool variables without initialization (`int var;` NOT `int var = 0;`)
-- Unicode arrows (↖↑↗←●→↙↓↘) - NOT emojis
-
-**UNSAFE:**
-- Too many WButton instances
-- Too many String arrays
-- WStyle (uses appendCSS → heap allocation)
-- Emojis in strings (causes WiFi crashes)
-- String var = "value"; in global scope
-
----
-
-## 2. Web Interface Reorganization
-
-### 2.1 Panels Page Improvements (WebPages.h lines 72-170)
-
-#### Organization by Physical Dome Location
-**Before:** All 13 panels listed without organization  
-**After:** Grouped by R2-D2 dome physical locations
-
-```
-Organized Structure:
-├── Predefined Sequences (dropdown with 21 choreographed animations)
-├── Front Lower Panels: P1, P2 (flanking front logic displays)
-├── Side Lower Panels: P3, P4 (left and right lower sides) 
-├── Upper/Rear Panels: P7, P10 (upper sides and rear)
-└── Quick Actions: Open All, Close All, Stop
-```
-
-#### Removed Non-Moving Panels
-- **P5** (Magic Panel) - fixed panel, doesn't open
-- **P6** (small upper panel) - fixed panel
-- **P8** (Rear PSI location) - fixed panel
-- **P9** (RLD location) - fixed panel
-- **P13** (top panel) - non-standard/rarely used
-
-**Benefit:** Saved 10 WButton instances, cleaner interface focused on moving panels
-
-#### Command Type Distinction
-- **:SE## commands:** Predefined sequences with timing/choreography
-- **:OP/:CL commands:** Direct open/close (immediate, no choreography)
-- **\*ST00 command:** Emergency stop for all servos
-
----
-
-### 2.2 Holo Projectors Page Improvements (WebPages.h lines 208-280)
-
-#### Separated Light Effects from Movements
-**Problem:** Users confused between LED effects and servo movements  
-**Solution:** Split into two distinct dropdowns with clear categorization
-
-```
-Holo Light Effects Dropdown (16 items):
-├── All On/Off, Front On/Off, Rear On/Off, Top On/Off (8 commands)
-├── Pulse (All/Front/Rear/Top) - LED dim pulse random color (4 commands)
-└── Rainbow (All/Front/Rear/Top) - LED color cycling (4 commands)
-
-Holo Movements Dropdown (9 items):
-├── Random (All/Front/Rear/Top) - Servo random positions (4 commands)
-├── Nod (All/Front/Rear/Top) - Servo nodding animation (4 commands)
-└── Reset All - Reset to default state (1 command)
-
-Auto HP Twitch Control:
-├── Disable (D198) - Turn off automatic movements
-└── Enable (D199) - Turn on automatic movements
-```
-
-#### Command Reference Table
-| Command | Type | Description |
-|---------|------|-------------|
-| \*ON##, \*OF## | Light Control | Turn holo LED on/off |
-| \*HP00-03 | Light Effect | Pulse - dim pulse random color |
-| \*HP04-07 | Light Effect | Rainbow - LED color cycling |
-| \*RD## | Movement | Random servo positions |
-| \*HN## | Movement | Servo nod animation |
-| \*ST00 | Control | Reset all to default |
-| D198/D199 | Control | Disable/Enable auto twitch |
-
-**Key Insight:** Pulse and Rainbow commands affect **LEDs only**, they do NOT move servos. This was verified in MarcduinoHolo.h source code comments: "Dim pulse random color" and "rainbow".
-
----
-
-### 2.3 Logic Displays Page Improvements (WebPages.h lines 345-420)
-
-#### Organization by Display Location
-**Before:** Mixed controls for front and rear displays  
-**After:** Clear sections for each display type
-
-```
-Front Logic Displays (FLDs) Section:
-├── Sequence dropdown
-├── Color dropdown
-├── Speed slider
-├── Duration slider
-└── Text message input
-
-Rear Logic Display (RLD) Section:
-├── Sequence dropdown
-├── Color dropdown  
-├── Speed slider
-├── Duration slider
-└── Text message input
-
-Apply Settings Button:
-└── Applies all changes to both displays simultaneously
-```
-
-**Benefits:**
-- Clear separation between FLD (two front displays) and RLD (single rear display)
-- All settings grouped by display location
-- Single Apply button reduces complexity
-
----
-
-## 3. Credenda Fork Integration
-
-### 3.1 All Holos On/Off Commands (MarcduinoHolo.h lines 3-13)
-
-**Added Commands:**
-- `*ON00` - Turn all three holo projectors ON (dim cycle random color)
-- `*OF00` - Turn all three holo projectors OFF
-
-**Implementation:**
-```cpp
-// CREDENDA FORK IMPROVEMENT: Added All Holos On/Off commands
-// These commands control all three holo projectors (Front, Rear, Top) simultaneously
-// *ON00 = All holos dim cycle random color
-// *OF00 = All holos off
-
-MARCDUINO_ACTION(AllHoloOn, *ON00, ({
-    CommandEvent::process(F("HPA0040")); // All Holo Dim cycle random color
-}))
-
-MARCDUINO_ACTION(AllHoloOFF, *OF00, ({
-    CommandEvent::process(F("HPA096")); // All Holo off (clear LEDs)
-}))
-```
-
----
-
-### 3.2 Enhanced Logic Sequences (MarcduinoLogics.h lines 108-160)
-
-#### Failure Sequence (@0T4)
-**Enhancement:** Added synchronized holo projector failure animation
-```cpp
-// CREDENDA FORK IMPROVEMENT: Enhanced Failure sequence
-// Added holo projector failure animation (HPA007) synchronized with logic displays
-// Auto-resets to normal after 11 seconds
-
-MARCDUINO_ACTION(FailureSequence, @0T4, ({
-    FLD.selectSequence(LogicEngineRenderer::FAILURE);
-    RLD.selectSequence(LogicEngineRenderer::FAILURE);
-    // Add All holo failure sequence
-    DO_COMMAND_AND_WAIT(F("HPA007|11\n"), 11000)
-    DO_RESET({
-        resetSequence();
-        // Reset to normal after failure
-        FLD.selectSequence(LogicEngineRenderer::NORMAL);
-        RLD.selectSequence(LogicEngineRenderer::NORMAL);
-    })
-}))
-```
-
-#### Scream/Red Alert Sequence (@0T5)
-**Enhancement:** Added synchronized holo projector scream animation
-```cpp
-// CREDENDA FORK IMPROVEMENT: Enhanced Scream/Red Alert sequence
-// Added holo projector scream animation (HPA0040) synchronized with logic displays
-// Auto-resets to normal after 7 seconds
-
-MARCDUINO_ACTION(ScreamLogicsSequence, @0T5, ({
-    FLD.selectSequence(LogicEngineRenderer::REDALERT);
-    RLD.selectSequence(LogicEngineRenderer::REDALERT);
-    // Add All holo scream sequence
-    DO_COMMAND_AND_WAIT(F("HPA0040|7\n"), 7000)
-    DO_RESET({
-        resetSequence();
-        // Reset to normal after scream
-        FLD.selectSequence(LogicEngineRenderer::NORMAL);
-        RLD.selectSequence(LogicEngineRenderer::NORMAL);
-    })
-}))
-```
-
-#### Leia Sequence (@0T6)
-**Enhancement:** Added synchronized front holo Leia message
-```cpp
-// CREDENDA FORK IMPROVEMENT: Enhanced Leia sequence
-// Added front holo projector Leia message (HPS1) synchronized with logic displays
-// Auto-resets after 45 seconds
-
-MARCDUINO_ACTION(LeiaLogicsSequence, @0T6, ({
-    FLD.selectSequence(LogicEngineRenderer::LEIA);
-    RLD.selectSequence(LogicEngineRenderer::LEIA);
-    // Add Front holo Leia sequence
-    DO_COMMAND_AND_WAIT(F("HPS1|45\n"), 45000)
-    DO_RESET({
-        resetSequence();
-    })
-}))
-```
-
----
-
-### 3.3 Enhanced Startup Text (AstroPixelsPlus.ino line 674)
-
-**Enhancement:** Displays iconic Star Wars text on boot
-```cpp
-// CREDENDA FORK IMPROVEMENT: Enhanced startup text display
-// Shows "STAR WARS" on RLD and "R2D2" on FLD during boot
-// Initialize LED effects before WiFi starts
-RLD.selectScrollTextLeft("... STAR WARS ....", LogicEngineRenderer::kBlue, 0, 15);
-FLD.selectScrollTextLeft("... R2D2 ...", LogicEngineRenderer::kRed, 0, 15);
-```
-
-**Effect:** 
-- Rear Logic Display (RLD): Scrolls "... STAR WARS ...." in blue
-- Front Logic Displays (FLD): Scrolls "... R2D2 ..." in red
-- Executes before WiFi initialization for immediate visual feedback
-
----
-
-## 4. Code Documentation Improvements
-
-### 4.1 Comprehensive Comments Added
-
-#### WebPages.h Documentation
-- **Lines 1-47:** ESP32 static initialization memory limits
-- **Lines 72-78:** Panels page organization by dome location
-- **Lines 208-220:** Holo commands categorization (lights vs movements)
-- **Lines 345-352:** Logic displays organization
-- **Throughout:** Inline comments explaining command types and purposes
-
-#### MarcduinoHolo.h Documentation
-- **Lines 3-8:** Credenda fork All Holos On/Off feature
-- **Lines 122-127:** Pulse commands clarified as LED effects (NOT movements)
-- **Lines 143-148:** Rainbow commands clarified as LED effects (NOT movements)
-
-#### MarcduinoLogics.h Documentation
-- **Lines 108:** Failure sequence enhancement with holo animation
-- **Lines 124:** Scream sequence enhancement with holo animation
-- **Lines 140:** Leia sequence enhancement with holo message
-
-#### AstroPixelsPlus.ino Documentation
-- **Line 674:** Startup text enhancement from credenda fork
-
-### 4.2 Troubleshooting Guide Added
-```powershell
-# Count WButtons (PowerShell):
-(Get-Content WebPages.h | Select-String -Pattern '\bWButton\(' -AllMatches).Matches.Count
-
-# Count String arrays (grep):
-grep -c '^String .*\[\]' WebPages.h
-
-# If crashes occur:
-# 1. Count instances (commands above)
-# 2. Compare to limits (50 WButtons, 6-7 String arrays)
-# 3. Consolidate WButtons into WSelect dropdowns
-# 4. Alternative: Use dynamic allocation pattern (see WebPages.h.backup)
-```
-
----
-
-## 5. File-by-File Change Summary
-
-### WebPages.h (~634 lines changed)
-- ✅ Added 47-line header documentation on ESP32 memory limits
-- ✅ Added panels page with dropdown and organized by dome location
-- ✅ Added holos page with separate light/movement dropdowns
-- ✅ Reorganized logics page by display location
-- ✅ Added inline comments throughout
-- ✅ Removed 70+ WButton instances (97 → 27)
-
-### MarcduinoHolo.h (~394 lines reformatted)
-- ✅ Added All Holos On/Off commands (\*ON00, \*OF00)
-- ✅ Added documentation for Pulse commands (LED effects)
-- ✅ Added documentation for Rainbow commands (LED effects)
-- ✅ Code reformatting for consistency
-
-### MarcduinoLogics.h (~188 lines reformatted)
-- ✅ Enhanced Failure sequence with holo animation + auto-reset
-- ✅ Enhanced Scream sequence with holo animation + auto-reset
-- ✅ Enhanced Leia sequence with holo message + auto-reset
-- ✅ Code reformatting for consistency
-
-### AstroPixelsPlus.ino (~114 lines changed)
-- ✅ Added "STAR WARS" / "R2D2" startup text on logic displays
-- ✅ Added documentation comment for startup enhancement
-
-### Other Files
-- **README.md:** Minor updates
-- **effects/BitmapEffect.h:** Minor fixes
-- **platformio.ini:** Configuration updates
-
----
-
-## 6. Benefits & Impact
-
-### Stability Improvements
-- ✅ **Zero boot crashes** - Reduced from constant crashes to 100% stable boots
-- ✅ **46% margin remaining** - 27/50 WButton limit (23 buttons of headroom)
-- ✅ **Proven test results** - Documented safe configurations
-
-### Usability Improvements
-- ✅ **Clearer organization** - Panels by location, holos by function type
-- ✅ **Reduced clutter** - Removed non-moving panels, redundant navigation
-- ✅ **Better categorization** - Light effects vs movements clearly separated
-- ✅ **Intuitive layout** - Physical dome locations mirror web interface
-
-### Feature Additions
-- ✅ **All Holos On/Off** - Control all three holos simultaneously
-- ✅ **Enhanced sequences** - Failure, Scream, Leia with holo integration
-- ✅ **Startup text** - "STAR WARS" branding on boot
-- ✅ **Auto-reset** - Sequences automatically return to normal
-
-### Maintainability Improvements
-- ✅ **Comprehensive documentation** - Every major change explained
-- ✅ **Troubleshooting guide** - Clear steps to debug memory issues
-- ✅ **Test results** - Known good configurations documented
-- ✅ **Inline comments** - Code intent clear for future developers
-
----
-
-## 7. Future Recommendations
-
-### Staying Within Limits
-1. **Before adding features:** Count current WButtons and String arrays
-2. **Prefer dropdowns:** Use WSelect instead of multiple WButtons
-3. **Test incrementally:** Add features one at a time, test boot stability
-4. **Monitor headroom:** Keep 10+ button margin for safety
-
-### Alternative Approach (If Limits Exceeded)
-If static initialization limits become constraining, consider the dynamic allocation pattern:
-```cpp
-// See WebPages.h.backup for full implementation
-void initWebPages() {
-    // Allocate arrays at runtime after heap is ready
-    mainContentsArray = new WElement[20]{
-        W1("Title"),
-        WButton(...), // Unlimited buttons possible
-        // ...
-    };
-}
-```
-**Tradeoff:** More complex initialization, but no static memory limits.
-
----
-
-## 8. Version History
-
-**December 2025** - Major refactoring
-- ESP32 memory crisis resolved
-- Web interface reorganized
-- Credenda fork features integrated
-- Comprehensive documentation added
-
----
-
-## Conclusion
-
-These improvements transform AstroPixelsPlus from a crash-prone prototype into a stable, well-organized, and user-friendly R2-D2 control system. The combination of memory optimization, interface reorganization, credenda fork integration, and thorough documentation provides a solid foundation for future development.
-
-**Key Achievement:** Reduced WButton count by 72% (97 → 27) while **adding** features and improving usability.
+### Added sequence/mode coverage for compatibility and demos
+- Added sequence handlers:
+  - `:SE10`, `:SE11`, `:SE12`, `:SE13`, `:SE14`, `:SE15`, `:SE16`, `:SE58`
+- Expanded web sequence/home quick-action controls and mood preset buttons.
+
+### Additive compatibility overlays (legacy-safe)
+- Kept existing commands; added aliases/wrappers for broader controller compatibility.
+- Holo overlays added:
+  - `*HD07`, `*HD08`, `*HD09`
+  - `*HW00`, `*HN00`
+- Logic quick-effect overlays added:
+  - `@0T12/@1T12/@2T12` (Rainbow)
+  - `@0T15/@1T15/@2T15` (Lights Out)
+  - `@0T22/@1T22/@2T22` (Fire)
+  - `@0T24/@1T24/@2T24` (Pulse)
+
+## 2026-02 Artoo-Oriented and Sound Controls
+
+### Artoo serial telemetry profile
+- Added preference keys:
+  - `artoo` (enable telemetry profile)
+  - `artoobaud` (expected upstream baud)
+- Added API/health visibility fields:
+  - `artoo`, `artoo_enabled`, `artoo_baud`, `artoo_last_seen_ms`, `artoo_signal_bursts`
+- Added Serial setup UI section for Artoo communication context.
+
+### Local sound execution feature toggle
+- Added `msoundlocal` preference.
+- When disabled, sound commands may still be accepted but local playback/startup/random local sound behavior is not actuated.
+
+## 2026-02 Remote Clarification and Build-Time Control
+
+### R2 Touch vs Droid Remote clarity
+- Clarified that `remote.html` is for **Droid Remote ESPNOW pairing** (host/secret), not R2 Touch IP/port setup.
+- Added explicit R2 Touch connection guidance under Serial setup (controller IP + port `2000`).
+
+### Build-time Droid Remote toggle (memory-focused)
+- Added build flag default:
+  - `-DAP_ENABLE_DROID_REMOTE=0`
+- `USE_DROID_REMOTE` now depends on this build flag.
+- When compiled out:
+  - Remote runtime state is forced disabled.
+  - API reports `remoteSupported=false`.
+  - Setup/Remote pages show build-disabled status and disable/hide remote controls accordingly.
+
+## 2026-02 Reliability and Static-Analysis Hardening
+
+### Correctness
+- Fixed MetaBalls stride/indexing to match buffer layout and prevent OOB behavior.
+- Fixed remote preference command-key mismatches for hostname/secret handling.
+
+### Runtime safety
+- Replaced blocking async reboot delays with scheduled reboot path in async loop.
+- Added cached I2C health scan data to avoid repeated full scan on each health request.
+- Added lock-protected telemetry reads/writes for shared Artoo counters.
+
+### Startup/runtime pacing
+- Reworked sound module initialization to deferred/retry flow (reduced setup blocking impact).
+- Adjusted event loop pacing to avoid overly tight polling.
+
+## 2026-02 Home Health and Status Signals
+
+- Added threshold-colored system status indicators on Home for:
+  - Free heap
+  - Min free heap since boot
+  - Serial2 activity age
+  - WiFi quality band
+  - I2C probe error count
+- Added clearer build-disabled representation for Droid Remote in Home/Setup.
+
+## Notes
+
+- This document intentionally focuses on concrete fork behavior/features.
+- Local bench-specific diagnostics and personal wiring notes should stay outside this file (for example local `tasks/*` notes) unless they represent a reusable firmware behavior change.
+
+## Historical Context: Why Async Web Migration Happened
+
+Before the async migration, this fork (like upstream-era patterns) relied on ReelTwo web page construction (`WebPages.h`, `WifiWebServer`, `WButton`-heavy static UI definitions).
+
+### What was attempted in the legacy model
+- Reorganize web pages and add richer controls directly in `WebPages.h`.
+- Add more panel/holo/logic controls and grouping improvements inside static widget arrays.
+- Tune/trim button layout to fit ESP32 constraints.
+
+### Problems encountered repeatedly
+- ESP32 stability degraded as static UI complexity increased.
+- `WButton`-heavy static initialization consumed heap early (before full runtime availability), causing fragile boot behavior when control count grew.
+- Practical UI growth ceiling made further feature expansion risky.
+- Iteration speed was poor because transport/UI/layout logic were tightly coupled to firmware-side static widget construction.
+
+### Decision rationale for migration
+The fork moved to async web + SPIFFS UI because it solves the structural bottleneck instead of only trimming symptoms.
+
+- Async handlers (`AsyncWebInterface.h`) keep firmware-side web control lightweight.
+- UI complexity now lives in static assets (`data/*.html`, `data/app.js`, `data/style.css`) where growth is safer and easier to iterate.
+- Command behavior remains consistent because all control paths still dispatch through the same Marcduino handling path.
+- This preserves compatibility while unlocking maintainable feature growth.
+
+### Outcome of that decision
+- Better stability under richer UI.
+- Clearer separation of concerns (firmware command execution vs web presentation).
+- Faster iteration on operator UX without reintroducing static-init heap pressure.
