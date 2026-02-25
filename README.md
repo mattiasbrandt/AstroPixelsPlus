@@ -5,11 +5,12 @@ Alternative firmware sketch for the AstroPixels boards
 
 ## Fork Notes (mattiasbrandt)
 
-This fork contains an async web migration and ongoing UI/UX hardening work that differs from upstream-focused docs.
+> [!NOTE]
+> This fork includes additional improvements: async web UI, command/sequence compatibility overlays, Artoo serial telemetry, sound execution toggles, remote-mode build gating, and reliability/health updates.
 
-See detailed fork-specific notes in:
-
-`FORK_IMPROVEMENTS.md`
+> [!IMPORTANT]
+> Full fork-specific changes and rationale:
+> [`FORK_IMPROVEMENTS.md`](./FORK_IMPROVEMENTS.md)
 
 ---
 
