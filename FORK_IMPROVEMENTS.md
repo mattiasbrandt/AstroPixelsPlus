@@ -123,6 +123,14 @@ This file tracks fork-specific behavior and feature changes that differ from ups
   - `Sound Playback Module: Enabled/Disabled`
   - Disabled reason is shown as either local preference or module setting.
 
+## 2026-02 Validation Tooling
+
+### Command compatibility matrix smoke runner
+- Added `tools/command_compat_matrix.py` to validate core Marcduino command families over HTTP API.
+- Runner sends command matrix entries through `/api/cmd` and checks `/api/state` + `/api/health` after each command.
+- Supports grouped runs (`--group panels|holos|logics|sequences|sound`), target host override, optional API token, and dry-run listing.
+- Bench validation completed on this fork: matrix runner executes successfully and reports expected PASS behavior.
+
 ## Notes
 
 - This document intentionally focuses on concrete fork behavior/features.
