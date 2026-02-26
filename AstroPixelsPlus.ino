@@ -496,6 +496,10 @@ volatile uint32_t sArtooSignalBursts;
 portMUX_TYPE sArtooTelemetryMux = portMUX_INITIALIZER_UNLOCKED;
 #endif
 
+#ifdef USE_WIFI_WEB
+static bool sAsyncWebStarted;
+#endif
+
 bool soundLocalEnabled;
 uint32_t sMinFreeHeap = 0;
 static bool sSoundInitPending;
@@ -647,7 +651,8 @@ void setup()
         DEBUG_PRINTLN("Failed to init prefs");
     }
 #ifdef USE_WIFI
-    wifiEnabled = wifiActive = preferences.getBool(PREFERENCE_WIFI_ENABLED, WIFI_ENABLED);
+    wifiEnabled = preferences.getBool(PREFERENCE_WIFI_ENABLED, WIFI_ENABLED);
+    wifiActive = false;
 #ifdef USE_DROID_REMOTE
     remoteEnabled = remoteActive = preferences.getBool(PREFERENCE_REMOTE_ENABLED, REMOTE_ENABLED);
 #else
@@ -861,8 +866,16 @@ void setup()
 #endif
         wifiAccess.notifyWifiConnected([](WifiAccess &wifi)
                                        {
+                                           wifiActive = true;
                                            Serial.print("Connect to http://");
                                            Serial.println(wifi.getIPAddress());
+#ifdef USE_WIFI_WEB
+                                           if (!sAsyncWebStarted)
+                                           {
+                                               initAsyncWeb();
+                                               sAsyncWebStarted = true;
+                                           }
+#endif
 #ifdef USE_MDNS
                                            // No point in setting up mDNS if R2 is the access point
                                            if (!wifi.isSoftAP())
@@ -880,6 +893,10 @@ void setup()
                                            }
 #endif
                                        });
+        wifiAccess.notifyWifiDisconnected([](WifiAccess &)
+                                          {
+                                              wifiActive = false;
+                                          });
 #endif
 #ifdef USE_OTA
         ArduinoOTA.onStart([]()
@@ -914,8 +931,7 @@ void setup()
     }
 #endif
 #ifdef USE_WIFI_WEB
-    // Initialize async web server (serves SPIFFS files + REST API + WebSocket)
-    initAsyncWeb();
+    sAsyncWebStarted = false;
 #endif
 
     // DEBUG TEMP: Deferring web server creation until WiFi connected

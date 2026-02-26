@@ -4,10 +4,28 @@ This file tracks fork-specific behavior and feature changes that differ from ups
 
 ## 2026-02 Core Platform and Web Stack
 
+### Dependency upgrade validation (current test baseline)
+- Updated and pinned dependency set for reproducible builds:
+  - `Reeltwo#23.5.3`
+  - `Adafruit_NeoPixel#1.15.4`
+  - `FastLED@3.10.3`
+  - `DFRobotDFPlayerMini#V1.0.6`
+  - `ESPAsyncWebServer@3.5.1`
+  - `AsyncTCP@3.3.2`
+- Build verification passes with this set (`pio run` and `buildfs`).
+- Runtime validation on hardware confirms:
+  - Web server starts and remains stable.
+  - Light control path (logic/holo command handling) remains functional.
+
 ### Async Web migration (transport layer only)
 - Migrated UI transport from static ReelTwo `WebPages.h` patterns to async REST/WS + SPIFFS pages.
 - Core control path remains unchanged: all command sources still route into `Marcduino::processCommand(...)`.
 - Added/maintained API endpoints for state/health/logs, command posting, preferences, reboot, and OTA upload.
+
+### Async startup ordering hardening
+- Fixed startup ordering for async web startup to avoid early lwIP calls before WiFi connectivity is established.
+- `initAsyncWeb()` is now started from WiFi-connected callback flow instead of unconditional early setup startup.
+- This addresses observed `tcpip_api_call ... Invalid mbox` crashloop behavior seen during dependency test iterations.
 
 ### OTA scope and UX
 - OTA firmware page updates app firmware only.
