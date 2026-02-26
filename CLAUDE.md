@@ -77,6 +77,22 @@ When this fork adds or changes behavior (async web routes, UI flows, safety/hard
 
 Keep that file as the fork-specific change log and rationale document so contributors can quickly understand what differs from upstream.
 
+## Planning & Approval Gate (Fork Workflow)
+
+For any non-trivial request (multi-file, behavior change, API change, upload, or commit), use this mandatory flow before implementation:
+
+1. Restate the user request in plain language.
+2. List assumptions, ambiguities, and targeted clarifying questions (if any).
+3. Propose a concrete implementation plan with explicit files to change.
+4. Present a short TODO checklist with verification steps.
+5. Stop and get explicit user approval before editing files.
+
+Rules:
+- Do not implement code changes before user approves the plan.
+- If scope changes mid-task, pause, re-plan, and get approval again.
+- Keep plans concise and practical; avoid over-design.
+- For trivial one-file typo/text edits only, a lightweight one-line plan is enough.
+
 ## Architecture
 
 ### Command Flow

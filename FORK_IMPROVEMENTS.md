@@ -50,6 +50,22 @@ This file tracks fork-specific behavior and feature changes that differ from ups
   - `*OF03 -> HPT096`
   - `*OF04 -> HPD096`
 
+### Expanded holo command compatibility (phase 1)
+- Added compatibility handlers in `MarcduinoHolo.h` for:
+  - `*COxxaaabbbcccddd` (compatibility parser retained in firmware)
+  - `*CHxx` (center command)
+  - `*RCxx` (RC-center compatibility behavior)
+  - `*TExx` (mechanical test choreography)
+- Added matching operator controls in `data/holos.html` under **Expanded Holo Commands** for center/test/RC operations.
+
+### Holo UX alignment and naming
+- Updated holoprojector naming in the web UI to builder-standard identifiers:
+  - `HP1 - Holoprojector 1 Front (FHP)`
+  - `HP2 - Holoprojector 2 Rear (RHP)`
+  - `HP3 - Holoprojector 3 Top (THP)`
+- Default holo `*ONxx` behavior now starts in static mode instead of cycle animation.
+- Holos page now exposes stable per-projector effect controls (`Static`, `Cycle`, `Pulse`, `Rainbow`) and removes unsupported color-selection controls to avoid broken UX.
+
 ### Added sequence/mode coverage for compatibility and demos
 - Added sequence handlers:
   - `:SE10`, `:SE11`, `:SE12`, `:SE13`, `:SE14`, `:SE15`, `:SE16`, `:SE58`
@@ -143,6 +159,22 @@ This file tracks fork-specific behavior and feature changes that differ from ups
 - While in sleep mode, incoming Marcduino commands are gated (blocked) except wake-profile commands to prevent unintended movement/noise.
 - Sleep state is exposed through `/api/state` and `/api/health` for UI/API clients.
 
+## 2026-02 Panel Calibration Command Coverage
+
+- Added firmware handlers for panel calibration commands in `MarcduinoPanel.h`:
+  - `:MVxxdddd` move target panel/group to a temporary position (no persistence)
+  - `#SOxxdddd` store open position
+  - `#SCxxdddd` store closed position
+  - `#SWxx` swap open/closed positions
+- Added compatibility target mapping for varied builds:
+  - `00` all panels, `01`-`10` panel groups, `11` pie group, `12` lower dome group,
+    `13` top center panel, `14` top-panels alias, `15` bottom-panels alias.
+- Added persisted calibration loading at boot in `AstroPixelsPlus.ino` (`loadPersistedPanelCalibration`) so saved open/closed positions survive reboot.
+- Calibration values accept either:
+  - `0000`-`0180` as degrees (scaled per-servo), or
+  - `0544`-`2500` as direct pulse width values.
+- Updated Panels calibration UI (`data/panels.html`) to expose extended compatibility targets (13/14/15).
+
 ### Today's linked commits (2026-02-26)
 
 - `4570ee4` — Panels UI now uses human-readable panel naming and completed flutter support for PP5/PP6 (`:OF11`, `:OF12`).
@@ -197,3 +229,16 @@ The fork moved to async web + SPIFFS UI because it solves the structural bottlen
 - Better stability under richer UI.
 - Clearer separation of concerns (firmware command execution vs web presentation).
 - Faster iteration on operator UX without reintroducing static-init heap pressure.
+
+## Coverage Snapshot (BetterDuino V4 vs This Fork)
+
+| Family | Firmware coverage | Web coverage | Current status |
+|---|---|---|---|
+| Panels (`:OP/:CL/:OF/:SE`) | Strong (`:OP00-12`, `:CL00-12`, `:OF00-12`, multiple `:SExx`) | Strong (All/Pie/Lower controls + sequences) | Supported in daily use |
+| Panel calibration (`:MV/#SO/#SC/#SW`) | Implemented with persistence + extended targets (`00-15`) | Implemented in Panels calibration UI | Covered |
+| Holo core (`*ON/*OF/*RD/*HP/*HN/*HW/*HD/*ST`) | Strong | Strong (Holos page) | Covered |
+| Holo expanded family (`*CO/*RC/*TE/*MO/*MF/*H1/*F1/*CH/...`) | Partial (`*CH/*RC/*TE` + compatibility parser for `*CO`) | Partial (center/test/RC exposed) | Partial coverage |
+| Logic/PSI (`@...`) | Strong | Strong (Logics page) | Covered |
+| Sound (`$...`) | Handler present (core sound command family) | Partial direct controls in UI | Partial |
+| BetterDuino setup suite (`#SP/#SS/...`) | Not implemented (fork uses `#AP...` + calibration `#SO/#SC/#SW`) | Not exposed | Gap by design |
+| I2C/EO extras (`&`, `:EO`, `*EO`) | Not implemented as BetterDuino-style handlers | Not exposed | Gap |
