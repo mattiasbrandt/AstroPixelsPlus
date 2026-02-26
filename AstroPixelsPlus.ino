@@ -704,6 +704,7 @@ void setup()
     Serial.println("=== END I2C DIAGNOSTICS ===\n");
 #endif
     SetupEvent::ready();
+    loadPersistedPanelCalibration();
 
     // dataPanel.setSequence(DataPanel::kDisabled);
     // chargeBayIndicator.setSequence(ChargeBayIndicator::kDisabled);
@@ -1177,6 +1178,40 @@ static void DisconnectRemote()
 
 static unsigned sPos;
 static char sBuffer[CONSOLE_BUFFER_SIZE];
+
+static bool isCalibrationPanelServoGroup(uint32_t group)
+{
+    return (group & (SMALL_PANEL | MEDIUM_PANEL | BIG_PANEL | PIE_PANEL | TOP_PIE_PANEL | MINI_PANEL)) != 0;
+}
+
+static void loadPersistedPanelCalibration()
+{
+    for (uint16_t i = 0; i < servoDispatch.getNumServos(); i++)
+    {
+        uint32_t group = servoDispatch.getGroup(i);
+        if (!isCalibrationPanelServoGroup(group)) continue;
+
+        uint16_t startPulse = servoDispatch.getStart(i);
+        uint16_t endPulse = servoDispatch.getEnd(i);
+
+        char openKey[8];
+        char closeKey[8];
+        snprintf(openKey, sizeof(openKey), "so%02u", i);
+        snprintf(closeKey, sizeof(closeKey), "sc%02u", i);
+
+        uint16_t persistedOpen = preferences.getUShort(openKey, startPulse);
+        uint16_t persistedClose = preferences.getUShort(closeKey, endPulse);
+
+        if (persistedOpen != startPulse)
+        {
+            servoDispatch.setStart(i, persistedOpen);
+        }
+        if (persistedClose != endPulse)
+        {
+            servoDispatch.setEnd(i, persistedClose);
+        }
+    }
+}
 
 String getConfiguredDroidName()
 {

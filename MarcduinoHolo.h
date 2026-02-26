@@ -4,9 +4,118 @@
 // *ON00 = All holos dim cycle random color
 // *OF00 = All holos off
 
+static bool parseTwoDigitProjector(const char *cmd, uint8_t &projector)
+{
+    if (cmd == nullptr || cmd[0] == '\0' || cmd[1] == '\0') return false;
+    if (cmd[0] < '0' || cmd[0] > '9' || cmd[1] < '0' || cmd[1] > '9') return false;
+    projector = uint8_t((cmd[0] - '0') * 10 + (cmd[1] - '0'));
+    if (projector > 3) return false;
+    return true;
+}
+
+static bool parseThreeDigitValue(const char *ptr, uint16_t &value)
+{
+    if (ptr == nullptr) return false;
+    if (ptr[0] == '\0' || ptr[1] == '\0' || ptr[2] == '\0') return false;
+    if (ptr[0] < '0' || ptr[0] > '9' || ptr[1] < '0' || ptr[1] > '9' || ptr[2] < '0' || ptr[2] > '9') return false;
+    value = uint16_t((ptr[0] - '0') * 100 + (ptr[1] - '0') * 10 + (ptr[2] - '0'));
+    return true;
+}
+
+static bool hasMinCommandLength(const char *cmd, size_t minLen)
+{
+    if (cmd == nullptr) return false;
+    return strnlen(cmd, 64) >= minLen;
+}
+
+static bool parseRgbPayload(const char *cmd, uint16_t &r, uint16_t &g, uint16_t &b, uint16_t &brightness)
+{
+    if (!hasMinCommandLength(cmd, 12)) return false;
+    return parseThreeDigitValue(cmd, r) &&
+           parseThreeDigitValue(cmd + 3, g) &&
+           parseThreeDigitValue(cmd + 6, b) &&
+           parseThreeDigitValue(cmd + 9, brightness);
+}
+
+static bool parseColorIndexPayload(const char *cmd, uint8_t &colorIndex)
+{
+    if (!hasMinCommandLength(cmd, 1)) return false;
+    if (cmd[0] < '0' || cmd[0] > '9') return false;
+    colorIndex = uint8_t(cmd[0] - '0');
+    return true;
+}
+
+static uint8_t rgbToHoloColorIndex(uint16_t r, uint16_t g, uint16_t b)
+{
+    if (r < 16 && g < 16 && b < 16) return 0;
+    if (r >= g && r >= b)
+    {
+        if (g > 180 && b < 100) return 7;
+        if (b > 180 && g > 180) return 8;
+        if (b > 140) return 6;
+        return 1;
+    }
+    if (g >= r && g >= b)
+    {
+        if (r > 180 && b < 100) return 2;
+        if (b > 160) return 4;
+        return 3;
+    }
+    if (b >= r && b >= g)
+    {
+        if (r > 160 && g > 160) return 9;
+        if (r > 140) return 6;
+        return 5;
+    }
+    return 9;
+}
+
+static void sendHoloLedSetColor(uint8_t projector, uint8_t colorIndex)
+{
+    char cmd[16];
+    char projectorCode = (projector == 0) ? 'A' : (projector == 1) ? 'F' : (projector == 2) ? 'R' : 'T';
+    snprintf(cmd, sizeof(cmd), "HP%c096", projectorCode);
+    CommandEvent::process(cmd);
+    snprintf(cmd, sizeof(cmd), "HP%c005%u", projectorCode, colorIndex);
+    CommandEvent::process(cmd);
+}
+
+static void sendHoloCenterCommand(uint8_t projector)
+{
+    char cmd[16];
+    char projectorCode = (projector == 0) ? 'A' : (projector == 1) ? 'F' : (projector == 2) ? 'R' : 'T';
+    snprintf(cmd, sizeof(cmd), "HP%c1011", projectorCode);
+    CommandEvent::process(cmd);
+}
+
+static void runHoloMechanicalTest(uint8_t projector)
+{
+    if (projector == 0)
+    {
+        CommandEvent::process(F("HPA105|8"));
+        return;
+    }
+    if (projector == 1) CommandEvent::process(F("HPF105|8"));
+    if (projector == 2) CommandEvent::process(F("HPR105|8"));
+    if (projector == 3) CommandEvent::process(F("HPT105|8"));
+}
+
 MARCDUINO_ACTION(AllHoloOn, *ON00, ({
-                     // All Holo Dim cycle random color
-                     CommandEvent::process(F("HPA0040"));
+                     const char *cmd = Marcduino::getCommand();
+                     uint8_t colorIndex = 0;
+                     uint16_t r = 0, g = 0, b = 0, brightness = 0;
+                     if (parseColorIndexPayload(cmd, colorIndex))
+                     {
+                         sendHoloLedSetColor(0, colorIndex);
+                     }
+                     else if (parseRgbPayload(cmd, r, g, b, brightness) && brightness > 0)
+                     {
+                         sendHoloLedSetColor(0, rgbToHoloColorIndex(r, g, b));
+                     }
+                     else
+                     {
+                         CommandEvent::process(F("HPA005"));
+                     }
                  }))
 
 ////////////////
@@ -19,8 +128,21 @@ MARCDUINO_ACTION(AllHoloOFF, *OF00, ({
 ////////////////
 
 MARCDUINO_ACTION(FrontHoloOn, *ON01, ({
-                     // Front Holo Dim cycle random color
-                     CommandEvent::process(F("HPF0040"));
+                     const char *cmd = Marcduino::getCommand();
+                     uint8_t colorIndex = 0;
+                     uint16_t r = 0, g = 0, b = 0, brightness = 0;
+                     if (parseColorIndexPayload(cmd, colorIndex))
+                     {
+                         sendHoloLedSetColor(1, colorIndex);
+                     }
+                     else if (parseRgbPayload(cmd, r, g, b, brightness) && brightness > 0)
+                     {
+                         sendHoloLedSetColor(1, rgbToHoloColorIndex(r, g, b));
+                     }
+                     else
+                     {
+                         CommandEvent::process(F("HPF005"));
+                     }
                  }))
 
 ////////////////
@@ -33,8 +155,21 @@ MARCDUINO_ACTION(FrontHoloOff, *OF01, ({
 ////////////////
 
 MARCDUINO_ACTION(RearHoloOn, *ON02, ({
-                     // Rear Holo Dim cycle random color
-                     CommandEvent::process(F("HPR0040"));
+                     const char *cmd = Marcduino::getCommand();
+                     uint8_t colorIndex = 0;
+                     uint16_t r = 0, g = 0, b = 0, brightness = 0;
+                     if (parseColorIndexPayload(cmd, colorIndex))
+                     {
+                         sendHoloLedSetColor(2, colorIndex);
+                     }
+                     else if (parseRgbPayload(cmd, r, g, b, brightness) && brightness > 0)
+                     {
+                         sendHoloLedSetColor(2, rgbToHoloColorIndex(r, g, b));
+                     }
+                     else
+                     {
+                         CommandEvent::process(F("HPR005"));
+                     }
                  }))
 
 ////////////////
@@ -47,8 +182,21 @@ MARCDUINO_ACTION(RearHoloOff, *OF02, ({
 ////////////////
 
 MARCDUINO_ACTION(TopHoloOn, *ON03, ({
-                     // Top Holo Dim cycle random color
-                     CommandEvent::process(F("HPT0040"));
+                     const char *cmd = Marcduino::getCommand();
+                     uint8_t colorIndex = 0;
+                     uint16_t r = 0, g = 0, b = 0, brightness = 0;
+                     if (parseColorIndexPayload(cmd, colorIndex))
+                     {
+                         sendHoloLedSetColor(3, colorIndex);
+                     }
+                     else if (parseRgbPayload(cmd, r, g, b, brightness) && brightness > 0)
+                     {
+                         sendHoloLedSetColor(3, rgbToHoloColorIndex(r, g, b));
+                     }
+                     else
+                     {
+                         CommandEvent::process(F("HPT005"));
+                     }
                  }))
 
 ////////////////
@@ -435,6 +583,80 @@ MARCDUINO_ACTION(TopHoloNod, *HN03, ({
 MARCDUINO_ACTION(AllHoloNod, *HN00, ({
                      // Move all three holos up/down nod pattern together
                      CommandEvent::process(F("HPA106|5"));
+                 }))
+
+////////////////
+
+MARCDUINO_ACTION(HoloColorSetCompat, *CO, ({
+                     const char *cmd = Marcduino::getCommand();
+                     uint8_t projector = 0;
+                     uint16_t r = 0, g = 0, b = 0, brightness = 0;
+                     if (!hasMinCommandLength(cmd, 14) ||
+                         !parseTwoDigitProjector(cmd, projector) ||
+                         !parseThreeDigitValue(cmd + 2, r) ||
+                         !parseThreeDigitValue(cmd + 5, g) ||
+                         !parseThreeDigitValue(cmd + 8, b) ||
+                         !parseThreeDigitValue(cmd + 11, brightness))
+                     {
+                         DEBUG_PRINTLN("[HOLO] Invalid *CO command");
+                     }
+                     else if (brightness == 0)
+                     {
+                         if (projector == 0 || projector > 3) CommandEvent::process(F("HPA096"));
+                         else if (projector == 1) CommandEvent::process(F("HPF096"));
+                         else if (projector == 2) CommandEvent::process(F("HPR096"));
+                         else if (projector == 3) CommandEvent::process(F("HPT096"));
+                     }
+                     else
+                     {
+                         uint8_t colorIndex = rgbToHoloColorIndex(r, g, b);
+                         sendHoloLedSetColor(projector, colorIndex);
+                     }
+                 }))
+
+////////////////
+
+MARCDUINO_ACTION(HoloCenterCompat, *CH, ({
+                     const char *cmd = Marcduino::getCommand();
+                     uint8_t projector = 0;
+                     if (!hasMinCommandLength(cmd, 2) || !parseTwoDigitProjector(cmd, projector))
+                     {
+                         DEBUG_PRINTLN("[HOLO] Invalid *CH command");
+                     }
+                     else
+                     {
+                         sendHoloCenterCommand(projector);
+                     }
+                 }))
+
+////////////////
+
+MARCDUINO_ACTION(HoloRCCompat, *RC, ({
+                     const char *cmd = Marcduino::getCommand();
+                     uint8_t projector = 0;
+                     if (!hasMinCommandLength(cmd, 2) || !parseTwoDigitProjector(cmd, projector))
+                     {
+                         DEBUG_PRINTLN("[HOLO] Invalid *RC command");
+                     }
+                     else
+                     {
+                         sendHoloCenterCommand(projector);
+                     }
+                 }))
+
+////////////////
+
+MARCDUINO_ACTION(HoloTestCompat, *TE, ({
+                     const char *cmd = Marcduino::getCommand();
+                     uint8_t projector = 0;
+                     if (!hasMinCommandLength(cmd, 2) || !parseTwoDigitProjector(cmd, projector))
+                     {
+                         DEBUG_PRINTLN("[HOLO] Invalid *TE command");
+                     }
+                     else
+                     {
+                         runHoloMechanicalTest(projector);
+                     }
                  }))
 
 ////////////////

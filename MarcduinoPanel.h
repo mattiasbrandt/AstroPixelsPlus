@@ -1,5 +1,196 @@
 ////////////////
 
+static bool parseTwoDigitTarget(const char *cmd, uint8_t &target)
+{
+    if (cmd == nullptr || cmd[0] == '\0' || cmd[1] == '\0') return false;
+    if (cmd[0] < '0' || cmd[0] > '9' || cmd[1] < '0' || cmd[1] > '9') return false;
+    target = uint8_t((cmd[0] - '0') * 10 + (cmd[1] - '0'));
+    return true;
+}
+
+static bool parseFourDigitValue(const char *cmd, uint16_t &value)
+{
+    if (cmd == nullptr) return false;
+    for (uint8_t i = 0; i < 4; i++)
+    {
+        if (cmd[i] < '0' || cmd[i] > '9') return false;
+    }
+    value = uint16_t((cmd[0] - '0') * 1000 + (cmd[1] - '0') * 100 + (cmd[2] - '0') * 10 + (cmd[3] - '0'));
+    return true;
+}
+
+static bool panelTargetToMask(uint8_t target, uint32_t &mask)
+{
+    switch (target)
+    {
+        case 0:  mask = ALL_DOME_PANELS_MASK; return true;
+        case 1:  mask = PANEL_GROUP_1; return true;
+        case 2:  mask = PANEL_GROUP_2; return true;
+        case 3:  mask = PANEL_GROUP_3; return true;
+        case 4:  mask = PANEL_GROUP_4; return true;
+        case 5:  mask = PANEL_GROUP_5; return true;
+        case 6:  mask = PANEL_GROUP_6; return true;
+        case 7:  mask = PANEL_GROUP_7; return true;
+        case 8:  mask = PANEL_GROUP_8; return true;
+        case 9:  mask = PANEL_GROUP_9; return true;
+        case 10: mask = PANEL_GROUP_10; return true;
+        case 11: mask = PIE_PANEL; return true;
+        case 12: mask = DOME_PANELS_MASK; return true;
+        case 13: mask = TOP_PIE_PANEL; return true;
+        case 14: mask = (PIE_PANEL | TOP_PIE_PANEL); return true;
+        case 15: mask = DOME_PANELS_MASK; return true;
+        default: return false;
+    }
+}
+
+static bool convertPanelValueToPulse(uint16_t servoIndex, uint16_t rawValue, uint16_t &pulse)
+{
+    if (rawValue <= 180)
+    {
+        pulse = servoDispatch.scaleToPos(servoIndex, float(rawValue) / 180.0f);
+        return true;
+    }
+    if (rawValue >= 544 && rawValue <= 2500)
+    {
+        pulse = rawValue;
+        return true;
+    }
+    return false;
+}
+
+static bool isPanelServoByGroup(uint32_t group)
+{
+    return (group & (SMALL_PANEL | MEDIUM_PANEL | BIG_PANEL | PIE_PANEL | TOP_PIE_PANEL | MINI_PANEL)) != 0;
+}
+
+static void persistPanelCalibrationValue(uint16_t servoIndex, bool openValue, uint16_t pulse)
+{
+    char key[8];
+    snprintf(key, sizeof(key), openValue ? "so%02u" : "sc%02u", servoIndex);
+    preferences.putUShort(key, pulse);
+}
+
+static bool applyPanelCalibrationToMask(uint32_t mask, bool setOpen, bool setClosed, uint16_t rawValue)
+{
+    bool changed = false;
+    for (uint16_t i = 0; i < servoDispatch.getNumServos(); i++)
+    {
+        uint32_t group = servoDispatch.getGroup(i);
+        if (!isPanelServoByGroup(group) || (group & mask) == 0) continue;
+
+        uint16_t pulse = 0;
+        if (!convertPanelValueToPulse(i, rawValue, pulse)) return false;
+
+        if (setOpen)
+        {
+            servoDispatch.setStart(i, pulse);
+            persistPanelCalibrationValue(i, true, pulse);
+            changed = true;
+        }
+        if (setClosed)
+        {
+            servoDispatch.setEnd(i, pulse);
+            persistPanelCalibrationValue(i, false, pulse);
+            changed = true;
+        }
+    }
+    return changed;
+}
+
+static bool movePanelMaskToValue(uint32_t mask, uint16_t rawValue)
+{
+    bool moved = false;
+    for (uint16_t i = 0; i < servoDispatch.getNumServos(); i++)
+    {
+        uint32_t group = servoDispatch.getGroup(i);
+        if (!isPanelServoByGroup(group) || (group & mask) == 0) continue;
+
+        uint16_t pulse = 0;
+        if (!convertPanelValueToPulse(i, rawValue, pulse)) return false;
+        servoDispatch.moveToPulse(i, pulse);
+        moved = true;
+    }
+    return moved;
+}
+
+static bool swapPanelCalibrationInMask(uint32_t mask)
+{
+    bool swapped = false;
+    for (uint16_t i = 0; i < servoDispatch.getNumServos(); i++)
+    {
+        uint32_t group = servoDispatch.getGroup(i);
+        if (!isPanelServoByGroup(group) || (group & mask) == 0) continue;
+
+        uint16_t openPulse = servoDispatch.getStart(i);
+        uint16_t closePulse = servoDispatch.getEnd(i);
+        servoDispatch.setStart(i, closePulse);
+        servoDispatch.setEnd(i, openPulse);
+        persistPanelCalibrationValue(i, true, closePulse);
+        persistPanelCalibrationValue(i, false, openPulse);
+        swapped = true;
+    }
+    return swapped;
+}
+
+MARCDUINO_ACTION(MovePanelCalibration, :MV, ({
+    const char *cmd = Marcduino::getCommand();
+    uint8_t target = 0;
+    uint16_t value = 0;
+    uint32_t mask = 0;
+    if (cmd == nullptr || !parseTwoDigitTarget(cmd, target) || !parseFourDigitValue(cmd + 2, value) || !panelTargetToMask(target, mask))
+    {
+        DEBUG_PRINTLN("[PANEL CAL] Invalid :MV command");
+    }
+    else if (!movePanelMaskToValue(mask, value))
+    {
+        DEBUG_PRINTLN("[PANEL CAL] :MV unsupported target/value for this build");
+    }
+}))
+
+MARCDUINO_ACTION(SavePanelOpenCalibration, #SO, ({
+    const char *cmd = Marcduino::getCommand();
+    uint8_t target = 0;
+    uint16_t value = 0;
+    uint32_t mask = 0;
+    if (cmd == nullptr || !parseTwoDigitTarget(cmd, target) || !parseFourDigitValue(cmd + 2, value) || !panelTargetToMask(target, mask))
+    {
+        DEBUG_PRINTLN("[PANEL CAL] Invalid #SO command");
+    }
+    else if (!applyPanelCalibrationToMask(mask, true, false, value))
+    {
+        DEBUG_PRINTLN("[PANEL CAL] #SO unsupported target/value for this build");
+    }
+}))
+
+MARCDUINO_ACTION(SavePanelClosedCalibration, #SC, ({
+    const char *cmd = Marcduino::getCommand();
+    uint8_t target = 0;
+    uint16_t value = 0;
+    uint32_t mask = 0;
+    if (cmd == nullptr || !parseTwoDigitTarget(cmd, target) || !parseFourDigitValue(cmd + 2, value) || !panelTargetToMask(target, mask))
+    {
+        DEBUG_PRINTLN("[PANEL CAL] Invalid #SC command");
+    }
+    else if (!applyPanelCalibrationToMask(mask, false, true, value))
+    {
+        DEBUG_PRINTLN("[PANEL CAL] #SC unsupported target/value for this build");
+    }
+}))
+
+MARCDUINO_ACTION(SwapPanelOpenClosedCalibration, #SW, ({
+    const char *cmd = Marcduino::getCommand();
+    uint8_t target = 0;
+    uint32_t mask = 0;
+    if (cmd == nullptr || !parseTwoDigitTarget(cmd, target) || !panelTargetToMask(target, mask))
+    {
+        DEBUG_PRINTLN("[PANEL CAL] Invalid #SW command");
+    }
+    else if (!swapPanelCalibrationInMask(mask))
+    {
+        DEBUG_PRINTLN("[PANEL CAL] #SW unsupported target for this build");
+    }
+}))
+
 MARCDUINO_ACTION(CloseAllPanels, :CL00, ({
     Marcduino::processCommand(player, "@4S3");
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, ALL_DOME_PANELS_MASK);

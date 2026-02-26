@@ -11,7 +11,8 @@
 </head>
 <body>
   <h1>Holo Projectors 💡</h1>
-  <div class="subtitle">RGB LED + servo-positioned holo projectors</div>
+  <div class="subtitle">HP1 (FHP), HP2 (RHP), HP3 (THP) LED + servo holoprojectors</div>
+  <div class="desc mt-4">Color selection is disabled in this build because these holo LEDs run fixed-color hardware behavior.</div>
   <nav>
     <a href="/">Home</a>
     <a href="/setup.html">Setup</a>
@@ -30,7 +31,7 @@
 
   <!-- All Holos -->
   <div class="card">
-    <h3>All Holos</h3>
+    <h3>All Holoprojectors (HP1/HP2/HP3)</h3>
     <div class="btn-grid">
       <button class="btn accent" onclick="sendCmd('*ON00')">All On</button>
       <button class="btn danger" onclick="sendCmd('*OF00')">All Off</button>
@@ -48,9 +49,8 @@
     </div>
   </div>
 
-  <!-- Front Holo -->
   <div class="card">
-    <h3>Front Holo</h3>
+    <h3>HP1 - Holoprojector 1 Front (FHP)</h3>
     <div class="btn-grid">
       <button class="btn accent" onclick="sendCmd('*ON01')">On</button>
       <button class="btn danger" onclick="sendCmd('*OF01')">Off</button>
@@ -61,6 +61,8 @@
     <div class="mt-6">
       <span class="label-dim">LED Effects:</span>
       <div class="btn-grid mt-4">
+        <button class="btn" onclick="sendCmd('*HPF005')">Static</button>
+        <button class="btn" onclick="sendCmd('*HPF0040')">Cycle</button>
         <button class="btn" onclick="sendCmd('*HPS301')">Pulse</button>
         <button class="btn" onclick="sendCmd('*HPS601')">Rainbow</button>
       </div>
@@ -68,22 +70,21 @@
     <div class="mt-6">
       <span class="label-dim">Position:</span>
       <div class="dir-pad mt-4">
-        <button class="btn" aria-label="Front holo upper left" onclick="sendCmd('*HP401')">&#x2196;</button>
-        <button class="btn" aria-label="Front holo up" onclick="sendCmd('*HP201')">&#x2191;</button>
-        <button class="btn" aria-label="Front holo upper right" onclick="sendCmd('*HP701')">&#x2197;</button>
-        <button class="btn" aria-label="Front holo left" onclick="sendCmd('*HP301')">&#x2190;</button>
-        <button class="btn accent" aria-label="Front holo center" onclick="sendCmd('*HP101')">&#x25CF;</button>
-        <button class="btn" aria-label="Front holo right" onclick="sendCmd('*HP601')">&#x2192;</button>
-        <button class="btn" aria-label="Front holo lower left" onclick="sendCmd('*HP501')">&#x2199;</button>
-        <button class="btn" aria-label="Front holo down" onclick="sendCmd('*HP001')">&#x2193;</button>
-        <button class="btn" aria-label="Front holo lower right" onclick="sendCmd('*HP801')">&#x2198;</button>
+        <button class="btn" aria-label="HP1 upper left" onclick="sendCmd('*HP401')">&#x2196;</button>
+        <button class="btn" aria-label="HP1 up" onclick="sendCmd('*HP201')">&#x2191;</button>
+        <button class="btn" aria-label="HP1 upper right" onclick="sendCmd('*HP701')">&#x2197;</button>
+        <button class="btn" aria-label="HP1 left" onclick="sendCmd('*HP301')">&#x2190;</button>
+        <button class="btn accent" aria-label="HP1 center" onclick="sendCmd('*HP101')">&#x25CF;</button>
+        <button class="btn" aria-label="HP1 right" onclick="sendCmd('*HP601')">&#x2192;</button>
+        <button class="btn" aria-label="HP1 lower left" onclick="sendCmd('*HP501')">&#x2199;</button>
+        <button class="btn" aria-label="HP1 down" onclick="sendCmd('*HP001')">&#x2193;</button>
+        <button class="btn" aria-label="HP1 lower right" onclick="sendCmd('*HP801')">&#x2198;</button>
       </div>
     </div>
   </div>
 
-  <!-- Rear Holo -->
   <div class="card">
-    <h3>Rear Holo</h3>
+    <h3>HP2 - Holoprojector 2 Rear (RHP)</h3>
     <div class="btn-grid">
       <button class="btn accent" onclick="sendCmd('*ON02')">On</button>
       <button class="btn danger" onclick="sendCmd('*OF02')">Off</button>
@@ -94,6 +95,8 @@
     <div class="mt-6">
       <span class="label-dim">LED Effects:</span>
       <div class="btn-grid mt-4">
+        <button class="btn" onclick="sendCmd('*HPR005')">Static</button>
+        <button class="btn" onclick="sendCmd('*HPR0040')">Cycle</button>
         <button class="btn" onclick="sendCmd('*HPS302')">Pulse</button>
         <button class="btn" onclick="sendCmd('*HPS602')">Rainbow</button>
       </div>
@@ -101,22 +104,21 @@
     <div class="mt-6">
       <span class="label-dim">Position:</span>
       <div class="dir-pad mt-4">
-        <button class="btn" aria-label="Rear holo upper left" onclick="sendCmd('*HP402')">&#x2196;</button>
-        <button class="btn" aria-label="Rear holo up" onclick="sendCmd('*HP202')">&#x2191;</button>
-        <button class="btn" aria-label="Rear holo upper right" onclick="sendCmd('*HP702')">&#x2197;</button>
-        <button class="btn" aria-label="Rear holo left" onclick="sendCmd('*HP302')">&#x2190;</button>
-        <button class="btn accent" aria-label="Rear holo center" onclick="sendCmd('*HP102')">&#x25CF;</button>
-        <button class="btn" aria-label="Rear holo right" onclick="sendCmd('*HP602')">&#x2192;</button>
-        <button class="btn" aria-label="Rear holo lower left" onclick="sendCmd('*HP502')">&#x2199;</button>
-        <button class="btn" aria-label="Rear holo down" onclick="sendCmd('*HP002')">&#x2193;</button>
-        <button class="btn" aria-label="Rear holo lower right" onclick="sendCmd('*HP802')">&#x2198;</button>
+        <button class="btn" aria-label="HP2 upper left" onclick="sendCmd('*HP402')">&#x2196;</button>
+        <button class="btn" aria-label="HP2 up" onclick="sendCmd('*HP202')">&#x2191;</button>
+        <button class="btn" aria-label="HP2 upper right" onclick="sendCmd('*HP702')">&#x2197;</button>
+        <button class="btn" aria-label="HP2 left" onclick="sendCmd('*HP302')">&#x2190;</button>
+        <button class="btn accent" aria-label="HP2 center" onclick="sendCmd('*HP102')">&#x25CF;</button>
+        <button class="btn" aria-label="HP2 right" onclick="sendCmd('*HP602')">&#x2192;</button>
+        <button class="btn" aria-label="HP2 lower left" onclick="sendCmd('*HP502')">&#x2199;</button>
+        <button class="btn" aria-label="HP2 down" onclick="sendCmd('*HP002')">&#x2193;</button>
+        <button class="btn" aria-label="HP2 lower right" onclick="sendCmd('*HP802')">&#x2198;</button>
       </div>
     </div>
   </div>
 
-  <!-- Top Holo -->
   <div class="card">
-    <h3>Top Holo</h3>
+    <h3>HP3 - Holoprojector 3 Top (THP)</h3>
     <div class="btn-grid">
       <button class="btn accent" onclick="sendCmd('*ON03')">On</button>
       <button class="btn danger" onclick="sendCmd('*OF03')">Off</button>
@@ -127,6 +129,8 @@
     <div class="mt-6">
       <span class="label-dim">LED Effects:</span>
       <div class="btn-grid mt-4">
+        <button class="btn" onclick="sendCmd('*HPT005')">Static</button>
+        <button class="btn" onclick="sendCmd('*HPT0040')">Cycle</button>
         <button class="btn" onclick="sendCmd('*HPS303')">Pulse</button>
         <button class="btn" onclick="sendCmd('*HPS603')">Rainbow</button>
       </div>
@@ -134,15 +138,15 @@
     <div class="mt-6">
       <span class="label-dim">Position:</span>
       <div class="dir-pad mt-4">
-        <button class="btn" aria-label="Top holo upper left" onclick="sendCmd('*HP403')">&#x2196;</button>
-        <button class="btn" aria-label="Top holo up" onclick="sendCmd('*HP203')">&#x2191;</button>
-        <button class="btn" aria-label="Top holo upper right" onclick="sendCmd('*HP703')">&#x2197;</button>
-        <button class="btn" aria-label="Top holo left" onclick="sendCmd('*HP303')">&#x2190;</button>
-        <button class="btn accent" aria-label="Top holo center" onclick="sendCmd('*HP103')">&#x25CF;</button>
-        <button class="btn" aria-label="Top holo right" onclick="sendCmd('*HP603')">&#x2192;</button>
-        <button class="btn" aria-label="Top holo lower left" onclick="sendCmd('*HP503')">&#x2199;</button>
-        <button class="btn" aria-label="Top holo down" onclick="sendCmd('*HP003')">&#x2193;</button>
-        <button class="btn" aria-label="Top holo lower right" onclick="sendCmd('*HP803')">&#x2198;</button>
+        <button class="btn" aria-label="HP3 upper left" onclick="sendCmd('*HP403')">&#x2196;</button>
+        <button class="btn" aria-label="HP3 up" onclick="sendCmd('*HP203')">&#x2191;</button>
+        <button class="btn" aria-label="HP3 upper right" onclick="sendCmd('*HP703')">&#x2197;</button>
+        <button class="btn" aria-label="HP3 left" onclick="sendCmd('*HP303')">&#x2190;</button>
+        <button class="btn accent" aria-label="HP3 center" onclick="sendCmd('*HP103')">&#x25CF;</button>
+        <button class="btn" aria-label="HP3 right" onclick="sendCmd('*HP603')">&#x2192;</button>
+        <button class="btn" aria-label="HP3 lower left" onclick="sendCmd('*HP503')">&#x2199;</button>
+        <button class="btn" aria-label="HP3 down" onclick="sendCmd('*HP003')">&#x2193;</button>
+        <button class="btn" aria-label="HP3 lower right" onclick="sendCmd('*HP803')">&#x2198;</button>
       </div>
     </div>
   </div>
@@ -157,6 +161,38 @@
       <button class="btn" onclick="sendCmd('*HRS6')">Rainbow</button>
       <button class="btn" onclick="sendCmd('*HRS4')">Cycle</button>
       <button class="btn danger" onclick="sendCmd('*OF04')">Off</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Expanded Holo Commands</h3>
+    <div class="desc">Compatibility controls for expanded holo commands.</div>
+    <div class="mt-6">
+      <span class="label-dim">Center Commands:</span>
+      <div class="btn-grid mt-4">
+        <button class="btn" onclick="sendCmd('*CH00')">Center All</button>
+        <button class="btn" onclick="sendCmd('*CH01')">Center HP1</button>
+        <button class="btn" onclick="sendCmd('*CH02')">Center HP2</button>
+        <button class="btn" onclick="sendCmd('*CH03')">Center HP3</button>
+      </div>
+    </div>
+    <div class="mt-6">
+      <span class="label-dim">Mechanical Test:</span>
+      <div class="btn-grid mt-4">
+        <button class="btn" onclick="sendCmd('*TE00')">Test All</button>
+        <button class="btn" onclick="sendCmd('*TE01')">Test HP1</button>
+        <button class="btn" onclick="sendCmd('*TE02')">Test HP2</button>
+        <button class="btn" onclick="sendCmd('*TE03')">Test HP3</button>
+      </div>
+    </div>
+    <div class="mt-6">
+      <span class="label-dim">RC-Center Alias:</span>
+      <div class="btn-grid mt-4">
+        <button class="btn" onclick="sendCmd('*RC00')">RC All</button>
+        <button class="btn" onclick="sendCmd('*RC01')">RC HP1</button>
+        <button class="btn" onclick="sendCmd('*RC02')">RC HP2</button>
+        <button class="btn" onclick="sendCmd('*RC03')">RC HP3</button>
+      </div>
     </div>
   </div>
 
