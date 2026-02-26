@@ -27,6 +27,23 @@ pio device monitor -p /dev/ttyUSB0 -b 115200
 pio run -e astropixelsplus -t upload && pio device monitor -p /dev/ttyUSB0 -b 115200
 ```
 
+### Post-build compatibility smoke test (fork workflow)
+
+After firmware/library changes and a successful build, run the command compatibility matrix runner before final sign-off:
+
+```bash
+# Dry-run (show matrix groups/commands)
+python3 tools/command_compat_matrix.py --dry-run
+
+# Full smoke run against default AP target
+python3 tools/command_compat_matrix.py
+
+# Example against station-mode IP with focused groups
+python3 tools/command_compat_matrix.py --host 10.0.0.21 --group holos --group logics
+```
+
+The runner sends commands through `/api/cmd` and verifies `/api/state` + `/api/health` after each step. Treat failures as regressions that must be investigated before release/upload sign-off.
+
 The Makefile (`make TARGET=ESP32`) is an alternative build path using a custom `../Arduino.mk` shim — prefer PlatformIO.
 
 ## Web UI Local Testing Workflow (Async Web Server)
