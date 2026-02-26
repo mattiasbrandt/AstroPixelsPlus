@@ -7,6 +7,24 @@
   // --- WebSocket ---
   var ws = null;
   var wsRetry = 1000;
+  var baseTitle = document.title || '';
+
+  function applyDroidBrand(name) {
+    if (!name || typeof name !== 'string') return;
+    var trimmed = name.trim();
+    if (!trimmed) return;
+
+    if (baseTitle.indexOf('AstroPixels') >= 0) {
+      document.title = baseTitle.replace(/AstroPixels/g, trimmed);
+    } else if (document.title.indexOf(trimmed) < 0) {
+      document.title = document.title + ' — ' + trimmed;
+    }
+
+    var brandEls = document.querySelectorAll('[data-droid-name-target]');
+    for (var i = 0; i < brandEls.length; i++) {
+      brandEls[i].textContent = trimmed;
+    }
+  }
 
   function wsConnect() {
     var loc = window.location;
@@ -27,6 +45,9 @@
     ws.onmessage = function(evt) {
       try {
         var msg = JSON.parse(evt.data);
+        if (msg.type === 'state' && msg.data && msg.data.droidName) {
+          applyDroidBrand(msg.data.droidName);
+        }
         if (msg.type === 'state' && typeof window.onStateUpdate === 'function') {
           window.onStateUpdate(msg.data);
         }
@@ -334,10 +355,16 @@
   // --- Init ---
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function() {
+      fetch('/api/state').then(function(r){ return r.json(); }).then(function(s){
+        if (s && s.droidName) applyDroidBrand(s.droidName);
+      }).catch(function(){});
       enhanceTooltips();
       wsConnect();
     });
   } else {
+    fetch('/api/state').then(function(r){ return r.json(); }).then(function(s){
+      if (s && s.droidName) applyDroidBrand(s.droidName);
+    }).catch(function(){});
     enhanceTooltips();
     wsConnect();
   }

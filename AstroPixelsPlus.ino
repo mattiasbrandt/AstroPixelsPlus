@@ -34,6 +34,10 @@
 #define AP_ENABLE_DROID_REMOTE 0
 #endif
 
+#ifndef AP_DROID_NAME
+#define AP_DROID_NAME "AstroPixels"
+#endif
+
 #ifdef USE_WIFI
 #if AP_ENABLE_DROID_REMOTE
 #define USE_DROID_REMOTE // Define for droid remote support
@@ -103,6 +107,7 @@
 #define PREFERENCE_MARCSOUND_RANDOM_MIN "mrandommin"
 #define PREFERENCE_MARCSOUND_RANDOM_MAX "mrandommax"
 #define PREFERENCE_MARCSOUND_LOCAL_ENABLED "msoundlocal"
+#define PREFERENCE_DROID_NAME "dname"
 
 ////////////////////////////////
 
@@ -675,7 +680,8 @@ void setup()
     sWakeTransitionPending = false;
     sWakeTransitionAtMs = 0;
     sMinFreeHeap = ESP.getFreeHeap();
-    PrintReelTwoInfo(Serial, "AstroPixelsPlus");
+    String droidName = getConfiguredDroidName();
+    PrintReelTwoInfo(Serial, droidName.c_str());
 
     if (preferences.getBool(PREFERENCE_MARCSERIAL_ENABLED, MARC_SERIAL_ENABLED))
     {
@@ -744,10 +750,11 @@ void setup()
     // { 21, 800, 2200, HOLO_HSERVO },                /* 18: horizontal rear holo */
 
     // CREDENDA FORK IMPROVEMENT: Enhanced startup text display
-    // Shows "STAR WARS" on RLD and "R2D2" on FLD during boot
+    // Shows droid name on both logic displays during boot
     // Initialize LED effects before WiFi starts
-    RLD.selectScrollTextLeft("... STAR WARS ....", LogicEngineRenderer::kBlue, kStatusScrollSpeedScale, 15);
-    FLD.selectScrollTextLeft("... R2D2 ...", LogicEngineRenderer::kBlue, kStatusScrollSpeedScale, 15);
+    String bootScroll = "... " + droidName + " ...";
+    RLD.selectScrollTextLeft(bootScroll.c_str(), LogicEngineRenderer::kBlue, kStatusScrollSpeedScale, 15);
+    FLD.selectScrollTextLeft(bootScroll.c_str(), LogicEngineRenderer::kBlue, kStatusScrollSpeedScale, 15);
     RLD.setLogicEffectSelector(CustomLogicEffectSelector);
     FLD.setLogicEffectSelector(CustomLogicEffectSelector);
     frontPSI.setLogicEffectSelector(CustomLogicEffectSelector);
@@ -1170,6 +1177,21 @@ static void DisconnectRemote()
 
 static unsigned sPos;
 static char sBuffer[CONSOLE_BUFFER_SIZE];
+
+String getConfiguredDroidName()
+{
+    String name = preferences.getString(PREFERENCE_DROID_NAME, AP_DROID_NAME);
+    name.trim();
+    if (name.length() == 0)
+    {
+        name = AP_DROID_NAME;
+    }
+    if (name.length() > 24)
+    {
+        name = name.substring(0, 24);
+    }
+    return name;
+}
 
 static bool isWakeProfileCommand(const char *cmd)
 {

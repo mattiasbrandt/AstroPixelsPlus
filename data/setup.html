@@ -22,6 +22,12 @@
 
   <div class="card">
     <h3>Settings</h3>
+    <div class="label-dim">Droid Name</div>
+    <div class="row mt-4 mb-10">
+      <input type="text" id="droid-name" maxlength="24" placeholder="AstroPixels" class="flex-1">
+      <button class="btn accent" onclick="saveDroidName()">Save Name</button>
+    </div>
+    <div class="desc">Used in web page titles and startup logic scroll text.</div>
     <div class="stack-6">
       <a href="/wifi.html" class="btn link-btn">WiFi Configuration</a>
       <a href="/serial.html" class="btn link-btn">Serial / Marcduino</a>
@@ -48,6 +54,10 @@
     fetch('/api/state').then(function(r){return r.json();}).then(function(s){
       var link = document.getElementById('remote-link');
       if (!link) return;
+      if (s && s.droidName) {
+        var nameInput = document.getElementById('droid-name');
+        if (nameInput) nameInput.value = s.droidName;
+      }
       if (typeof s.remoteSupported !== 'undefined' && !s.remoteSupported) {
         link.textContent = 'Droid Remote (Disabled in this build)';
         link.title = 'Droid Remote ESPNOW support is compiled out in this firmware build.';
@@ -72,6 +82,26 @@
       setApiToken(token);
       refreshTokenStatus();
       alert(token ? 'Token saved in browser.' : 'Token cleared.');
+    }
+
+    function saveDroidName() {
+      var name = document.getElementById('droid-name').value.trim();
+      if (!name) name = 'AstroPixels';
+      apiPostForm('/api/pref', 'key=dname&val=' + encodeURIComponent(name))
+        .then(function(resp) {
+          if (!resp.ok) throw new Error('save failed');
+          return fetch('/api/state');
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(s) {
+          if (s && s.droidName) {
+            document.getElementById('droid-name').value = s.droidName;
+          }
+          alert('Droid name saved.');
+        })
+        .catch(function() {
+          alert('Failed to save droid name.');
+        });
     }
 
     function clearApiToken() {

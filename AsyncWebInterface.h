@@ -35,6 +35,7 @@ extern portMUX_TYPE sArtooTelemetryMux;
 extern bool shouldBlockCommandDuringSleep(const char *cmd);
 extern bool enterSoftSleepMode();
 extern bool exitSoftSleepMode();
+extern String getConfiguredDroidName();
 
 #ifdef USE_DROID_REMOTE
 extern bool sRemoteConnected;
@@ -119,7 +120,8 @@ static bool isAllowedPrefKey(const String &key)
            key == "mwifi" || key == "mwifipass" ||
            key == "msound" || key == "msoundser" || key == "mvolume" ||
            key == "msoundstart" || key == "mrandom" || key == "mrandommin" ||
-           key == "mrandommax" || key == "msoundlocal" || key == "apitoken";
+           key == "mrandommax" || key == "msoundlocal" || key == "apitoken" ||
+           key == "dname";
 }
 
 static size_t maxPrefValueLen(const String &key)
@@ -127,6 +129,7 @@ static size_t maxPrefValueLen(const String &key)
     if (key == "artoobaud") return 8;
     if (key == "ssid" || key == "rhost") return 32;
     if (key == "pass" || key == "rsecret" || key == "apitoken") return 64;
+    if (key == "dname") return 24;
     return 16;
 }
 
@@ -221,6 +224,7 @@ static String buildStateJson()
     portEXIT_CRITICAL(&sArtooTelemetryMux);
 
     String json = "{";
+    String droidName = getConfiguredDroidName();
     json += "\"wifiEnabled\":" + String(wifiEnabled ? "true" : "false");
     json += ",\"remoteEnabled\":" + String(remoteEnabled ? "true" : "false");
     json += ",\"artooEnabled\":" + String(artooEnabled ? "true" : "false");
@@ -245,6 +249,7 @@ static String buildStateJson()
     json += ",\"serial2LastSeenMs\":" + String(serial2LastSeenMs);
     json += ",\"serial2SignalBursts\":" + String(serial2SignalBursts);
     json += ",\"i2c_probe_failures\":" + String(i2cProbeFailures);
+    json += ",\"droidName\":\"" + jsonEscape(droidName) + "\"";
 
     // WiFi details
     json += ",\"wifiAP\":" + String((WiFi.getMode() & WIFI_MODE_AP) ? "true" : "false");
