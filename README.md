@@ -12,23 +12,6 @@ Alternative firmware sketch for the AstroPixels boards
 > Full fork-specific changes and rationale:
 > [`FORK_IMPROVEMENTS.md`](./FORK_IMPROVEMENTS.md)
 
-### Command compatibility smoke test (fork utility)
-
-Run the command matrix runner against the controller to sanity-check core command families after firmware/library updates.
-
-```bash
-# Dry-run (show selected matrix)
-python3 tools/command_compat_matrix.py --dry-run
-
-# Full matrix against default AP target (192.168.4.1)
-python3 tools/command_compat_matrix.py
-
-# Example: only holo + logic commands against station IP
-python3 tools/command_compat_matrix.py --host 10.0.0.21 --group holos --group logics
-```
-
-The runner sends commands via `/api/cmd` and checks `/api/state` + `/api/health` after each step. It reports PASS/FAIL and exits non-zero on failures.
-
 ---
 
 ![AstroPixels](https://we-make-things.co.uk/wp-content/uploads/2022/10/PXL_20220423_103855938-scaled.jpg)

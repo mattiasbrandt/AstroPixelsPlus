@@ -18,3 +18,7 @@
 
 # Local bench testing notes (user-specific)
 tasks/bench-testing.md
+
+# Local agent scratch/state
+.cache/*
+tasks/todo.md
