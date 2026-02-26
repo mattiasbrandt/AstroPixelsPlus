@@ -95,6 +95,18 @@
         <button class="btn" onclick="sendCmd('@1P60');sendCmd('@2P60')">Latin</button>
         <button class="btn" onclick="sendCmd('@1P61');sendCmd('@2P61')">Aurabesh</button>
       </div>
+      <div class="mt-8">
+        <span class="label-dim">Front scroll speed:</span>
+        <div class="row-10 mt-4">
+          <span class="value-label">1</span>
+          <input type="range" id="fld-speed" class="sound-range" min="1" max="6" value="4"
+                 oninput="document.getElementById('fld-speed-val').textContent=this.value"
+                 onchange="applyFrontScrollSpeed(this.value)">
+          <span class="value-label">6</span>
+          <span id="fld-speed-val" class="value-label">4</span>
+          <button class="btn" onclick="applyFrontScrollSpeed(document.getElementById('fld-speed').value)">Apply</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -121,6 +133,18 @@
         <span class="label-dim">Font:</span>
         <button class="btn" onclick="sendCmd('@3P60')">Latin</button>
         <button class="btn" onclick="sendCmd('@3P61')">Aurabesh</button>
+      </div>
+      <div class="mt-8">
+        <span class="label-dim">Rear scroll speed:</span>
+        <div class="row-10 mt-4">
+          <span class="value-label">1</span>
+          <input type="range" id="rld-speed" class="sound-range" min="1" max="6" value="4"
+                 oninput="document.getElementById('rld-speed-val').textContent=this.value"
+                 onchange="applyRearScrollSpeed(this.value)">
+          <span class="value-label">6</span>
+          <span id="rld-speed-val" class="value-label">4</span>
+          <button class="btn" onclick="applyRearScrollSpeed(document.getElementById('rld-speed').value)">Apply</button>
+        </div>
       </div>
     </div>
   </div>
@@ -166,5 +190,25 @@
 
   <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>
   <script src="/app.js"></script>
+  <script>
+    function clampScrollSpeed(v) {
+      var n = parseInt(v, 10);
+      if (!isFinite(n)) return 4;
+      if (n < 1) return 1;
+      if (n > 6) return 6;
+      return n;
+    }
+
+    function applyFrontScrollSpeed(v) {
+      var speed = clampScrollSpeed(v);
+      sendCmd('@1G' + speed);
+      sendCmd('@2G' + speed);
+    }
+
+    function applyRearScrollSpeed(v) {
+      var speed = clampScrollSpeed(v);
+      sendCmd('@3G' + speed);
+    }
+  </script>
 </body>
 </html>
