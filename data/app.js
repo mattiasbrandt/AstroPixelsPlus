@@ -208,6 +208,30 @@
     return '';
   }
 
+  function hasSymbolPrefix(label) {
+    var t = (label || '').trim();
+    if (!t) return true;
+    return /[^A-Za-z0-9]/.test(t.charAt(0));
+  }
+
+  function commandSymbol(cmd, onClick) {
+    if (cmd) {
+      if (cmd.indexOf(':SE') === 0) return '🎬';
+      if (cmd.indexOf(':OP') === 0 || cmd.indexOf(':CL') === 0 || cmd.indexOf(':OF') === 0) return '🧩';
+      if (cmd.charAt(0) === '*') return '🔦';
+      if (cmd.charAt(0) === '@') return '💡';
+      if (cmd.charAt(0) === '$') return '🔊';
+      if (cmd.indexOf('#AP') === 0) return '📡';
+    }
+
+    if (!onClick) return '';
+    if (onClick.indexOf('save') >= 0) return '💾';
+    if (onClick.indexOf('uploadFirmware') >= 0) return '⬆';
+    if (onClick.indexOf('_clear') >= 0) return '♻';
+    if (onClick.indexOf('sendCmd') >= 0) return '▶';
+    return '';
+  }
+
   function extractCommandFromButton(btn) {
     var direct = btn.getAttribute('data-cmd');
     if (direct) return direct;
@@ -231,11 +255,24 @@
     var buttons = document.querySelectorAll('button[onclick]');
     for (var i = 0; i < buttons.length; i++) {
       var btn = buttons[i];
+      var onClick = btn.getAttribute('onclick') || '';
       if (btn.getAttribute('title')) continue;
       var cmd = extractCommandFromButton(btn);
       if (!cmd) continue;
       var tip = describeCommand(cmd);
       if (tip) btn.setAttribute('title', tip + ' (' + cmd + ')');
+    }
+
+    var allButtons = document.querySelectorAll('button[onclick]');
+    for (var k = 0; k < allButtons.length; k++) {
+      var b = allButtons[k];
+      var cmdText = extractCommandFromButton(b);
+      var clickText = b.getAttribute('onclick') || '';
+      var current = (b.textContent || '').trim();
+      var symbol = commandSymbol(cmdText, clickText);
+      if (symbol && !hasSymbolPrefix(current)) {
+        b.textContent = symbol + ' ' + current;
+      }
     }
 
     var linkTips = {
@@ -273,8 +310,17 @@
     var ev = (typeof event !== 'undefined') ? event : null;
     if (ev && ev.target) {
       var btn = ev.target;
-      btn.style.background = '#0088aa';
-      setTimeout(function() { btn.style.background = ''; }, 150);
+      if (btn.classList) {
+        var parent = btn.parentElement;
+        if (parent && parent.classList && parent.classList.contains('btn-grid')) {
+          var selected = parent.querySelectorAll('.btn.is-selected');
+          for (var i = 0; i < selected.length; i++) selected[i].classList.remove('is-selected');
+          btn.classList.add('is-selected');
+        }
+        btn.classList.remove('is-fired');
+        btn.classList.add('is-fired');
+        setTimeout(function() { btn.classList.remove('is-fired'); }, 260);
+      }
     }
   };
 

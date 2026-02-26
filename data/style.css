@@ -85,28 +85,41 @@ nav a.active {
 
 /* Buttons — R2's blue panel buttons */
 .btn {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   padding: 10px 14px;
   margin: 3px;
   background: var(--surface-alt);
   color: var(--silver-bright);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 999px;
   font-size: 0.85em;
+  font-weight: 600;
   cursor: pointer;
   text-align: center;
   min-width: 70px;
-  transition: background 0.15s, border-color 0.15s;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.22);
+  transition: transform 0.14s ease, box-shadow 0.14s ease, background 0.14s ease, border-color 0.14s ease;
   -webkit-tap-highlight-color: transparent;
 }
 .btn:hover {
   background: var(--border);
   border-color: var(--accent);
   color: var(--white);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.28);
 }
 .btn:active {
   background: var(--accent-dim);
   color: var(--white);
+  transform: scale(0.97);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.24);
+}
+.btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(106, 176, 255, 0.35), 0 0 0 4px rgba(12, 21, 37, 0.95);
 }
 /* Primary action — R2's signature blue */
 .btn.accent {
@@ -134,12 +147,26 @@ nav a.active {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 4px;
+  gap: 6px;
   margin-bottom: 12px;
 }
 
 .btn-grid .btn {
   margin: 0;
+}
+
+.btn.is-selected {
+  border-color: var(--accent-bright);
+  box-shadow: 0 0 0 2px rgba(106, 176, 255, 0.28), 0 4px 10px rgba(0, 0, 0, 0.28);
+}
+
+.btn.is-fired {
+  animation: btnPulse 240ms ease-out;
+}
+
+@keyframes btnPulse {
+  0% { transform: scale(0.96); }
+  100% { transform: scale(1); }
 }
 
 /* Dropdown select */
