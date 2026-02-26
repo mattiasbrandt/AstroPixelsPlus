@@ -216,6 +216,9 @@ static String buildStateJson()
     json += ",\"artooEnabled\":" + String(artooEnabled ? "true" : "false");
     json += ",\"artooBaud\":" + String(artooBaud);
     json += ",\"soundLocalEnabled\":" + String(soundLocalEnabled ? "true" : "false");
+    String soundPref = preferences.getString("msound", "0");
+    bool soundModuleEnabled = (soundLocalEnabled && soundPref != "0");
+    json += ",\"soundModuleEnabled\":" + String(soundModuleEnabled ? "true" : "false");
 #ifdef USE_DROID_REMOTE
     json += ",\"remoteConnected\":" + String(sRemoteConnected ? "true" : "false");
     json += ",\"remoteSupported\":true";

@@ -119,6 +119,9 @@ This file tracks fork-specific behavior and feature changes that differ from ups
   - WiFi quality band
   - I2C probe error count
 - Added clearer build-disabled representation for Droid Remote in Home/Setup.
+- Home System status now reports a single sound line:
+  - `Sound Playback Module: Enabled/Disabled`
+  - Disabled reason is shown as either local preference or module setting.
 
 ## Notes
 
