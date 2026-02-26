@@ -31,72 +31,6 @@
     </div>
   </div>
 
-  <!-- Panel Groups 1-10 -->
-  <div class="card">
-    <h3>Panel Groups</h3>
-    <div class="table-wrap">
-    <table class="panel-table">
-      <tr class="panel-head">
-        <td class="panel-cell">Group</td>
-        <td class="panel-cell-center">Open</td>
-        <td class="panel-cell-center">Close</td>
-        <td class="panel-cell-center">Flutter</td>
-      </tr>
-      <tr><td class="panel-cell">Group 1</td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OP01')">Open</button></td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CL01')">Close</button></td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OF01')">Flutter</button></td></tr>
-      <tr><td class="panel-cell">Group 2</td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OP02')">Open</button></td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CL02')">Close</button></td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OF02')">Flutter</button></td></tr>
-      <tr><td class="panel-cell">Group 3</td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OP03')">Open</button></td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CL03')">Close</button></td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OF03')">Flutter</button></td></tr>
-      <tr><td class="panel-cell">Group 4</td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OP04')">Open</button></td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CL04')">Close</button></td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OF04')">Flutter</button></td></tr>
-      <tr><td class="panel-cell">Group 5</td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OP05')">Open</button></td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CL05')">Close</button></td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OF05')">Flutter</button></td></tr>
-      <tr><td class="panel-cell">Group 6</td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OP06')">Open</button></td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CL06')">Close</button></td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OF06')">Flutter</button></td></tr>
-      <tr><td class="panel-cell">Group 7</td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OP07')">Open</button></td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CL07')">Close</button></td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OF07')">Flutter</button></td></tr>
-      <tr><td class="panel-cell">Group 8</td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OP08')">Open</button></td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CL08')">Close</button></td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OF08')">Flutter</button></td></tr>
-      <tr><td class="panel-cell">Group 9</td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OP09')">Open</button></td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CL09')">Close</button></td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OF09')">Flutter</button></td></tr>
-      <tr><td class="panel-cell">Group 10</td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OP10')">Open</button></td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CL10')">Close</button></td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OF10')">Flutter</button></td></tr>
-    </table>
-    </div>
-  </div>
-
-  <!-- Dome Zones -->
-  <div class="card">
-    <h3>Dome Zones</h3>
-    <div class="btn-grid">
-      <button class="btn" onclick="sendCmd(':OP11')">Open Top Pie</button>
-      <button class="btn" onclick="sendCmd(':CL11')">Close Top Pie</button>
-      <button class="btn" onclick="sendCmd(':OP12')">Open Bottom</button>
-      <button class="btn" onclick="sendCmd(':CL12')">Close Bottom</button>
-    </div>
-  </div>
-
   <!-- Panel Animations -->
   <div class="card">
     <h3>Animations (All Panels)</h3>
@@ -112,7 +46,193 @@
     </div>
   </div>
 
+  <div class="card">
+    <h3>Pie Panel Movement</h3>
+    <div class="desc">Upper pie panels (Pie Panel X / PPX).</div>
+    <div class="table-wrap">
+    <table class="panel-table">
+      <tr class="panel-head">
+        <td class="panel-cell">Panel</td>
+        <td class="panel-cell-center">Open</td>
+        <td class="panel-cell-center">Close</td>
+        <td class="panel-cell-center">Flutter</td>
+      </tr>
+      <tr><td class="panel-cell">Pie Panel 1 (PP1)</td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OP05')">Open</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CL05')">Close</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OF05')">Flutter</button></td></tr>
+      <tr><td class="panel-cell">Pie Panel 2 (PP2)</td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OP06')">Open</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CL06')">Close</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OF06')">Flutter</button></td></tr>
+      <tr><td class="panel-cell">Pie Panel 3 (PP3)</td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OP08')">Open</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CL08')">Close</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OF08')">Flutter</button></td></tr>
+      <tr><td class="panel-cell">Pie Panel 4 (PP4)</td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OP09')">Open</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CL09')">Close</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OF09')">Flutter</button></td></tr>
+      <tr><td class="panel-cell">Pie Panel 5 (PP5)</td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OP11')">Open</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CL11')">Close</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OF11')">Flutter</button></td></tr>
+      <tr><td class="panel-cell">Pie Panel 6 (PP6)</td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OP12')">Open</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CL12')">Close</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OF12')">Flutter</button></td></tr>
+    </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Lower Panel Movement</h3>
+    <div class="desc">Lower dome panels (Panel X / PX).</div>
+    <div class="desc mt-4">Each row shows the panel name first, then the legacy command number used in this UI.</div>
+    <div class="table-wrap">
+    <table class="panel-table">
+      <tr class="panel-head">
+        <td class="panel-cell">Panel</td>
+        <td class="panel-cell-center">Open</td>
+        <td class="panel-cell-center">Close</td>
+        <td class="panel-cell-center">Flutter</td>
+      </tr>
+      <tr><td class="panel-cell">Panel 1 (P1)</td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OP01')">Open</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CL01')">Close</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OF01')">Flutter</button></td></tr>
+      <tr><td class="panel-cell">Panel 2 (P2)</td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OP02')">Open</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CL02')">Close</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OF02')">Flutter</button></td></tr>
+      <tr><td class="panel-cell">Panel 3 (P3)</td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OP03')">Open</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CL03')">Close</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OF03')">Flutter</button></td></tr>
+      <tr><td class="panel-cell">Panel 4 (P4)</td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OP04')">Open</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CL04')">Close</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OF04')">Flutter</button></td></tr>
+      <tr><td class="panel-cell">Panel 7 (P7)</td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OP07')">Open</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CL07')">Close</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OF07')">Flutter</button></td></tr>
+      <tr><td class="panel-cell">Panel 10 (P10)</td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OP10')">Open</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CL10')">Close</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OF10')">Flutter</button></td></tr>
+    </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Panel Servo Calibration</h3>
+    <div class="desc">Select a panel, test position with temporary move, then store open/closed values.</div>
+
+    <div class="row mt-8">
+      <label class="label-dim" for="cal-panel">Panel:</label>
+      <select id="cal-panel" class="flex-1" onchange="updateCalPreview()">
+        <optgroup label="Lower Dome Panels">
+          <option value="01">Panel 1 (P1)</option>
+          <option value="02">Panel 2 (P2)</option>
+          <option value="03">Panel 3 (P3)</option>
+          <option value="04">Panel 4 (P4)</option>
+          <option value="07">Panel 7 (P7)</option>
+          <option value="10">Panel 10 (P10)</option>
+        </optgroup>
+        <optgroup label="Upper Pie Panels">
+          <option value="05">Pie Panel 1 (PP1)</option>
+          <option value="06">Pie Panel 2 (PP2)</option>
+          <option value="08">Pie Panel 3 (PP3)</option>
+          <option value="09">Pie Panel 4 (PP4)</option>
+          <option value="11">Pie Panel 5 (PP5)</option>
+          <option value="12">Pie Panel 6 (PP6)</option>
+        </optgroup>
+      </select>
+    </div>
+
+    <div class="row mt-8">
+      <label class="label-dim" for="cal-pos">Position:</label>
+      <input id="cal-pos" type="number" min="700" max="2300" step="1" value="1500" class="flex-1" oninput="updateCalPreview()">
+      <button class="btn" onclick="sendMovePosition()">Move (:MV)</button>
+    </div>
+
+    <div class="btn-grid mt-8">
+      <button class="btn accent" onclick="saveOpenPosition()">Save Open (#SO)</button>
+      <button class="btn" onclick="saveClosedPosition()">Save Closed (#SC)</button>
+      <button class="btn danger" onclick="swapOpenClosed()">Swap Open/Closed (#SW)</button>
+    </div>
+
+    <div class="label-dim mt-8">Command preview:</div>
+    <div id="cal-preview" class="desc mt-4">:MV011500</div>
+
+    <div class="label-dim mt-10">Best Practice Panel Adjustment</div>
+    <div class="desc mt-4">3) Use <code>:MVxxdddd</code> to explore servo range.</div>
+    <div class="desc">4) When you find a good open position, store with <code>#SOxxdddd</code>.</div>
+    <div class="desc">5) When you find a good closed position, store with <code>#SCxxdddd</code>.</div>
+    <div class="desc">Example: <code>:MV010900</code> -> <code>#SO010900</code> (open), <code>:MV011750</code> -> <code>#SC011750</code> (closed).</div>
+    <div class="desc">6) <code>:MVxxdddd</code> does not store; it only moves the servo temporarily.</div>
+    <div class="desc mt-6">Quick swap shortcut: <code>#SWxx</code> swaps open/closed and stores immediately. Use only during calibration, never at every boot.</div>
+  </div>
+
   <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>
   <script src="/app.js"></script>
+  <script>
+    function twoDigitPanel(v) {
+      var n = String(v || '').replace(/\D/g, '');
+      if (!n) n = '1';
+      if (n.length === 1) n = '0' + n;
+      return n.slice(0, 2);
+    }
+
+    function fourDigitPos(v) {
+      var n = parseInt(v, 10);
+      if (!isFinite(n)) n = 1500;
+      if (n < 700) n = 700;
+      if (n > 2300) n = 2300;
+      var s = String(n);
+      while (s.length < 4) s = '0' + s;
+      return s;
+    }
+
+    function selectedPanel() {
+      return twoDigitPanel(document.getElementById('cal-panel').value);
+    }
+
+    function selectedPos() {
+      return fourDigitPos(document.getElementById('cal-pos').value);
+    }
+
+    function updateCalPreview() {
+      var cmd = ':MV' + selectedPanel() + selectedPos();
+      document.getElementById('cal-preview').textContent = cmd;
+    }
+
+    function sendMovePosition() {
+      var cmd = ':MV' + selectedPanel() + selectedPos();
+      sendCmd(cmd);
+      updateCalPreview();
+    }
+
+    function saveOpenPosition() {
+      var cmd = '#SO' + selectedPanel() + selectedPos();
+      sendCmd(cmd);
+      document.getElementById('cal-preview').textContent = cmd;
+    }
+
+    function saveClosedPosition() {
+      var cmd = '#SC' + selectedPanel() + selectedPos();
+      sendCmd(cmd);
+      document.getElementById('cal-preview').textContent = cmd;
+    }
+
+    function swapOpenClosed() {
+      var cmd = '#SW' + selectedPanel();
+      sendCmd(cmd);
+      document.getElementById('cal-preview').textContent = cmd;
+    }
+
+    updateCalPreview();
+  </script>
 </body>
 </html>

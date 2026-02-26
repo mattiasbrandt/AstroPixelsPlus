@@ -537,3 +537,15 @@ MARCDUINO_ACTION(FlutterPanelGroup9, :OF09, ({
 MARCDUINO_ACTION(FlutterPanelGroup10, :OF10, ({
     SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_GROUP_10, 10, 50);
 }))
+
+////////////////
+
+MARCDUINO_ACTION(FlutterTopPanels, :OF11, ({
+    SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PIE_PANEL, 10, 50);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(FlutterBottomPanels, :OF12, ({
+    SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, DOME_PANELS_MASK, 10, 50);
+}))
