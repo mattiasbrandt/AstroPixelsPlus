@@ -52,6 +52,19 @@ h2 {
   margin-bottom: 16px;
 }
 
+.topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.power-toggle {
+  min-width: 92px;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
 /* Navigation — silver tabs like R2's panel seams */
 nav {
   display: flex;
@@ -390,6 +403,44 @@ table td {
   height: 100%; background: var(--accent); border-radius: 4px;
   transition: width 0.3s;
   width: 0%;
+}
+
+.sleep-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 14, 24, 0.72);
+  z-index: 160;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.sleep-overlay.active {
+  display: flex;
+}
+
+.sleep-panel {
+  width: min(420px, 96vw);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 10px;
+  padding: 16px;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+.sleep-title {
+  font-size: 1.08em;
+  color: var(--white);
+  font-weight: 700;
+}
+
+.sleep-sub {
+  margin: 8px 0 14px;
+  font-size: 0.86em;
+  color: var(--text-dim);
 }
 
 .ui-toast {

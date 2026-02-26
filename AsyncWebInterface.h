@@ -26,10 +26,15 @@ extern bool otaInProgress;
 extern bool artooEnabled;
 extern int artooBaud;
 extern bool soundLocalEnabled;
+extern bool sSleepModeActive;
+extern uint32_t sSleepModeSinceMs;
 extern uint32_t sMinFreeHeap;
 extern volatile uint32_t sArtooLastSignalMs;
 extern volatile uint32_t sArtooSignalBursts;
 extern portMUX_TYPE sArtooTelemetryMux;
+extern bool shouldBlockCommandDuringSleep(const char *cmd);
+extern bool enterSoftSleepMode();
+extern bool exitSoftSleepMode();
 
 #ifdef USE_DROID_REMOTE
 extern bool sRemoteConnected;
@@ -91,6 +96,11 @@ static bool parseWsCommand(const uint8_t *data, size_t len, char *out, size_t ou
 static void processMarcduinoCommandWithSource(const char *source, const char *cmd)
 {
     if (cmd == nullptr || cmd[0] == '\0') return;
+    if (shouldBlockCommandDuringSleep(cmd))
+    {
+        logCapture.printf("[CMD][%s][sleep-blocked] %s\n", source, cmd);
+        return;
+    }
     logCapture.printf("[CMD][%s] %s\n", source, cmd);
     Marcduino::processCommand(player, cmd);
 }
@@ -216,6 +226,8 @@ static String buildStateJson()
     json += ",\"artooEnabled\":" + String(artooEnabled ? "true" : "false");
     json += ",\"artooBaud\":" + String(artooBaud);
     json += ",\"soundLocalEnabled\":" + String(soundLocalEnabled ? "true" : "false");
+    json += ",\"sleepMode\":" + String(sSleepModeActive ? "true" : "false");
+    json += ",\"sleepSinceMs\":" + String(sSleepModeSinceMs);
     String soundPref = preferences.getString("msound", "0");
     bool soundModuleEnabled = (soundLocalEnabled && soundPref != "0");
     json += ",\"soundModuleEnabled\":" + String(soundModuleEnabled ? "true" : "false");
@@ -316,6 +328,8 @@ static String buildHealthJson()
     bool soundEnabled = (soundLocalEnabled && soundPref != "0");
     json += ",\"sound_module\":" + String(soundEnabled ? "true" : "false");
     json += ",\"sound_local_enabled\":" + String(soundLocalEnabled ? "true" : "false");
+    json += ",\"sleep_mode\":" + String(sSleepModeActive ? "true" : "false");
+    json += ",\"sleep_since_ms\":" + String(sSleepModeSinceMs);
 
     // WiFi
     json += ",\"wifi\":" + String(wifiEnabled ? "true" : "false");
@@ -387,6 +401,11 @@ static void initAsyncWeb()
             if (!isValidCommandString(cmd))
             {
                 request->send(400, "application/json", "{\"error\":\"invalid cmd\"}");
+                return;
+            }
+            if (shouldBlockCommandDuringSleep(cmd.c_str()))
+            {
+                request->send(423, "application/json", "{\"error\":\"sleeping\",\"hint\":\"POST /api/wake\"}");
                 return;
             }
             logCapture.printf("[API] cmd=%s len=%u\n", cmd.c_str(), (unsigned int)cmd.length());
@@ -554,6 +573,34 @@ static void initAsyncWeb()
         }
         request->send(200, "application/json", "{\"ok\":true,\"msg\":\"rebooting\"}");
         scheduleReboot(500);
+    });
+
+    asyncServer.on("/api/sleep", HTTP_POST, [](AsyncWebServerRequest *request)
+    {
+        if (!checkWriteAuth(request))
+        {
+            request->send(401, "application/json", "{\"error\":\"unauthorized\"}");
+            return;
+        }
+        bool changed = enterSoftSleepMode();
+        request->send(200, "application/json", changed
+            ? "{\"ok\":true,\"sleepMode\":true,\"changed\":true}"
+            : "{\"ok\":true,\"sleepMode\":true,\"changed\":false}");
+        broadcastState();
+    });
+
+    asyncServer.on("/api/wake", HTTP_POST, [](AsyncWebServerRequest *request)
+    {
+        if (!checkWriteAuth(request))
+        {
+            request->send(401, "application/json", "{\"error\":\"unauthorized\"}");
+            return;
+        }
+        bool changed = exitSoftSleepMode();
+        request->send(200, "application/json", changed
+            ? "{\"ok\":true,\"sleepMode\":false,\"changed\":true}"
+            : "{\"ok\":true,\"sleepMode\":false,\"changed\":false}");
+        broadcastState();
     });
 
     // ---- Firmware upload (OTA via web) ----

@@ -501,6 +501,13 @@ static bool sAsyncWebStarted;
 #endif
 
 bool soundLocalEnabled;
+bool sSleepModeActive;
+uint32_t sSleepModeSinceMs;
+uint32_t sSleepEnforceAtMs;
+static const uint8_t kStatusScrollSpeedScale = 4;
+static const uint32_t kSleepTransitionScrollMs = 5200;
+bool sWakeTransitionPending;
+uint32_t sWakeTransitionAtMs;
 uint32_t sMinFreeHeap = 0;
 static bool sSoundInitPending;
 static uint32_t sSoundInitAtMs;
@@ -662,6 +669,11 @@ void setup()
     artooBaud = preferences.getInt(PREFERENCE_ARTOO_BAUD, ARTOO_BAUD);
 #endif
     soundLocalEnabled = preferences.getBool(PREFERENCE_MARCSOUND_LOCAL_ENABLED, MARC_SOUND_LOCAL_ENABLED);
+    sSleepModeActive = false;
+    sSleepModeSinceMs = 0;
+    sSleepEnforceAtMs = 0;
+    sWakeTransitionPending = false;
+    sWakeTransitionAtMs = 0;
     sMinFreeHeap = ESP.getFreeHeap();
     PrintReelTwoInfo(Serial, "AstroPixelsPlus");
 
@@ -734,8 +746,8 @@ void setup()
     // CREDENDA FORK IMPROVEMENT: Enhanced startup text display
     // Shows "STAR WARS" on RLD and "R2D2" on FLD during boot
     // Initialize LED effects before WiFi starts
-    RLD.selectScrollTextLeft("... STAR WARS ....", LogicEngineRenderer::kBlue, 0, 15);
-    FLD.selectScrollTextLeft("... R2D2 ...", LogicEngineRenderer::kRed, 0, 15);
+    RLD.selectScrollTextLeft("... STAR WARS ....", LogicEngineRenderer::kBlue, kStatusScrollSpeedScale, 15);
+    FLD.selectScrollTextLeft("... R2D2 ...", LogicEngineRenderer::kBlue, kStatusScrollSpeedScale, 15);
     RLD.setLogicEffectSelector(CustomLogicEffectSelector);
     FLD.setLogicEffectSelector(CustomLogicEffectSelector);
     frontPSI.setLogicEffectSelector(CustomLogicEffectSelector);
@@ -1159,9 +1171,84 @@ static void DisconnectRemote()
 static unsigned sPos;
 static char sBuffer[CONSOLE_BUFFER_SIZE];
 
+static bool isWakeProfileCommand(const char *cmd)
+{
+    return strcmp(cmd, ":SE11") == 0 || strcmp(cmd, ":SE13") == 0 || strcmp(cmd, ":SE14") == 0;
+}
+
+bool shouldBlockCommandDuringSleep(const char *cmd)
+{
+    if (!sSleepModeActive || cmd == nullptr || cmd[0] == '\0') return false;
+    return !isWakeProfileCommand(cmd);
+}
+
+static void applySoftSleepOutputs()
+{
+    sMarcSound.suspendRandom();
+    sMarcSound.stop();
+
+    FLD.selectSequence(LogicEngineRenderer::LIGHTSOUT);
+    RLD.selectSequence(LogicEngineRenderer::LIGHTSOUT);
+    frontPSI.selectSequence(LogicEngineRenderer::LIGHTSOUT);
+    rearPSI.selectSequence(LogicEngineRenderer::LIGHTSOUT);
+
+    frontHolo.selectSequence(7, 0);
+    rearHolo.selectSequence(7, 0);
+    topHolo.selectSequence(7, 0);
+    frontHolo.off();
+    rearHolo.off();
+    topHolo.off();
+}
+
+static void applySoftWakeOutputs()
+{
+    sMarcSound.resumeRandomInSeconds(2);
+    Marcduino::processCommand(player, ":SE14");
+    Marcduino::processCommand(player, "@0P1");
+}
+
+bool enterSoftSleepMode()
+{
+    if (sSleepModeActive) return false;
+
+    sWakeTransitionPending = false;
+    sWakeTransitionAtMs = 0;
+    Marcduino::processCommand(player, ":SE10");
+    Marcduino::processCommand(player, "*ST00");
+    FLD.selectScrollTextLeft("GOING TO SLEEP...", LogicEngineRenderer::kBlue, kStatusScrollSpeedScale, 6);
+    RLD.selectScrollTextLeft("GOING TO SLEEP...", LogicEngineRenderer::kBlue, kStatusScrollSpeedScale, 6);
+
+    sSleepModeActive = true;
+    sSleepModeSinceMs = millis();
+    sSleepEnforceAtMs = sSleepModeSinceMs + kSleepTransitionScrollMs;
+    DEBUG_PRINTLN("Soft sleep mode enabled");
+    return true;
+}
+
+bool exitSoftSleepMode()
+{
+    if (!sSleepModeActive) return false;
+
+    sSleepEnforceAtMs = 0;
+    FLD.selectScrollTextLeft("WAKING UP...", LogicEngineRenderer::kGreen, kStatusScrollSpeedScale, 6);
+    RLD.selectScrollTextLeft("WAKING UP...", LogicEngineRenderer::kGreen, kStatusScrollSpeedScale, 6);
+    sWakeTransitionPending = true;
+    sWakeTransitionAtMs = millis() + kSleepTransitionScrollMs;
+
+    sSleepModeActive = false;
+    sSleepModeSinceMs = 0;
+    DEBUG_PRINTLN("Soft sleep mode disabled");
+    return true;
+}
+
 static void processMarcduinoCommandWithSourceMain(const char *source, const char *cmd)
 {
     if (cmd == nullptr || cmd[0] == '\0') return;
+    if (shouldBlockCommandDuringSleep(cmd))
+    {
+        Serial.printf("[CMD][%s][sleep-blocked] %s\n", source, cmd);
+        return;
+    }
     Serial.printf("[CMD][%s] %s\n", source, cmd);
     Marcduino::processCommand(player, cmd);
 }
@@ -1182,6 +1269,19 @@ I2CReceiverBase<CONSOLE_BUFFER_SIZE> i2cReceiver(USE_I2C_ADDRESS, [](char *cmd)
 void mainLoop()
 {
     AnimatedEvent::process();
+
+    if (sSleepModeActive && sSleepEnforceAtMs != 0 && (int32_t)(millis() - sSleepEnforceAtMs) >= 0)
+    {
+        applySoftSleepOutputs();
+        sSleepEnforceAtMs = 0;
+    }
+
+    if (sWakeTransitionPending && sWakeTransitionAtMs != 0 && (int32_t)(millis() - sWakeTransitionAtMs) >= 0)
+    {
+        applySoftWakeOutputs();
+        sWakeTransitionPending = false;
+        sWakeTransitionAtMs = 0;
+    }
 
     uint32_t freeHeapNow = ESP.getFreeHeap();
     if (sMinFreeHeap == 0 || freeHeapNow < sMinFreeHeap)
