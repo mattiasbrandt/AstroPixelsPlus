@@ -131,6 +131,40 @@ This file tracks fork-specific behavior and feature changes that differ from ups
 - Supports grouped runs (`--group panels|holos|logics|sequences|sound`), target host override, optional API token, and dry-run listing.
 - Bench validation completed on this fork: matrix runner executes successfully and reports expected PASS behavior.
 
+## 2026-02 Soft Sleep / Wake Runtime Control
+
+- Added runtime soft sleep state tracking in firmware (`sleepMode`, `sleepSinceMs`) while keeping ESP32, WiFi, and async web services online.
+- Added new authenticated API endpoints:
+  - `POST /api/sleep` to enter quiet low-activity profile
+  - `POST /api/wake` to restore active profile
+- Sleep entry uses existing Marcduino/ReelTwo command patterns already present in this fork:
+  - `:SE10` (quiet reset), `*ST00` (disable holo twitch), `@0T15` (logic lights-out)
+- Wake exit restores active baseline using `:SE14` (awake+ profile).
+- While in sleep mode, incoming Marcduino commands are gated (blocked) except wake-profile commands to prevent unintended movement/noise.
+- Sleep state is exposed through `/api/state` and `/api/health` for UI/API clients.
+
+### Today's linked commits (2026-02-26)
+
+- `4570ee4` — Panels UI now uses human-readable panel naming and completed flutter support for PP5/PP6 (`:OF11`, `:OF12`).
+- `4aeda27` — Repo hygiene/docs cleanup: ignore local agent artifacts and trim fork notes in README.
+- `b78bb07` — Added soft sleep/wake control flow in firmware + API + Home overlay toggle.
+- `c115c52` — Added configurable droid naming across firmware boot text, API state, setup page, and page branding.
+- `17c905c` — Added front/rear logic scroll-speed sliders on Logics page.
+
+### 2026-02-26 detail snapshot
+
+- **Sleep/Wake stack**
+  - Firmware state machine and timed transition enforcement in `AstroPixelsPlus.ino`.
+  - Command gating while sleeping in both serial/web command paths.
+  - API endpoints in `AsyncWebInterface.h`: `POST /api/sleep` and `POST /api/wake`.
+  - Home UX in `data/index.html` and `data/style.css`: top-right power toggle + dimmed sleep overlay with wake action.
+- **Droid naming stack**
+  - Build-time default via `AP_DROID_NAME` in `platformio.ini`.
+  - Runtime pref key `dname` with validation and max length enforcement in `AsyncWebInterface.h`.
+  - Setup page controls in `data/setup.html` and dynamic title/brand binding in `data/app.js`.
+- **Logics UX**
+  - Added scroll-speed sliders (front and rear) in `data/logics.html` using existing Marcduino speed commands.
+
 ## Notes
 
 - This document intentionally focuses on concrete fork behavior/features.
