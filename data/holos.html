@@ -12,7 +12,6 @@
 <body>
   <h1>Holo Projectors 💡</h1>
   <div class="subtitle">HP1 (FHP), HP2 (RHP), HP3 (THP) LED + servo holoprojectors</div>
-  <div class="desc mt-4">Color selection is disabled in this build because these holo LEDs run fixed-color hardware behavior.</div>
   <nav>
     <a href="/">Home</a>
     <a href="/setup.html">Setup</a>
@@ -26,6 +25,10 @@
     <h3>Holo Servo Controller Status</h3>
     <div class="desc" id="holo-health-text">Checking controller availability...</div>
     <div class="i2c-list" id="holo-i2c-list"></div>
+    <div class="i2c-list" id="holo-i2c-codes"></div>
+    <div class="i2c-list" id="holo-i2c-hint"></div>
+    <div class="mt-8"><button id="holo-deep-btn" class="btn" onclick="window.runHoloDeepDiag()">Run Deep I2C Scan</button></div>
+    <div id="holo-deep-result" class="i2c-list">Deep scan result: not run yet. Full-bus scan checks addresses 0x01-0x7E.</div>
     <div class="i2c-list" id="holo-last-cmd"></div>
   </div>
 
@@ -204,6 +207,10 @@
 
       var healthTextEl = document.getElementById('holo-health-text');
       var i2cListEl = document.getElementById('holo-i2c-list');
+      var i2cCodesEl = document.getElementById('holo-i2c-codes');
+      var i2cHintEl = document.getElementById('holo-i2c-hint');
+      var deepResultEl = document.getElementById('holo-deep-result');
+      var deepBtnEl = document.getElementById('holo-deep-btn');
       var lastCmdEl = document.getElementById('holo-last-cmd');
       var healthCardEl = document.getElementById('holo-health-card');
 
@@ -219,7 +226,7 @@
           setHealthText('<span class="dot green"></span>Holo servo controller detected at I2C 0x41. Holo movement commands should reach hardware. Holo LED light control remains on the AstroPixels board.');
         } else {
           if (healthCardEl) healthCardEl.style.borderLeftColor = 'var(--warning)';
-          setHealthText('<span class="dot yellow"></span>No holo servo controller detected at I2C 0x41. Holo movement features will not actuate until controller power/wiring is restored. Holo LED light commands still run on the AstroPixels board.');
+          setHealthText('<span class="dot yellow"></span>No holo servo controller detected at I2C 0x41. Check holo controller power/wiring.');
         }
 
         if (i2cListEl) {
@@ -230,6 +237,82 @@
           }
         }
       }
+
+      function updateHoloDiag(d) {
+        if (!d || !d.holos) return;
+        if (i2cCodesEl) {
+          i2cCodesEl.textContent =
+            'I2C code/streak for holo controller (0x41): code ' + d.holos.last_code +
+            ', failures ' + d.holos.consecutive_failures +
+            ' | scan age ' + d.scan_age_ms + ' ms';
+        }
+
+        if (i2cHintEl) {
+          var hint = '';
+          if (d.operator && d.operator.hints && d.operator.hints.length > 0) {
+            hint = d.operator.hints[0];
+          }
+          i2cHintEl.textContent = hint
+            ? ('Troubleshooting hint: ' + hint)
+            : 'Troubleshooting hint: I2C checks are currently stable.';
+        }
+      }
+
+      function refreshHoloDiag(force) {
+        var url = force ? '/api/diag/i2c?force=1' : '/api/diag/i2c';
+        if (force) setDeepStateRunning();
+        return fetch(url).then(function(r) { return r.json(); }).then(function(d) {
+          updateHoloDiag(d);
+          if (force) {
+            updateDeepResult(d);
+            if (typeof window.uiToast === 'function') window.uiToast('Deep I2C scan completed', d.holos && d.holos.ok ? '' : 'warn');
+          }
+          return d;
+        }).catch(function() {
+          if (i2cCodesEl) i2cCodesEl.textContent = 'I2C code: unable to read /api/diag/i2c';
+          if (i2cHintEl) i2cHintEl.textContent = 'Troubleshooting hint: diagnostics endpoint unavailable right now.';
+          if (force && deepResultEl) deepResultEl.textContent = 'Deep scan result: failed (cannot reach /api/diag/i2c).';
+          if (force && typeof window.uiToast === 'function') window.uiToast('Deep I2C scan failed', 'error');
+        }).finally(function() {
+          if (force) setDeepStateIdle();
+        });
+      }
+
+      function setDeepStateRunning() {
+        if (deepBtnEl) {
+          deepBtnEl.disabled = true;
+          deepBtnEl.textContent = 'Running Deep I2C Scan...';
+        }
+        if (deepResultEl) {
+          deepResultEl.textContent = 'Deep scan result: running full-bus scan (0x01-0x7E)...';
+        }
+      }
+
+      function setDeepStateIdle() {
+        if (deepBtnEl) {
+          deepBtnEl.disabled = false;
+          deepBtnEl.textContent = 'Run Deep I2C Scan';
+        }
+      }
+
+      function updateDeepResult(d) {
+        if (!deepResultEl || !d) return;
+        var faults = (d.operator && d.operator.faults && d.operator.faults.length) ? d.operator.faults.join(', ') : 'none';
+        var devices = (d.devices && d.devices.length) ? d.devices.join(', ') : 'none';
+        var status = (d.holos && d.holos.ok) ? 'holo controller detected' : 'holo controller missing';
+        var ts = new Date().toLocaleTimeString();
+        deepResultEl.textContent =
+          '[' + ts + '] Deep scan done (full bus 0x01-0x7E): ' + status +
+          '; devices=' + d.device_count +
+          ' [' + devices + ']' +
+          '; duration=' + d.scan_duration_us + ' us' +
+          '; faults=' + faults +
+          '; scan_mode=' + d.scan_mode + '.';
+      }
+
+      window.runHoloDeepDiag = function() {
+        refreshHoloDiag(true);
+      };
 
       function setLastCmdStatus(cmd, statusText) {
         if (!lastCmdEl) return;
@@ -260,6 +343,8 @@
       fetch('/api/health').then(function(r) { return r.json(); }).then(updateHoloHealth).catch(function() {
         setHealthText('<span class="dot red"></span>Unable to read /api/health right now.');
       });
+      refreshHoloDiag(false);
+      setInterval(function() { refreshHoloDiag(false); }, 30000);
 
       window.onHealthUpdate = updateHoloHealth;
     })();

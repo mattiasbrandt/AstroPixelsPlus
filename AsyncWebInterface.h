@@ -59,6 +59,19 @@ static bool otaUploadFailed = false;
 static uint32_t lastI2CScanMs = 0;
 static bool cachedPanelsOk = false;
 static bool cachedHolosOk = false;
+static uint8_t cachedPanelsCode = 255;
+static uint8_t cachedHolosCode = 255;
+static uint32_t cachedPanelsLastOkMs = 0;
+static uint32_t cachedPanelsLastFailMs = 0;
+static uint32_t cachedHolosLastOkMs = 0;
+static uint32_t cachedHolosLastFailMs = 0;
+static uint32_t cachedPanelsConsecutiveFailures = 0;
+static uint32_t cachedHolosConsecutiveFailures = 0;
+static uint32_t cachedI2CScanDurationUs = 0;
+static uint32_t cachedI2CDeviceCount = 0;
+static uint32_t lastI2CDeepScanMs = 0;
+static bool cachedLastScanWasDeep = false;
+static uint32_t i2cCodeHistogram[6] = {0, 0, 0, 0, 0, 0};
 static String cachedI2CDevicesJson = "[]";
 static uint32_t i2cProbeFailures = 0;
 
@@ -271,12 +284,20 @@ static String buildStateJson()
 // ---------------------------------------------------------------
 // Probe an I2C address — returns true if device ACKs
 // ---------------------------------------------------------------
-static bool probeI2C(uint8_t addr)
+static uint8_t probeI2CCode(uint8_t addr, uint8_t attempts = 2)
 {
-    Wire.beginTransmission(addr);
-    bool ok = (Wire.endTransmission() == 0);
-    if (!ok) i2cProbeFailures++;
-    return ok;
+    uint8_t code = 4;
+    for (uint8_t i = 0; i < attempts; i++)
+    {
+        Wire.beginTransmission(addr);
+        code = (uint8_t)Wire.endTransmission();
+        if (code == 0) break;
+        delayMicroseconds(200);
+    }
+    if (code > 5) code = 5;
+    i2cCodeHistogram[code]++;
+    if (code != 0) i2cProbeFailures++;
+    return code;
 }
 
 static void refreshI2CHealthCache(bool force = false)
@@ -285,24 +306,191 @@ static void refreshI2CHealthCache(bool force = false)
     if (!force && (now - lastI2CScanMs) < 30000u)
         return;
 
-    cachedPanelsOk = probeI2C(0x40);
-    cachedHolosOk = probeI2C(0x41);
+    uint32_t scanStartUs = micros();
 
+    cachedPanelsCode = probeI2CCode(0x40);
+    cachedHolosCode = probeI2CCode(0x41);
+
+    cachedPanelsOk = (cachedPanelsCode == 0);
+    cachedHolosOk = (cachedHolosCode == 0);
+
+    if (cachedPanelsOk)
+    {
+        cachedPanelsLastOkMs = now;
+        cachedPanelsConsecutiveFailures = 0;
+    }
+    else
+    {
+        cachedPanelsLastFailMs = now;
+        cachedPanelsConsecutiveFailures++;
+    }
+
+    if (cachedHolosOk)
+    {
+        cachedHolosLastOkMs = now;
+        cachedHolosConsecutiveFailures = 0;
+    }
+    else
+    {
+        cachedHolosLastFailMs = now;
+        cachedHolosConsecutiveFailures++;
+    }
+
+    bool deepScan = force;
     String devices = "[";
     bool firstDev = true;
-    for (uint8_t addr = 1; addr < 127; addr++)
+    uint32_t deviceCount = 0;
+
+    if (deepScan)
     {
-        Wire.beginTransmission(addr);
-        if (Wire.endTransmission() == 0)
+        for (uint8_t addr = 1; addr < 127; addr++)
+        {
+            Wire.beginTransmission(addr);
+            if (Wire.endTransmission() == 0)
+            {
+                if (!firstDev) devices += ",";
+                firstDev = false;
+                deviceCount++;
+                devices += "\"0x" + String(addr, HEX) + "\"";
+            }
+        }
+        cachedLastScanWasDeep = true;
+        lastI2CDeepScanMs = now;
+    }
+    else
+    {
+        if (cachedPanelsOk)
+        {
+            devices += "\"0x40\"";
+            firstDev = false;
+            deviceCount++;
+        }
+        if (cachedHolosOk)
         {
             if (!firstDev) devices += ",";
-            firstDev = false;
-            devices += "\"0x" + String(addr, HEX) + "\"";
+            devices += "\"0x41\"";
+            deviceCount++;
         }
+        cachedLastScanWasDeep = false;
     }
     devices += "]";
     cachedI2CDevicesJson = devices;
+    cachedI2CDeviceCount = deviceCount;
+    cachedI2CScanDurationUs = micros() - scanStartUs;
     lastI2CScanMs = now;
+}
+
+static String buildI2CDiagnosticsJson(bool forceScan = false)
+{
+    refreshI2CHealthCache(forceScan);
+    uint32_t now = millis();
+    uint32_t scanAgeMs = (now >= lastI2CScanMs) ? (now - lastI2CScanMs) : 0;
+    uint32_t deepScanAgeMs = (lastI2CDeepScanMs > 0 && now >= lastI2CDeepScanMs) ? (now - lastI2CDeepScanMs) : 0;
+    bool has40 = (cachedI2CDevicesJson.indexOf("\"0x40\"") >= 0);
+    bool has41 = (cachedI2CDevicesJson.indexOf("\"0x41\"") >= 0);
+
+    String faults = "[";
+    String hints = "[";
+    bool firstFault = true;
+    bool firstHint = true;
+    auto addFault = [&](const char *fault, const char *hint)
+    {
+        if (!firstFault) faults += ",";
+        faults += "\"" + String(fault) + "\"";
+        firstFault = false;
+        if (hint && hint[0] != '\0')
+        {
+            if (!firstHint) hints += ",";
+            hints += "\"" + String(hint) + "\"";
+            firstHint = false;
+        }
+    };
+
+    if (!cachedPanelsOk && !cachedHolosOk)
+    {
+        addFault("both_expected_missing", "Both 0x40 and 0x41 are missing: check SDA/SCL wiring, common ground, and controller power.");
+    }
+    else
+    {
+        if (!cachedPanelsOk)
+        {
+            addFault("panels_0x40_missing", "0x40 missing: check panel controller power, address straps, and wiring to panel PCA9685.");
+        }
+        if (!cachedHolosOk)
+        {
+            addFault("holos_0x41_missing", "0x41 missing: check holo controller power, address straps, and wiring to holo PCA9685.");
+        }
+    }
+    if (!has40 && cachedPanelsOk)
+    {
+        addFault("scan_missed_0x40", "Probe to 0x40 ACKed but bus scan missed it. This can indicate transient bus instability.");
+    }
+    if (!has41 && cachedHolosOk)
+    {
+        addFault("scan_missed_0x41", "Probe to 0x41 ACKed but bus scan missed it. This can indicate transient bus instability.");
+    }
+    if (cachedPanelsConsecutiveFailures >= 2 || cachedHolosConsecutiveFailures >= 2)
+    {
+        addFault("intermittent_failures", "Repeated probe failures detected. Check for loose connections, bus noise, or servo rail brownout conditions.");
+    }
+    if (firstFault)
+    {
+        addFault("none", "I2C diagnostic checks are stable for expected PCA9685 addresses.");
+    }
+    faults += "]";
+    hints += "]";
+
+    String json = "{";
+    json += "\"scan_age_ms\":" + String(scanAgeMs);
+    json += ",\"scan_mode\":\"" + String(cachedLastScanWasDeep ? "deep" : "quick") + "\"";
+    json += ",\"deep_scan_age_ms\":" + String(deepScanAgeMs);
+    json += ",\"scan_duration_us\":" + String(cachedI2CScanDurationUs);
+    json += ",\"device_count\":" + String(cachedI2CDeviceCount);
+    json += ",\"devices\":" + cachedI2CDevicesJson;
+    json += ",\"probe_failures\":" + String(i2cProbeFailures);
+
+    json += ",\"code_histogram\":{";
+    json += "\"0\":" + String(i2cCodeHistogram[0]);
+    json += ",\"1\":" + String(i2cCodeHistogram[1]);
+    json += ",\"2\":" + String(i2cCodeHistogram[2]);
+    json += ",\"3\":" + String(i2cCodeHistogram[3]);
+    json += ",\"4\":" + String(i2cCodeHistogram[4]);
+    json += ",\"other\":" + String(i2cCodeHistogram[5]);
+    json += "}";
+
+    json += ",\"panels\":{";
+    json += "\"addr\":\"0x40\"";
+    json += ",\"ok\":" + String(cachedPanelsOk ? "true" : "false");
+    json += ",\"last_code\":" + String(cachedPanelsCode);
+    json += ",\"last_ok_ms\":" + String(cachedPanelsLastOkMs);
+    json += ",\"last_fail_ms\":" + String(cachedPanelsLastFailMs);
+    json += ",\"consecutive_failures\":" + String(cachedPanelsConsecutiveFailures);
+    json += "}";
+
+    json += ",\"holos\":{";
+    json += "\"addr\":\"0x41\"";
+    json += ",\"ok\":" + String(cachedHolosOk ? "true" : "false");
+    json += ",\"last_code\":" + String(cachedHolosCode);
+    json += ",\"last_ok_ms\":" + String(cachedHolosLastOkMs);
+    json += ",\"last_fail_ms\":" + String(cachedHolosLastFailMs);
+    json += ",\"consecutive_failures\":" + String(cachedHolosConsecutiveFailures);
+    json += "}";
+
+    json += ",\"operator\":{";
+    json += "\"faults\":" + faults;
+    json += ",\"hints\":" + hints;
+    json += ",\"code_meaning\":{";
+    json += "\"0\":\"ok\"";
+    json += ",\"1\":\"buffer_overflow\"";
+    json += ",\"2\":\"address_nack\"";
+    json += ",\"3\":\"data_nack\"";
+    json += ",\"4\":\"other_error\"";
+    json += ",\"5\":\"timeout\"";
+    json += "}";
+    json += "}";
+
+    json += "}";
+    return json;
 }
 
 static void scheduleReboot(uint32_t delayMs)
@@ -324,6 +512,10 @@ static String buildHealthJson()
     bool holosOk  = cachedHolosOk;
     json += "\"i2c_panels\":" + String(panelsOk ? "true" : "false");
     json += ",\"i2c_holos\":" + String(holosOk ? "true" : "false");
+    json += ",\"i2c_panels_code\":" + String(cachedPanelsCode);
+    json += ",\"i2c_holos_code\":" + String(cachedHolosCode);
+    json += ",\"i2c_panels_fail_streak\":" + String(cachedPanelsConsecutiveFailures);
+    json += ",\"i2c_holos_fail_streak\":" + String(cachedHolosConsecutiveFailures);
 
     // Sound module — check if not disabled
     // sMarcSound is the global MarcSound instance in .ino
@@ -433,6 +625,12 @@ static void initAsyncWeb()
     asyncServer.on("/api/health", HTTP_GET, [](AsyncWebServerRequest *request)
     {
         request->send(200, "application/json", buildHealthJson());
+    });
+
+    asyncServer.on("/api/diag/i2c", HTTP_GET, [](AsyncWebServerRequest *request)
+    {
+        bool forceScan = request->hasParam("force") && request->getParam("force")->value() == "1";
+        request->send(200, "application/json", buildI2CDiagnosticsJson(forceScan));
     });
 
     // ---- REST API: Get log lines ----
@@ -751,7 +949,7 @@ static void asyncWebLoop()
     // (I2C scan takes ~100ms so keep interval long)
     if (now - lastHealthBroadcast >= 30000)
     {
-        refreshI2CHealthCache(true);
+        refreshI2CHealthCache(false);
         String json = "{\"type\":\"health\",\"data\":" + buildHealthJson() + "}";
         ws.textAll(json);
         lastHealthBroadcast = now;

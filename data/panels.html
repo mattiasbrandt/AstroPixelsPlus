@@ -21,6 +21,16 @@
     <a href="/sequences.html">Sequences</a>
   </nav>
 
+  <div class="card" id="panel-health-card">
+    <h3>Panel Servo Controller Status</h3>
+    <div id="panel-health-text" class="desc"><span class="dot yellow"></span>Checking controller health...</div>
+    <div id="panel-i2c-list" class="desc mt-4">Detected I2C devices: ...</div>
+    <div id="panel-i2c-codes" class="desc mt-4">I2C code: ...</div>
+    <div id="panel-i2c-hint" class="desc mt-4">Troubleshooting hint: ...</div>
+    <div class="mt-8"><button id="panel-deep-btn" class="btn" onclick="window.runPanelDeepDiag()">Run Deep I2C Scan</button></div>
+    <div id="panel-deep-result" class="desc mt-4">Deep scan result: not run yet. Full-bus scan checks addresses 0x01-0x7E.</div>
+  </div>
+
   <!-- All Panels -->
   <div class="card">
     <h3>All Panels</h3>
@@ -184,6 +194,124 @@
   <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>
   <script src="/app.js"></script>
   <script>
+    (function() {
+      var healthTextEl = document.getElementById('panel-health-text');
+      var i2cListEl = document.getElementById('panel-i2c-list');
+      var i2cCodesEl = document.getElementById('panel-i2c-codes');
+      var i2cHintEl = document.getElementById('panel-i2c-hint');
+      var deepResultEl = document.getElementById('panel-deep-result');
+      var deepBtnEl = document.getElementById('panel-deep-btn');
+      var healthCardEl = document.getElementById('panel-health-card');
+
+      function setHealthText(html) {
+        if (healthTextEl) healthTextEl.innerHTML = html;
+      }
+
+      function updatePanelHealth(h) {
+        if (!h || typeof h.i2c_panels === 'undefined') return;
+
+        if (h.i2c_panels) {
+          if (healthCardEl) healthCardEl.style.borderLeftColor = 'var(--success)';
+          setHealthText('<span class="dot green"></span>Panel servo controller detected at I2C 0x40. Panel movement commands should reach hardware.');
+        } else {
+          if (healthCardEl) healthCardEl.style.borderLeftColor = 'var(--warning)';
+          setHealthText('<span class="dot yellow"></span>No panel servo controller detected at I2C 0x40. Check panel controller power/wiring.');
+        }
+
+        if (i2cListEl) {
+          if (h.i2c_devices && h.i2c_devices.length > 0) {
+            i2cListEl.textContent = 'Detected I2C devices: ' + h.i2c_devices.join(', ');
+          } else {
+            i2cListEl.textContent = 'Detected I2C devices: none';
+          }
+        }
+      }
+
+      function updatePanelDiag(d) {
+        if (!d || !d.panels) return;
+        if (i2cCodesEl) {
+          i2cCodesEl.textContent =
+            'I2C code/streak for panel controller (0x40): code ' + d.panels.last_code +
+            ', failures ' + d.panels.consecutive_failures +
+            ' | scan age ' + d.scan_age_ms + ' ms';
+        }
+
+        if (i2cHintEl) {
+          var hint = '';
+          if (d.operator && d.operator.hints && d.operator.hints.length > 0) {
+            hint = d.operator.hints[0];
+          }
+          i2cHintEl.textContent = hint
+            ? ('Troubleshooting hint: ' + hint)
+            : 'Troubleshooting hint: I2C checks are currently stable.';
+        }
+      }
+
+      function setDeepStateRunning() {
+        if (deepBtnEl) {
+          deepBtnEl.disabled = true;
+          deepBtnEl.textContent = 'Running Deep I2C Scan...';
+        }
+        if (deepResultEl) {
+          deepResultEl.textContent = 'Deep scan result: running full-bus scan (0x01-0x7E)...';
+        }
+      }
+
+      function setDeepStateIdle() {
+        if (deepBtnEl) {
+          deepBtnEl.disabled = false;
+          deepBtnEl.textContent = 'Run Deep I2C Scan';
+        }
+      }
+
+      function updateDeepResult(d) {
+        if (!deepResultEl || !d) return;
+        var faults = (d.operator && d.operator.faults && d.operator.faults.length) ? d.operator.faults.join(', ') : 'none';
+        var devices = (d.devices && d.devices.length) ? d.devices.join(', ') : 'none';
+        var status = (d.panels && d.panels.ok) ? 'panel controller detected' : 'panel controller missing';
+        var ts = new Date().toLocaleTimeString();
+        deepResultEl.textContent =
+          '[' + ts + '] Deep scan done (full bus 0x01-0x7E): ' + status +
+          '; devices=' + d.device_count +
+          ' [' + devices + ']' +
+          '; duration=' + d.scan_duration_us + ' us' +
+          '; faults=' + faults +
+          '; scan_mode=' + d.scan_mode + '.';
+      }
+
+      function refreshPanelDiag(force) {
+        var url = force ? '/api/diag/i2c?force=1' : '/api/diag/i2c';
+        if (force) setDeepStateRunning();
+        return fetch(url).then(function(r) { return r.json(); }).then(function(d) {
+          updatePanelDiag(d);
+          if (force) {
+            updateDeepResult(d);
+            if (typeof window.uiToast === 'function') window.uiToast('Deep I2C scan completed', d.panels && d.panels.ok ? '' : 'warn');
+          }
+          return d;
+        }).catch(function() {
+          if (i2cCodesEl) i2cCodesEl.textContent = 'I2C code: unable to read /api/diag/i2c';
+          if (i2cHintEl) i2cHintEl.textContent = 'Troubleshooting hint: diagnostics endpoint unavailable right now.';
+          if (force && deepResultEl) deepResultEl.textContent = 'Deep scan result: failed (cannot reach /api/diag/i2c).';
+          if (force && typeof window.uiToast === 'function') window.uiToast('Deep I2C scan failed', 'error');
+        }).finally(function() {
+          if (force) setDeepStateIdle();
+        });
+      }
+
+      window.runPanelDeepDiag = function() {
+        refreshPanelDiag(true);
+      };
+
+      fetch('/api/health').then(function(r) { return r.json(); }).then(updatePanelHealth).catch(function() {
+        setHealthText('<span class="dot red"></span>Unable to read /api/health right now.');
+      });
+      refreshPanelDiag(false);
+      setInterval(function() { refreshPanelDiag(false); }, 30000);
+
+      window.onHealthUpdate = updatePanelHealth;
+    })();
+
     function twoDigitPanel(v) {
       var n = String(v || '').replace(/\D/g, '');
       if (!n) n = '1';
