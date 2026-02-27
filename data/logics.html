@@ -65,6 +65,84 @@
     </div>
   </div>
 
+  <div class="card">
+    <h3>Custom effect</h3>
+    <div class="desc">Build custom AstroPixels logic effects with target, effect, color, speed, and duration controls.</div>
+
+    <div class="label-dim mt-8">Target</div>
+    <div class="btn-grid" id="aple-target-grid">
+      <button class="btn is-selected" type="button" data-logic="0" onclick="setApleTarget(0, this)">Both</button>
+      <button class="btn" type="button" data-logic="1" onclick="setApleTarget(1, this)">Front</button>
+      <button class="btn" type="button" data-logic="2" onclick="setApleTarget(2, this)">Rear</button>
+    </div>
+
+    <div class="label-dim mt-8">Effect</div>
+    <select id="aple-effect" onchange="updateAplePreview()">
+      <option value="0">00 - Normal</option>
+      <option value="1">01 - Alarm</option>
+      <option value="2">02 - Failure</option>
+      <option value="3">03 - Leia</option>
+      <option value="4">04 - March</option>
+      <option value="5" selected>05 - Solid Color</option>
+      <option value="6">06 - Flash Color</option>
+      <option value="7">07 - Flip Flop</option>
+      <option value="8">08 - Flip Flop Alt</option>
+      <option value="9">09 - Color Swap</option>
+      <option value="10">10 - Rainbow</option>
+      <option value="11">11 - Red Alert</option>
+      <option value="12">12 - Mic Bright</option>
+      <option value="13">13 - Mic Rainbow</option>
+      <option value="14">14 - Lights Out</option>
+      <option value="15">15 - Text</option>
+      <option value="16">16 - Text Scroll Left</option>
+      <option value="17">17 - Text Scroll Right</option>
+      <option value="18">18 - Text Scroll Up</option>
+      <option value="19">19 - Roaming Pixel</option>
+      <option value="20">20 - Horizontal Scan</option>
+      <option value="21">21 - Vertical Scan</option>
+      <option value="22">22 - Fire</option>
+      <option value="23">23 - PSI Color Wipe</option>
+      <option value="24">24 - Pulse</option>
+      <option value="99">99 - Random</option>
+    </select>
+
+    <div class="label-dim mt-8">Color</div>
+    <div class="aple-color-grid" id="aple-color-grid">
+      <button class="aple-color-chip is-selected" type="button" data-color="0" onclick="setApleColor(0, this)"><span class="dot" style="background:#8c98a8"></span>Default</button>
+      <button class="aple-color-chip" type="button" data-color="1" onclick="setApleColor(1, this)"><span class="dot" style="background:#d94949"></span>Red</button>
+      <button class="aple-color-chip" type="button" data-color="2" onclick="setApleColor(2, this)"><span class="dot" style="background:#e88f3d"></span>Orange</button>
+      <button class="aple-color-chip" type="button" data-color="3" onclick="setApleColor(3, this)"><span class="dot" style="background:#dcbf3a"></span>Yellow</button>
+      <button class="aple-color-chip" type="button" data-color="4" onclick="setApleColor(4, this)"><span class="dot" style="background:#3db769"></span>Green</button>
+      <button class="aple-color-chip" type="button" data-color="5" onclick="setApleColor(5, this)"><span class="dot" style="background:#3dc9c4"></span>Cyan</button>
+      <button class="aple-color-chip" type="button" data-color="6" onclick="setApleColor(6, this)"><span class="dot" style="background:#4e86dd"></span>Blue</button>
+      <button class="aple-color-chip" type="button" data-color="7" onclick="setApleColor(7, this)"><span class="dot" style="background:#8450d9"></span>Purple</button>
+      <button class="aple-color-chip" type="button" data-color="8" onclick="setApleColor(8, this)"><span class="dot" style="background:#c155d8"></span>Magenta</button>
+      <button class="aple-color-chip" type="button" data-color="9" onclick="setApleColor(9, this)"><span class="dot" style="background:#d95f9b"></span>Pink</button>
+    </div>
+
+    <div class="label-dim mt-8">Speed / Sensitivity</div>
+    <div class="row-10 mt-4">
+      <span class="value-label">0</span>
+      <input type="range" id="aple-speed" class="sound-range" min="0" max="9" value="5" oninput="document.getElementById('aple-speed-val').textContent=this.value;updateAplePreview()">
+      <span class="value-label">9</span>
+      <span id="aple-speed-val" class="value-label">5</span>
+    </div>
+
+    <div class="label-dim mt-8">Duration (seconds)</div>
+    <div class="row-10 mt-4">
+      <span class="value-label">00</span>
+      <input type="range" id="aple-duration" class="sound-range" min="0" max="99" value="0" oninput="document.getElementById('aple-duration-val').textContent=pad2(this.value);updateAplePreview()">
+      <span class="value-label">99</span>
+      <span id="aple-duration-val" class="value-label">00</span>
+    </div>
+
+    <div class="label-dim mt-10">Command preview</div>
+    <div id="aple-preview" class="desc mt-4">@APLE0050500</div>
+    <div class="btn-grid mt-8 mb-0">
+      <button class="btn accent" type="button" onclick="sendApleBuilderCommand()">Send Custom Effect</button>
+    </div>
+  </div>
+
   <!-- Front Logic Display -->
   <div class="card">
     <h3>Front Logic Display (FLD)</h3>
@@ -191,6 +269,70 @@
   <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>
   <script src="/app.js"></script>
   <script>
+    var apleBuilderState = {
+      logic: 0,
+      color: 0
+    };
+
+    function pad2(v) {
+      var n = parseInt(v, 10);
+      if (!isFinite(n)) n = 0;
+      if (n < 0) n = 0;
+      if (n > 99) n = 99;
+      return n < 10 ? ('0' + n) : String(n);
+    }
+
+    function clampDigit(v) {
+      var n = parseInt(v, 10);
+      if (!isFinite(n)) return 0;
+      if (n < 0) return 0;
+      if (n > 9) return 9;
+      return n;
+    }
+
+    function setApleTarget(logic, el) {
+      apleBuilderState.logic = clampDigit(logic);
+      var buttons = document.querySelectorAll('#aple-target-grid .btn');
+      for (var i = 0; i < buttons.length; i++) {
+        buttons[i].classList.remove('is-selected');
+      }
+      if (el && el.classList) el.classList.add('is-selected');
+      updateAplePreview();
+    }
+
+    function setApleColor(color, el) {
+      apleBuilderState.color = clampDigit(color);
+      var chips = document.querySelectorAll('#aple-color-grid .aple-color-chip');
+      for (var i = 0; i < chips.length; i++) {
+        chips[i].classList.remove('is-selected');
+      }
+      if (el && el.classList) el.classList.add('is-selected');
+      updateAplePreview();
+    }
+
+    function getApleBuilderCommand() {
+      var effect = parseInt(document.getElementById('aple-effect').value, 10);
+      if (!isFinite(effect) || effect < 0) effect = 0;
+      if (effect > 99) effect = 99;
+      var speed = clampDigit(document.getElementById('aple-speed').value);
+      var duration = parseInt(document.getElementById('aple-duration').value, 10);
+      if (!isFinite(duration) || duration < 0) duration = 0;
+      if (duration > 99) duration = 99;
+
+      return '@APLE' + apleBuilderState.logic + pad2(effect) + apleBuilderState.color + speed + pad2(duration);
+    }
+
+    function updateAplePreview() {
+      var preview = document.getElementById('aple-preview');
+      if (!preview) return;
+      preview.textContent = getApleBuilderCommand();
+    }
+
+    function sendApleBuilderCommand() {
+      sendCmd(getApleBuilderCommand());
+      updateAplePreview();
+    }
+
     function clampScrollSpeed(v) {
       var n = parseInt(v, 10);
       if (!isFinite(n)) return 4;
@@ -209,6 +351,8 @@
       var speed = clampScrollSpeed(v);
       sendCmd('@3G' + speed);
     }
+
+    updateAplePreview();
   </script>
 </body>
 </html>

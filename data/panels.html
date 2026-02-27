@@ -21,7 +21,7 @@
     <a href="/sequences.html">Sequences</a>
   </nav>
 
-  <div class="card" id="panel-health-card">
+  <div class="card" id="panel-health-card" style="display:none;">
     <h3>Panel Servo Controller Status</h3>
     <div id="panel-health-text" class="desc"><span class="dot yellow"></span>Checking controller health...</div>
     <div id="panel-i2c-list" class="desc mt-4">Detected I2C devices: ...</div>
@@ -173,6 +173,23 @@
       <button class="btn" onclick="sendMovePosition()">Move (:MV)</button>
     </div>
 
+    <div class="row mt-8">
+      <label class="label-dim" for="cal-easing">Easing:</label>
+      <select id="cal-easing" class="flex-1" onchange="updateCalPreview()">
+        <option value="0" selected>0 - Standard</option>
+        <option value="1">1 - Ease In</option>
+        <option value="2">2 - Ease Out</option>
+        <option value="3">3 - Ease In/Out</option>
+        <option value="4">4 - Bounce</option>
+        <option value="5">5 - Elastic</option>
+        <option value="6">6 - Back</option>
+        <option value="7">7 - Smooth Step</option>
+        <option value="8">8 - Fast Start</option>
+        <option value="9">9 - Slow Start</option>
+      </select>
+      <button class="btn" onclick="setServoEasing()">Set (:SF)</button>
+    </div>
+
     <div class="btn-grid mt-8">
       <button class="btn accent" onclick="saveOpenPosition()">Save Open (#SO)</button>
       <button class="btn" onclick="saveClosedPosition()">Save Closed (#SC)</button>
@@ -181,6 +198,7 @@
 
     <div class="label-dim mt-8">Command preview:</div>
     <div id="cal-preview" class="desc mt-4">:MV011500</div>
+    <div id="cal-easing-preview" class="desc mt-4">:SF01$0</div>
 
     <div class="label-dim mt-10">Best Practice Panel Adjustment</div>
     <div class="desc mt-4">3) Use <code>:MVxxdddd</code> to explore servo range.</div>
@@ -212,9 +230,11 @@
 
         if (h.i2c_panels) {
           if (healthCardEl) healthCardEl.style.borderLeftColor = 'var(--success)';
+          if (healthCardEl) healthCardEl.style.display = 'none';
           setHealthText('<span class="dot green"></span>Panel servo controller detected at I2C 0x40. Panel movement commands should reach hardware.');
         } else {
           if (healthCardEl) healthCardEl.style.borderLeftColor = 'var(--warning)';
+          if (healthCardEl) healthCardEl.style.display = '';
           setHealthText('<span class="dot yellow"></span>No panel servo controller detected at I2C 0x40. Check panel controller power/wiring.');
         }
 
@@ -304,6 +324,7 @@
       };
 
       fetch('/api/health').then(function(r) { return r.json(); }).then(updatePanelHealth).catch(function() {
+        if (healthCardEl) healthCardEl.style.display = '';
         setHealthText('<span class="dot red"></span>Unable to read /api/health right now.');
       });
       refreshPanelDiag(false);
@@ -337,9 +358,18 @@
       return fourDigitPos(document.getElementById('cal-pos').value);
     }
 
+    function selectedEasing() {
+      var n = parseInt(document.getElementById('cal-easing').value, 10);
+      if (!isFinite(n)) n = 0;
+      if (n < 0) n = 0;
+      if (n > 9) n = 9;
+      return String(n);
+    }
+
     function updateCalPreview() {
       var cmd = ':MV' + selectedPanel() + selectedPos();
       document.getElementById('cal-preview').textContent = cmd;
+      document.getElementById('cal-easing-preview').textContent = ':SF' + selectedPanel() + '$' + selectedEasing();
     }
 
     function sendMovePosition() {
@@ -364,6 +394,13 @@
       var cmd = '#SW' + selectedPanel();
       sendCmd(cmd);
       document.getElementById('cal-preview').textContent = cmd;
+    }
+
+    function setServoEasing() {
+      var cmd = ':SF' + selectedPanel() + '$' + selectedEasing();
+      sendCmd(cmd);
+      document.getElementById('cal-preview').textContent = cmd;
+      document.getElementById('cal-easing-preview').textContent = cmd;
     }
 
     updateCalPreview();

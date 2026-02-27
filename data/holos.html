@@ -21,7 +21,7 @@
     <a href="/sequences.html">Sequences</a>
   </nav>
 
-  <div class="card" id="holo-health-card">
+  <div class="card" id="holo-health-card" style="display:none;">
     <h3>Holo Servo Controller Status</h3>
     <div class="desc" id="holo-health-text">Checking controller availability...</div>
     <div class="i2c-list" id="holo-i2c-list"></div>
@@ -223,9 +223,11 @@
 
         if (h.i2c_holos) {
           if (healthCardEl) healthCardEl.style.borderLeftColor = 'var(--success)';
+          if (healthCardEl) healthCardEl.style.display = 'none';
           setHealthText('<span class="dot green"></span>Holo servo controller detected at I2C 0x41. Holo movement commands should reach hardware. Holo LED light control remains on the AstroPixels board.');
         } else {
           if (healthCardEl) healthCardEl.style.borderLeftColor = 'var(--warning)';
+          if (healthCardEl) healthCardEl.style.display = '';
           setHealthText('<span class="dot yellow"></span>No holo servo controller detected at I2C 0x41. Check holo controller power/wiring.');
         }
 
@@ -341,6 +343,7 @@
       };
 
       fetch('/api/health').then(function(r) { return r.json(); }).then(updateHoloHealth).catch(function() {
+        if (healthCardEl) healthCardEl.style.display = '';
         setHealthText('<span class="dot red"></span>Unable to read /api/health right now.');
       });
       refreshHoloDiag(false);

@@ -157,6 +157,54 @@
     return 'PSI indicator';
   }
 
+  function logicEffectName(id) {
+    var names = {
+      0: 'Normal',
+      1: 'Alarm',
+      2: 'Failure',
+      3: 'Leia',
+      4: 'March',
+      5: 'Solid Color',
+      6: 'Flash Color',
+      7: 'Flip Flop',
+      8: 'Flip Flop Alt',
+      9: 'Color Swap',
+      10: 'Rainbow',
+      11: 'Red Alert',
+      12: 'Mic Bright',
+      13: 'Mic Rainbow',
+      14: 'Lights Out',
+      15: 'Text',
+      16: 'Text Scroll Left',
+      17: 'Text Scroll Right',
+      18: 'Text Scroll Up',
+      19: 'Roaming Pixel',
+      20: 'Horizontal Scan',
+      21: 'Vertical Scan',
+      22: 'Fire',
+      23: 'PSI Color Wipe',
+      24: 'Pulse',
+      99: 'Random'
+    };
+    return names[id] || ('Effect ' + id);
+  }
+
+  function logicColorName(id) {
+    var names = {
+      0: 'Default',
+      1: 'Red',
+      2: 'Orange',
+      3: 'Yellow',
+      4: 'Green',
+      5: 'Cyan',
+      6: 'Blue',
+      7: 'Purple',
+      8: 'Magenta',
+      9: 'Pink'
+    };
+    return names[id] || ('Color ' + id);
+  }
+
   function describeCommand(cmd) {
     var m;
 
@@ -173,6 +221,8 @@
 
     m = cmd.match(/^:SE(\d{2})$/);
     if (m) return 'Run sequence ' + m[1];
+    m = cmd.match(/^:SF(\d{2})\$(\d)$/);
+    if (m) return 'Set servo easing for panel/group ' + m[1] + ' to profile ' + m[2];
 
     if (cmd === '*ON00') return 'Turn all holo lights on';
     if (cmd === '*OF00') return 'Turn all holo lights off';
@@ -208,6 +258,37 @@
     if (m) return 'Set PSI mode ' + m[2] + ' on ' + psiTarget(m[1]);
     m = cmd.match(/^@[123]M/);
     if (m) return 'Send scroll text to logic display';
+    m = cmd.match(/^@APLE(\d+)$/);
+    if (m) {
+      var raw = m[1];
+      var logic = '0';
+      var payload = raw;
+      if (raw.length >= 7) {
+        logic = raw.charAt(0);
+        payload = raw.slice(1);
+      }
+
+      var duration = 0;
+      var speed = 0;
+      var color = 0;
+      var effect = 0;
+
+      if (payload.length >= 2) {
+        duration = parseInt(payload.slice(-2), 10) || 0;
+      }
+      if (payload.length >= 3) {
+        speed = parseInt(payload.charAt(payload.length - 3), 10) || 0;
+      }
+      if (payload.length >= 4) {
+        color = parseInt(payload.charAt(payload.length - 4), 10) || 0;
+      }
+      if (payload.length > 4) {
+        effect = parseInt(payload.slice(0, -4), 10) || 0;
+      }
+
+      return 'Run ' + logicEffectName(effect) + ' on ' + logicTarget(logic) +
+             ' (color ' + logicColorName(color) + ', speed ' + speed + ', duration ' + duration + 's)';
+    }
 
     if (cmd === '$R') return 'Play random sound';
     if (cmd === '$S') return 'Play scream sound';

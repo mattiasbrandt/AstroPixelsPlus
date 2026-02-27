@@ -364,6 +364,8 @@ table td {
   grid-template-columns: repeat(3, 1fr);
   gap: 4px;
   max-width: 240px;
+  margin-left: auto;
+  margin-right: auto;
 }
 .dir-pad .btn {
   min-width: 0;
@@ -597,10 +599,58 @@ table td {
   accent-color: var(--accent);
 }
 
+.aple-color-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.aple-color-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 10px;
+  background: var(--surface-alt);
+  color: var(--silver-bright);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.82em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.14s ease, box-shadow 0.14s ease, background 0.14s ease;
+}
+
+.aple-color-chip .dot {
+  margin-right: 0;
+  width: 10px;
+  height: 10px;
+}
+
+.aple-color-chip:hover {
+  border-color: var(--accent);
+  background: var(--surface);
+}
+
+.aple-color-chip.is-selected {
+  border-color: var(--accent-bright);
+  box-shadow: 0 0 0 2px rgba(106, 176, 255, 0.22);
+}
+
+#aple-preview {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-style: normal;
+  font-size: 0.85em;
+  color: var(--silver-bright);
+}
+
 /* Responsive: wider screens get more columns */
 @media (min-width: 400px) {
   .btn { min-width: 74px; }
   .dir-pad .btn { min-width: 0; }
+  .aple-color-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 }
 
 /* Ensure touch targets meet 44px minimum on small screens */
