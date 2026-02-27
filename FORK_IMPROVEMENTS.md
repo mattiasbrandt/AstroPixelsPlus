@@ -139,6 +139,23 @@ This file tracks fork-specific behavior and feature changes that differ from ups
   - `Sound Playback Module: Enabled/Disabled`
   - Disabled reason is shown as either local preference or module setting.
 
+## 2026-02 I2C Diagnostics Clarity and Operator UX
+
+- Health model is intentionally split into two layers:
+  - **Quick health probes** for expected servo-controller roles (`0x40` panels, `0x41` holos) used by `/api/health` and periodic UI status.
+  - **Deep diagnostics scan** for full-bus discovery over `0x01-0x7E` used by `/api/diag/i2c?force=1`.
+- Deep diagnostics JSON now reports scan context and operator-facing details used in troubleshooting:
+  - `scan_mode` (`quick` or `deep`)
+  - `devices` and `device_count`
+  - `scan_duration_us` and `scan_age_ms`
+  - per-controller codes/streaks and `operator.faults` / `operator.hints`
+- Panels and Holos pages now expose explicit operator feedback for deep scans:
+  - running state text while deep scan is in progress,
+  - completion summary with timestamp, full-bus wording (`0x01-0x7E`), discovered addresses, duration, and faults,
+  - failure messaging when diagnostics endpoint is unreachable.
+- This wording update is deliberate to avoid implying deep scan is limited to expected addresses only.
+- Upstream context considered: `reeltwo/AstroPixelsPlus#10` reports wiring-doc confusion around holo address-bridge guidance; fork diagnostics copy now emphasizes what was actually scanned versus what is expected for role mapping.
+
 ## 2026-02 Validation Tooling
 
 ### Command compatibility matrix smoke runner
