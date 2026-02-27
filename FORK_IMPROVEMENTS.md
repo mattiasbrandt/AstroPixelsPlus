@@ -65,6 +65,8 @@ This file tracks fork-specific behavior and feature changes that differ from ups
   - `HP3 - Holoprojector 3 Top (THP)`
 - Default holo `*ONxx` behavior now starts in static mode instead of cycle animation.
 - Holos page now exposes stable per-projector effect controls (`Static`, `Cycle`, `Pulse`, `Rainbow`) and removes unsupported color-selection controls to avoid broken UX.
+- Holos position direction pads are centered for all three projectors to keep control alignment consistent across desktop/mobile layouts.
+- Holo servo status card visibility is now conditional: hidden when holo I2C health is green and shown only for warning/error states.
 
 ### Added sequence/mode coverage for compatibility and demos
 - Added sequence handlers:
@@ -191,6 +193,14 @@ This file tracks fork-specific behavior and feature changes that differ from ups
   - `0000`-`0180` as degrees (scaled per-servo), or
   - `0544`-`2500` as direct pulse width values.
 - Updated Panels calibration UI (`data/panels.html`) to expose extended compatibility targets (13/14/15).
+- Added direct servo easing control in Panels calibration UI via `:SFxx$easing` command builder and live preview.
+- Panel servo status card visibility is now conditional: hidden when panel I2C health is green and shown only for warning/error states.
+
+## 2026-02 Logic Effects UI Coverage
+
+- Added a new **Custom effect** builder card on Logics page to construct full `@APLE` commands from UI controls instead of relying on shortcut-only coverage.
+- Builder supports explicit target selection (both/front/rear), complete effect list, color chips, speed/sensitivity, and duration controls with live command preview.
+- Added shared command description parsing in `data/app.js` for `@APLE...` payloads and `:SFxx$easing` commands so tooltips and UI hints remain human-readable.
 
 ### Today's linked commits (2026-02-26)
 
