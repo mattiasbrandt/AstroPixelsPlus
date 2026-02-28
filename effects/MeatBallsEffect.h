@@ -122,7 +122,7 @@ static bool LogicEffectMetaBalls(LogicEngineRenderer& r)
                 G = 255;
             if (B > 255)
                 B = 255;
-            r.setPixelRGB(x, y, R*0.5, G*0.5, B*0.5);
+            r.setPixelRGB(x, y, R>>1, G>>1, B>>1);
         }
     }
     return true;

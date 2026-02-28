@@ -58,7 +58,7 @@ static bool LogicEffectFadeAndScroll(LogicEngineRenderer& r)
             unsigned w = r.width();
 
             if (fs_palette == kPaletteRandom)
-                fs_palette = Palette(random(int(kPaletteLast)));
+                fs_palette = Palette(random(int(kPaletteLast) + 1));
             if (fs_dir == kRandomDirection)
                 fs_dir = Direction(random(int(kLastDirection)));
             if (fs_scroll_type == kRandomType)
