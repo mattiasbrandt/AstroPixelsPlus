@@ -115,6 +115,26 @@ This file tracks fork-specific behavior and feature changes that differ from ups
 
 ## 2026-02 Reliability and Static-Analysis Hardening
 
+### Comprehensive Code Remediation (Phase 1)
+A full review of correctness, robustness, and static-analysis issues was completed. All findings addressed:
+
+| Category | Fix | File(s) |
+|----------|-----|---------|
+| **Memory** | C1: String reservation in JSON builders | `AsyncWebInterface.h` |
+| **Memory** | L5: F() macro wrapping for DEBUG_PRINT literals | `AstroPixelsPlus.ino` |
+| **Memory** | H1: Null-check heap allocations in effects | `effects/*Effect.h` |
+| **Correctness** | C3: stopRandom() boolean logic | `MarcduinoSound.h` |
+| **Correctness** | C4: Copy command buffer before parsing | `MarcduinoPanel.h` |
+| **Correctness** | C5: Remove dead return in BitmapEffect | `effects/BitmapEffect.h` |
+| **Correctness** | C7b: Replace FP color halving with bitshift | `effects/MeatBallsEffect.h` |
+| **Correctness** | C8: Fix palette random range off-by-one | `effects/FadeAndScrollEffect.h` |
+| **Docs** | L3: Document Makefile relative path dependency | `Makefile` |
+| **Analysis** | C2: Verified same-core I2C access (non-issue) | `AsyncWebInterface.h` |
+
+See `CRITICAL_FINDINGS.md` for detailed technical notes on each fix.
+
+### Correctness
+
 ### Correctness
 - Fixed MetaBalls stride/indexing to match buffer layout and prevent OOB behavior.
 - Fixed remote preference command-key mismatches for hostname/secret handling.
