@@ -412,7 +412,7 @@ void unmountFileSystems()
 // This function is called when settings have been changed and needs a reboot
 void reboot()
 {
-    DEBUG_PRINTLN("Restarting...");
+    DEBUG_PRINTLN(F("Restarting..."));
 #ifdef USE_DROID_REMOTE
     DisconnectRemote();
 #endif
@@ -581,10 +581,10 @@ static bool sArtooSignalActive;
 void scan_i2c()
 {
     unsigned nDevices = 0;
-    Serial.println("===========================================");
-    Serial.println("Scanning I2C addresses 0x01-0x7E...");
-    Serial.println("Expected: 0x40 (Panels), 0x41 (Holos)");
-    Serial.println("===========================================");
+    Serial.println(F("==========================================="));
+    Serial.println(F("Scanning I2C addresses 0x01-0x7E..."));
+    Serial.println(F("Expected: 0x40 (Panels), 0x41 (Holos)"));
+    Serial.println(F("==========================================="));
     
     for (byte address = 1; address < 127; address++)
     {
@@ -624,32 +624,32 @@ void scan_i2c()
 
         if (error == 0)
         {
-            Serial.print("✓ I2C device found at address 0x");
+            Serial.print(F("✓ I2C device found at address 0x"));
             if (address < 16)
-                Serial.print("0");
+                Serial.print(F("0"));
             Serial.print(address, HEX);
-            Serial.print(" ");
+            Serial.print(F(" "));
             Serial.println(name);
             nDevices++;
         }
         else if (error == 4)
         {
-            Serial.print("✗ Unknown error at address 0x");
+            Serial.print(F("✗ Unknown error at address 0x"));
             if (address < 16)
-                Serial.print("0");
+                Serial.print(F("0"));
             Serial.println(address, HEX);
         }
     }
-    Serial.println("===========================================");
+    Serial.println(F("==========================================="));
     if (nDevices == 0)
-        Serial.println("❌ NO I2C DEVICES FOUND!");
+        Serial.println(F("❌ NO I2C DEVICES FOUND!"));
     else
     {
-        Serial.print("✓ Found ");
+        Serial.print(F("✓ Found "));
         Serial.print(nDevices);
-        Serial.println(" I2C device(s)");
+        Serial.println(F(" I2C device(s)"));
     }
-    Serial.println("===========================================\n");
+    Serial.println(F("==========================================\n"));
 }
 
 ////////////////////////////////
@@ -660,7 +660,7 @@ void setup()
 
     if (!preferences.begin("astro", false))
     {
-        DEBUG_PRINTLN("Failed to init prefs");
+        DEBUG_PRINTLN(F("Failed to init prefs"));
     }
 #ifdef USE_WIFI
     wifiEnabled = preferences.getBool(PREFERENCE_WIFI_ENABLED, WIFI_ENABLED);
@@ -692,16 +692,16 @@ void setup()
     }
     if (!mountReadOnlyFileSystem())
     {
-        DEBUG_PRINTLN("Failed to mount read only filesystem");
+        DEBUG_PRINTLN(F("Failed to mount read only filesystem"));
     }
 
 #ifndef USE_I2C_ADDRESS
     Wire.begin();
-    Serial.println("\n=== I2C DIAGNOSTICS ===");
-    Serial.println("Initializing I2C on SDA=21, SCL=22");
+    Serial.println(F("\n=== I2C DIAGNOSTICS ==="));
+    Serial.println(F("Initializing I2C on SDA=21, SCL=22"));
     delay(100); // Give I2C time to settle
     scan_i2c();
-    Serial.println("=== END I2C DIAGNOSTICS ===\n");
+    Serial.println(F("=== END I2C DIAGNOSTICS ===\n"));
 #endif
     SetupEvent::ready();
     loadPersistedPanelCalibration();
@@ -724,7 +724,7 @@ void setup()
     sSoundInitAttempts = 0;
     if (!soundLocalEnabled)
     {
-        DEBUG_PRINTLN("Local sound execution disabled by preference");
+        DEBUG_PRINTLN(F("Local sound execution disabled by preference"));
     }
     else if (soundPlayer != MarcSound::kDisabled)
     {
@@ -734,7 +734,7 @@ void setup()
         sSoundInitModule = soundPlayer;
         sSoundInitStartup = soundStartup;
         sSoundInitVolume = preferences.getInt(PREFERENCE_MARCSOUND_VOLUME, MARC_SOUND_VOLUME) / 1000.0f;
-        DEBUG_PRINTLN("Sound module initialization scheduled (deferred)");
+        DEBUG_PRINTLN(F("Sound module initialization scheduled (deferred)"));
     }
     // Assign servos to holo projectors
     frontHolo.assignServos(&servoDispatch, 13, 14);
@@ -779,7 +779,7 @@ void setup()
             size_t pairedHostsSize = preferences.getBytesLength(PREFERENCE_REMOTE_PAIRED);
             unsigned numHosts = pairedHostsSize / sizeof(pairedHosts[0]);
             printf("numHosts: %d\n", numHosts);
-            Serial.print("WiFi.macAddress() : ");
+            Serial.print(F("WiFi.macAddress() : "));
             Serial.println(WiFi.macAddress());
             if (numHosts != 0)
             {
