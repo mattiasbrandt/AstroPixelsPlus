@@ -4,6 +4,22 @@ This file tracks fork-specific behavior and feature changes that differ from ups
 
 ---
 
+## Why This Fork Exists
+
+The original AstroPixelsPlus firmware is designed primarily for **live performance and remote-controlled operation** — driving R2-D2 around conventions with a radio controller, triggering actions via Marcduino serial commands from a body-mounted controller.
+
+**This fork takes a different approach.** My R2 operates mainly as a **static display piece** — positioned at exhibitions, photo opportunities, or in the workshop, where the goal is reliable, repeatable automation rather than real-time driving. This shifts the priorities:
+
+- **WiFi client mode** takes precedence over access-point-only operation. The dome controller joins the local network and stays accessible from any device on that LAN.
+- **Web-first control** is the primary interface. Instead of relying on a physical radio controller or serial-command infrastructure, actions are triggered through a proper browser-based UI — sequences, effects, panel choreography, and diagnostics are all one click away.
+- **Stability over responsiveness.** Since the droid isn't being driven in real-time, rock-solid uptime, memory safety, and predictable health monitoring matter more than shaving milliseconds off command latency.
+
+This philosophical difference explains the disproportionate effort spent on web-server hardening, async stability, health diagnostics, and the rich web UI — features that may be overkill for a convention-driving setup but are essential for a display-piece that needs to run unattended for hours and be operated by visitors or crew through a phone or tablet.
+
+---
+
+---
+
 ## Firmware Core
 
 Changes to the underlying platform, runtime, and stability foundation.
