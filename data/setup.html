@@ -36,7 +36,31 @@
       <a href="/firmware.html" class="btn link-btn">Firmware Update</a>
     </div>
   </div>
+  </div>
 
+  <div class="card">
+    <h3>Hardware Gadgets</h3>
+    <div class="desc">Enable or disable optional hardware components. Changes require reboot.</div>
+    <div class="stack-6">
+      <div class="toggle-row">
+        <label>BadMotivator</label>
+        <input type="checkbox" id="gadget-badmot" onchange="saveGadgetPref('badmot')">
+      </div>
+      <div class="toggle-row">
+        <label>FireStrip</label>
+        <input type="checkbox" id="gadget-firest" onchange="saveGadgetPref('firest')">
+      </div>
+      <div class="toggle-row">
+        <label>Charge Bay Indicator (CBI)</label>
+        <input type="checkbox" id="gadget-cbienb" onchange="saveGadgetPref('cbienb')">
+      </div>
+      <div class="toggle-row">
+        <label>DataPanel</label>
+        <input type="checkbox" id="gadget-dpenab" onchange="saveGadgetPref('dpenab')">
+      </div>
+    </div>
+    <div class="desc mt-8">Note: Hardware must be physically connected and build flags enabled in firmware.</div>
+  </div>
   <div class="card">
     <h3>Write API Token (Optional)</h3>
     <div class="desc">Used by this browser when write endpoints are protected</div>
@@ -111,6 +135,36 @@
     }
 
     refreshTokenStatus();
+
+    // Load gadget preferences on page load
+    fetch('/api/pref?keys=badmot,firest,cbienb,dpenab')
+      .then(function(r){return r.json();})
+      .then(function(prefs) {
+        document.getElementById('gadget-badmot').checked = prefs.badmot === 'true';
+        document.getElementById('gadget-firest').checked = prefs.firest === 'true';
+        document.getElementById('gadget-cbienb').checked = prefs.cbienb === 'true';
+        document.getElementById('gadget-dpenab').checked = prefs.dpenab === 'true';
+      })
+      .catch(function(err) {
+        console.warn('Failed to load gadget preferences:', err);
+      });
+
+    function saveGadgetPref(key) {
+      var checkbox = document.getElementById('gadget-' + key);
+      var value = checkbox.checked ? 'true' : 'false';
+      apiPostForm('/api/pref', 'key=' + key + '&val=' + value)
+        .then(function(resp) {
+          if (!resp.ok) throw new Error('save failed');
+          // Show subtle feedback
+          checkbox.style.opacity = '0.5';
+          setTimeout(function() { checkbox.style.opacity = '1'; }, 300);
+        })
+        .catch(function() {
+          alert('Failed to save ' + key + ' preference. Changes will take effect after reboot.');
+          // Revert checkbox on error
+          checkbox.checked = !checkbox.checked;
+        });
+    }
   </script>
 </body>
 </html>

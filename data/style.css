@@ -663,3 +663,25 @@ table td {
 @supports (padding: env(safe-area-inset-bottom)) {
   body { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
 }
+
+/* Gadget toggle rows */
+.toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-dim);
+}
+.toggle-row:last-child {
+  border-bottom: none;
+}
+.toggle-row label {
+  font-weight: 500;
+  color: var(--text);
+}
+.toggle-row input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  accent-color: var(--accent);
+}

@@ -11,7 +11,22 @@
 #include <WiFi.h>
 #include <ctype.h>
 #include "SPIFFS.h"
+#include "SPIFFS.h"
 #include "LogCapture.h"
+
+// Gadget includes for extern declarations
+#if AP_ENABLE_FIRESTRIP
+#include "dome/FireStrip.h"
+#endif
+#if AP_ENABLE_BADMOTIVATOR
+#include "dome/BadMotivator.h"
+#endif
+#if AP_ENABLE_CBI
+#include "body/ChargeBayIndicator.h"
+#endif
+#if AP_ENABLE_DATAPANEL
+#include "body/DataPanel.h"
+#endif
 
 // Forward declarations — these are defined in AstroPixelsPlus.ino
 extern void reboot();
@@ -37,8 +52,28 @@ extern bool enterSoftSleepMode();
 extern bool exitSoftSleepMode();
 extern String getConfiguredDroidName();
 
+// Gadget preference constants (must match AstroPixelsPlus.ino)
+#define PREFERENCE_BADMOTIVATOR_ENABLED "badmot"
+#define PREFERENCE_FIRESTRIP_ENABLED "firest"
+#define PREFERENCE_CBI_ENABLED "cbienb"
+#define PREFERENCE_DATAPANEL_ENABLED "dpenab"
+
 #ifdef USE_DROID_REMOTE
 extern bool sRemoteConnected;
+#endif
+
+// Gadget extern declarations
+#if AP_ENABLE_FIRESTRIP
+extern FireStrip fireStrip;
+#endif
+#if AP_ENABLE_BADMOTIVATOR
+extern BadMotivator badMotivator;
+#endif
+#if AP_ENABLE_CBI
+extern ChargeBayIndicator chargeBayIndicator;
+#endif
+#if AP_ENABLE_DATAPANEL
+extern DataPanel dataPanel;
 #endif
 
 // ESPAsyncWebServer objects — allocated once, no static init heap issues
@@ -569,6 +604,36 @@ static String buildHealthJson()
     json += ",\"min_free_heap\":" + String(sMinFreeHeap);
     json += ",\"i2c_probe_failures\":" + String(i2cProbeFailures);
 
+    // Gadget status
+    json += ",\"gadgets\":{";
+#if AP_ENABLE_BADMOTIVATOR
+    bool badmotEnabled = preferences.getBool(PREFERENCE_BADMOTIVATOR_ENABLED, false);
+    json += "\"badmotivator\":{\"enabled\":" + String(badmotEnabled ? "true" : "false") + ",\"present\":true}";
+#else
+    json += "\"badmotivator\":{\"enabled\":false,\"present\":false}";
+#endif
+#if AP_ENABLE_FIRESTRIP
+    bool firestripEnabled = preferences.getBool(PREFERENCE_FIRESTRIP_ENABLED, false);
+    json += ",\"firestrip\":{\"enabled\":" + String(firestripEnabled ? "true" : "false") + ",\"present\":true}";
+#else
+    json += ",\"firestrip\":{\"enabled\":false,\"present\":false}";
+#endif
+#if AP_ENABLE_CBI
+    bool cbiEnabled = preferences.getBool(PREFERENCE_CBI_ENABLED, false);
+    json += ",\"cbi\":{\"enabled\":" + String(cbiEnabled ? "true" : "false") + ",\"present\":true}";
+#else
+    json += ",\"cbi\":{\"enabled\":false,\"present\":false}";
+#endif
+#if AP_ENABLE_DATAPANEL
+    bool datapanelEnabled = preferences.getBool(PREFERENCE_DATAPANEL_ENABLED, false);
+    json += ",\"datapanel\":{\"enabled\":" + String(datapanelEnabled ? "true" : "false") + ",\"present\":true}";
+#else
+    json += ",\"datapanel\":{\"enabled\":false,\"present\":false}";
+#endif
+    json += "}";
+
+    json += "}";
+
     json += "}";
     return json;
 }
@@ -682,7 +747,10 @@ static void initAsyncWeb()
                 if (!first) json += ",";
                 first = false;
                 // Boolean keys: firmware uses getBool/putBool for these
-                if (key == "wifi" || key == "ap" || key == "remote" || key == "artoo" || key == "msoundlocal")
+                // Boolean keys: firmware uses getBool/putBool for these
+                if (key == "wifi" || key == "ap" || key == "remote" || key == "artoo" || key == "msoundlocal" ||
+                    key == PREFERENCE_BADMOTIVATOR_ENABLED || key == PREFERENCE_FIRESTRIP_ENABLED ||
+                    key == PREFERENCE_CBI_ENABLED || key == PREFERENCE_DATAPANEL_ENABLED)
                 {
                     bool val = preferences.getBool(key.c_str(), false);
                     json += "\"" + jsonEscape(key) + "\":" + (val ? "true" : "false");
@@ -743,6 +811,14 @@ static void initAsyncWeb()
                 if (key == "msoundlocal")
                 {
                     soundLocalEnabled = bval;
+                }
+                // Gadget preferences
+                else if (key == PREFERENCE_BADMOTIVATOR_ENABLED || key == PREFERENCE_FIRESTRIP_ENABLED ||
+                         key == PREFERENCE_CBI_ENABLED || key == PREFERENCE_DATAPANEL_ENABLED)
+                {
+                    // Just store the preference value, actual enable/disable happens on next reboot
+                    // or could be handled dynamically if needed
+                    logCapture.printf("[API] pref (gadget): %s = %s\n", key.c_str(), bval ? "true" : "false");
                 }
                 logCapture.printf("[API] pref (bool): %s = %s\n", key.c_str(), bval ? "true" : "false");
             }
@@ -807,6 +883,158 @@ static void initAsyncWeb()
             ? "{\"ok\":true,\"sleepMode\":false,\"changed\":true}"
             : "{\"ok\":true,\"sleepMode\":false,\"changed\":false}");
         broadcastState();
+    });
+
+    // ---- REST API: Smoke control ----
+    asyncServer.on("/api/smoke", HTTP_POST, [](AsyncWebServerRequest *request)
+    {
+        if (!checkWriteAuth(request))
+        {
+            request->send(401, "application/json", "{\"error\":\"unauthorized\"}");
+            return;
+        }
+        if (request->hasParam("state", true))
+        {
+            String state = request->getParam("state", true)->value();
+            if (state == "on")
+            {
+                processMarcduinoCommandWithSource("astropixel-web-api", "BMON");
+                request->send(200, "application/json", "{\"ok\":true,\"state\":\"on\"}");
+            }
+            else if (state == "off")
+            {
+                processMarcduinoCommandWithSource("astropixel-web-api", "BMOFF");
+                request->send(200, "application/json", "{\"ok\":true,\"state\":\"off\"}");
+            }
+            else
+            {
+                request->send(400, "application/json", "{\"error\":\"invalid state, use 'on' or 'off'\"}");
+            }
+        }
+        else
+        {
+            request->send(400, "application/json", "{\"error\":\"missing state param\"}");
+        }
+    });
+
+    // ---- REST API: Fire effects control ----
+    asyncServer.on("/api/fire", HTTP_POST, [](AsyncWebServerRequest *request)
+    {
+        if (!checkWriteAuth(request))
+        {
+            request->send(401, "application/json", "{\"error\":\"unauthorized\"}");
+            return;
+        }
+        if (request->hasParam("state", true))
+        {
+            String state = request->getParam("state", true)->value();
+            if (state == "on")
+            {
+                processMarcduinoCommandWithSource("astropixel-web-api", "FS11000");
+                request->send(200, "application/json", "{\"ok\":true,\"state\":\"on\"}");
+            }
+            else if (state == "off")
+            {
+                processMarcduinoCommandWithSource("astropixel-web-api", "FSOFF");
+                request->send(200, "application/json", "{\"ok\":true,\"state\":\"off\"}");
+            }
+            else
+            {
+                request->send(400, "application/json", "{\"error\":\"invalid state, use 'on' or 'off'\"}");
+            }
+        }
+        else
+        {
+            request->send(400, "application/json", "{\"error\":\"missing state param\"}");
+        }
+    });
+
+    // ---- REST API: CBI (Charge Bay Indicator) control ----
+    asyncServer.on("/api/cbi", HTTP_GET, [](AsyncWebServerRequest *request)
+    {
+        // Return current CBI state (simplified - no direct state tracking)
+        request->send(200, "application/json", "{\"ok\":true,\"state\":\"unknown\"}");
+    });
+
+    asyncServer.on("/api/cbi", HTTP_POST, [](AsyncWebServerRequest *request)
+    {
+        if (!checkWriteAuth(request))
+        {
+            request->send(401, "application/json", "{\"error\":\"unauthorized\"}");
+            return;
+        }
+        if (request->hasParam("action", true))
+        {
+            String action = request->getParam("action", true)->value();
+            if (action == "flicker")
+            {
+                String duration = request->hasParam("duration", true) ? 
+                    request->getParam("duration", true)->value() : "6";
+                String cmd = "CB2" + duration + "006";
+                processMarcduinoCommandWithSource("astropixel-web-api", cmd.c_str());
+                request->send(200, "application/json", "{\"ok\":true,\"action\":\"flicker\",\"duration\":\"" + duration + "\"}");
+            }
+            else if (action == "disable")
+            {
+                String duration = request->hasParam("duration", true) ? 
+                    request->getParam("duration", true)->value() : "8";
+                String cmd = "CB1" + duration + "008";
+                processMarcduinoCommandWithSource("astropixel-web-api", cmd.c_str());
+                request->send(200, "application/json", "{\"ok\":true,\"action\":\"disable\",\"duration\":\"" + duration + "\"}");
+            }
+            else
+            {
+                request->send(400, "application/json", "{\"error\":\"invalid action, use 'flicker' or 'disable'\"}");
+            }
+        }
+        else
+        {
+            request->send(400, "application/json", "{\"error\":\"missing action param\"}");
+        }
+    });
+
+    // ---- REST API: DataPanel control ----
+    asyncServer.on("/api/datapanel", HTTP_GET, [](AsyncWebServerRequest *request)
+    {
+        // Return current DataPanel state (simplified - no direct state tracking)
+        request->send(200, "application/json", "{\"ok\":true,\"state\":\"unknown\"}");
+    });
+
+    asyncServer.on("/api/datapanel", HTTP_POST, [](AsyncWebServerRequest *request)
+    {
+        if (!checkWriteAuth(request))
+        {
+            request->send(401, "application/json", "{\"error\":\"unauthorized\"}");
+            return;
+        }
+        if (request->hasParam("action", true))
+        {
+            String action = request->getParam("action", true)->value();
+            if (action == "flicker")
+            {
+                String duration = request->hasParam("duration", true) ? 
+                    request->getParam("duration", true)->value() : "6";
+                String cmd = "DP2" + duration + "006";
+                processMarcduinoCommandWithSource("astropixel-web-api", cmd.c_str());
+                request->send(200, "application/json", "{\"ok\":true,\"action\":\"flicker\",\"duration\":\"" + duration + "\"}");
+            }
+            else if (action == "disable")
+            {
+                String duration = request->hasParam("duration", true) ? 
+                    request->getParam("duration", true)->value() : "8";
+                String cmd = "DP1" + duration + "008";
+                processMarcduinoCommandWithSource("astropixel-web-api", cmd.c_str());
+                request->send(200, "application/json", "{\"ok\":true,\"action\":\"disable\",\"duration\":\"" + duration + "\"}");
+            }
+            else
+            {
+                request->send(400, "application/json", "{\"error\":\"invalid action, use 'flicker' or 'disable'\"}");
+            }
+        }
+        else
+        {
+            request->send(400, "application/json", "{\"error\":\"missing action param\"}");
+        }
     });
 
     // ---- Firmware upload (OTA via web) ----

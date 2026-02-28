@@ -38,6 +38,22 @@
 #define AP_DROID_NAME "AstroPixels"
 #endif
 
+
+#ifndef AP_ENABLE_BADMOTIVATOR
+#define AP_ENABLE_BADMOTIVATOR 0
+#endif
+
+#ifndef AP_ENABLE_FIRESTRIP
+#define AP_ENABLE_FIRESTRIP 0
+#endif
+
+#ifndef AP_ENABLE_CBI
+#define AP_ENABLE_CBI 0
+#endif
+
+#ifndef AP_ENABLE_DATAPANEL
+#define AP_ENABLE_DATAPANEL 0
+#endif
 #ifdef USE_WIFI
 #if AP_ENABLE_DROID_REMOTE
 #define USE_DROID_REMOTE // Define for droid remote support
@@ -108,7 +124,12 @@
 #define PREFERENCE_MARCSOUND_RANDOM_MAX "mrandommax"
 #define PREFERENCE_MARCSOUND_LOCAL_ENABLED "msoundlocal"
 #define PREFERENCE_DROID_NAME "dname"
+#define PREFERENCE_DROID_NAME "dname"
 
+#define PREFERENCE_BADMOTIVATOR_ENABLED "badmot"
+#define PREFERENCE_FIRESTRIP_ENABLED "firest"
+#define PREFERENCE_CBI_ENABLED "cbienb"
+#define PREFERENCE_DATAPANEL_ENABLED "dpenab"
 ////////////////////////////////
 
 #define CONSOLE_BUFFER_SIZE 300
@@ -208,20 +229,36 @@
 #define PIN_FRONT_HOLO 25
 #define PIN_REAR_HOLO 26
 #define PIN_TOP_HOLO 27
+#ifndef PIN_AUX1
 #define PIN_AUX1 2
+#endif
+#ifndef PIN_AUX2
 #define PIN_AUX2 4
+#endif
+#ifndef PIN_AUX3
 #define PIN_AUX3 5
+#endif
+#ifndef PIN_AUX4
 #define PIN_AUX4 18
+#endif
+#ifndef PIN_AUX5
 #define PIN_AUX5 19
+#endif
 
 #ifdef USE_RSERIES_RLD_CURVED
 // Define RSeries RLD clock pin to be AUX5 (could just as well be AUX1, AUX2, AUX3, or AUX4)
 #define PIN_REAR_LOGIC_CLOCK PIN_AUX5
 #endif
 
+#ifndef CBI_DATAIN_PIN
 #define CBI_DATAIN_PIN PIN_AUX3
+#endif
+#ifndef CBI_CLOCK_PIN
 #define CBI_CLOCK_PIN PIN_AUX2
+#endif
+#ifndef CBI_LOAD_PIN
 #define CBI_LOAD_PIN PIN_AUX1
+#endif
 
 ////////////////////////////////
 
@@ -259,16 +296,36 @@ HoloLights rearHolo(PIN_REAR_HOLO, HoloLights::kRGB, 2);
 HoloLights topHolo(PIN_TOP_HOLO, HoloLights::kRGB, 3);
 #endif
 
-// #if USE_FIRESTRIP_TEMPLATE
-//  FireStrip<PIN_AUX4> fireStrip;
-// #else
-//  FireStrip fireStrip(PIN_AUX4);
-// #endif
-//  BadMotivator badMotivator(PIN_AUX5);
+#if AP_ENABLE_FIRESTRIP
+#if USE_FIRESTRIP_TEMPLATE
+ FireStrip<PIN_AUX4> fireStrip;
+#else
+ FireStrip fireStrip(PIN_AUX4);
+#endif
+#endif
 
-// LedControlMAX7221<5> ledChain1(CBI_DATAIN_PIN, CBI_CLOCK_PIN, CBI_LOAD_PIN);
-// ChargeBayIndicator chargeBayIndicator(ledChain1);
-// DataPanel dataPanel(ledChain1);
+#if AP_ENABLE_BADMOTIVATOR
+ BadMotivator badMotivator(PIN_AUX5);
+#endif
+#if AP_ENABLE_CBI || AP_ENABLE_DATAPANEL
+LedControlMAX7221<5> ledChain1(CBI_DATAIN_PIN, CBI_CLOCK_PIN, CBI_LOAD_PIN);
+#if AP_ENABLE_CBI
+ChargeBayIndicator chargeBayIndicator(ledChain1);
+#endif
+#if AP_ENABLE_DATAPANEL
+DataPanel dataPanel(ledChain1);
+#endif
+#endif
+
+
+
+
+
+
+
+
+
+
 // TeecesPSI teecesPSI(ledChain1);
 // TeecesRearLogics teecesRLD(ledChain1);
 // TeecesFrontLogics teecesTFLD(ledChain1);
@@ -706,8 +763,13 @@ void setup()
     SetupEvent::ready();
     loadPersistedPanelCalibration();
 
-    // dataPanel.setSequence(DataPanel::kDisabled);
-    // chargeBayIndicator.setSequence(ChargeBayIndicator::kDisabled);
+    #if AP_ENABLE_DATAPANEL
+    dataPanel.setSequence(DataPanel::kDisabled);
+#endif
+#if AP_ENABLE_CBI
+    chargeBayIndicator.setSequence(ChargeBayIndicator::kDisabled);
+#endif
+
 
 #ifdef USE_LCD_SCREEN
     sDisplay.setEnabled(sDisplay.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS));

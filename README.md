@@ -3,14 +3,38 @@ Alternative firmware sketch for the AstroPixels boards
 
 ---
 
-## Fork Notes (mattiasbrandt)
+## About This Fork
 
-> [!NOTE]
-> This fork includes additional improvements: async web UI, command/sequence compatibility overlays, Artoo serial telemetry, sound execution toggles, remote-mode build gating, and reliability/health updates.
+This fork by **mattiasbrandt** extends the original AstroPixelsPlus firmware with enhanced capabilities for **static display installations** and **WiFi-based control systems**.
 
-> [!IMPORTANT]
-> Full fork-specific changes and rationale:
-> [`FORK_IMPROVEMENTS.md`](./FORK_IMPROVEMENTS.md)
+### 🎯 Primary Use Case: Static Display + Web Control
+
+While the original firmware excels at convention driving with radio controllers, this fork optimizes for:
+
+- **Exhibition setups** — Positioned displays that need reliable automation
+- **Photo opportunities** — Controlled via phone/tablet from any LAN device
+- **Workshop benches** — Web-based diagnostics and testing without physical remotes
+- **Visitor interaction** — Browser-based UI that anyone can operate
+
+### ✨ Key Enhancements
+
+| Feature | What It Does |
+|---------|--------------|
+| **Async Web UI** | Rich browser interface for control and diagnostics |
+| **Extended Marcduino Commands** | Additional compatibility overlays and sequences |
+| **Hardware Gadget Support** | Smoke, fire effects, CBI, DataPanel (optional) |
+| **Health Monitoring** | System status, I2C diagnostics, heap tracking |
+| **Artoo Telemetry** | Integration with R2 body control systems |
+| **Feature Toggles** | Build-time and runtime enablement of features |
+
+### 📖 Full Documentation
+
+For complete details on all changes, build instructions, and wiring guides:
+
+> **→ [`FORK_IMPROVEMENTS.md`](./FORK_IMPROVEMENTS.md)** — Comprehensive fork documentation
+> **→ [`docs/SETUP.md`](./docs/SETUP.md)** — Installation and configuration guide
+> **→ [`docs/HARDWARE_WIRING.md`](./docs/HARDWARE_WIRING.md)** — Wiring diagrams and hardware setup
+> **→ [`docs/COMMANDS.md`](./docs/COMMANDS.md)** — Extended command reference
 
 ---
 

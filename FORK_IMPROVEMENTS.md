@@ -73,7 +73,7 @@ Added API/health visibility fields: `artoo`, `artoo_enabled`, `artoo_baud`, `art
 Added `msoundlocal` preference. When disabled, sound commands may still be accepted but local playback/startup/random local sound behavior is not actuated.
 
 ### Code Remediation & Static-Analysis Hardening
-Comprehensive review of correctness, robustness, and static-analysis issues completed. All findings addressed — see `CRITICAL_FINDINGS.md` for detailed technical notes.
+Comprehensive review of correctness, robustness, and static-analysis issues completed. All findings addressed and merged to main.
 
 | Fix | Description | Commit |
 |-----|-------------|--------|
@@ -88,6 +88,198 @@ Comprehensive review of correctness, robustness, and static-analysis issues comp
 | L5 | F() macro for DEBUG_PRINT | `054893e`, `cd48053` |
 
 ---
+
+## Hardware Gadget Support
+
+Optional hardware add-ons that extend the static display experience beyond the core dome visuals. These gadgets are implemented via ReelTwo library components and are gated by build flags — unused gadgets compile out entirely.
+
+### Overview
+
+| Gadget | ReelTwo class | Wiring (default) | Build flag | Runtime pref key | Primary commands |
+|---|---|---|---|---|---|
+| BadMotivator (Smoke) | `BadMotivator` | `PIN_AUX5` (GPIO 19) | `AP_ENABLE_BADMOTIVATOR` | `badmot` | `#BMSMOKE`, `#BMSTOP`, `#BMPULSE<sec>`, `#BMAUTO,<min>,<max>` |
+| FireStrip (Fire) | `FireStrip` | `PIN_AUX4` (GPIO 18) | `AP_ENABLE_FIRESTRIP` | `firest` | `#FIRESPARK<ms>`, `#FIREBURN<ms>`, `#FIRESTOP` |
+| ChargeBayIndicator | `ChargeBayIndicator` | AUX bus `PIN_AUX1/2/3` (GPIO 2/4/5) | `AP_ENABLE_CBI` | `cbienb` | `#CBION`, `#CBIOFF`, `#CBISET<n>` |
+| DataPanel | `DataPanel` | AUX bus `PIN_AUX1/2/3` (GPIO 2/4/5) | `AP_ENABLE_DATAPANEL` | `dpenab` | `#DPON`, `#DPOFF`, `#DPSET<n>` |
+
+Notes:
+- All four gadget build flags default to `0` (disabled) in `platformio.ini`.
+- In addition to the `#...` Marcduino commands, the ReelTwo gadget classes also accept raw `CommandEvent` tokens used by built-in sequences and REST helpers.
+
+---
+
+### BadMotivator (Smoke Generator)
+
+**Purpose**: Controlled smoke/fog bursts for the "bad motivator" prop effect (dome smoke port), intended to create an attention-grabbing moment during static display.
+
+**Hardware**: A smoke/fog element driven through a relay or MOSFET module from a single ESP32 GPIO. Ensure the smoke element power is fused and that the ESP32 shares ground with the smoke power supply.
+
+| Parameter | Value |
+|---|---|
+| Default GPIO | `PIN_AUX5` (GPIO 19) |
+| Pin override | `-DPIN_AUX5=<gpio>` build flag |
+| Build flag | `-DAP_ENABLE_BADMOTIVATOR=1` |
+| Runtime pref key | `badmot` (bool) |
+| ReelTwo source | [`src/dome/BadMotivator.h`](https://github.com/reeltwo/Reeltwo/tree/master/src/dome/BadMotivator.h) |
+
+**Commands** (Marcduino `#` domain; see `docs/COMMANDS.md` for full details):
+
+| Command | Action |
+|---|---|
+| `#BMSMOKE` | Start smoke (continuous until stopped) |
+| `#BMSTOP` | Stop smoke immediately |
+| `#BMPULSE<sec>` | Timed smoke pulse (validated range `1–30`) |
+| `#BMAUTO,<min>,<max>` | Automatic random smoke bursts (validated range `1–60` seconds) |
+
+**Internal tokens** (raw ReelTwo `CommandEvent` strings used by built-in sequences/REST):
+
+| Token | Used by | Meaning |
+|---|---|---|
+| `BMON` | `/api/smoke` and sequences | Smoke on |
+| `BMOFF` | `/api/smoke` and sequences | Smoke off |
+
+**Safety notes**:
+- Prefer `#BMPULSE...` over continuous smoke for automation so the effect ends even if a stop command is lost.
+- Provide adequate ventilation and keep the smoke outlet/tubing away from wiring looms and servo linkages.
+- Add a fuse on the smoke element power line sized to your module (1A is a common starting point, but match the device spec).
+
+---
+
+### FireStrip (Fire Effects)
+
+**Purpose**: WS2812B fire/spark strip animation to visually complement smoke sequences and add ambient motion during static display.
+
+**Hardware**: WS2812B (NeoPixel-compatible) strip powered from a dedicated 5V supply. Data is a single GPIO. A firmware-side brightness cap is applied on the `#FIREBURN` command path.
+
+| Parameter | Value |
+|---|---|
+| Default data GPIO | `PIN_AUX4` (GPIO 18) |
+| Pin override | `-DPIN_AUX4=<gpio>` build flag |
+| Build flag | `-DAP_ENABLE_FIRESTRIP=1` |
+| Runtime pref key | `firest` (bool) |
+| Brightness cap | `FIRE_MAX_BRIGHTNESS = 200` (firmware wrapper) |
+| ReelTwo source | [`src/dome/FireStrip.h`](https://github.com/reeltwo/Reeltwo/tree/master/src/dome/FireStrip.h) |
+
+**Commands** (Marcduino `#` domain):
+
+| Command | Action |
+|---|---|
+| `#FIRESPARK<ms>` | Spark effect for `1–5000` ms |
+| `#FIREBURN<ms>` | Fire/burn effect for `1–10000` ms (brightness capped) |
+| `#FIRESTOP` | Stop effect immediately and turn strip off |
+
+**Internal tokens** (raw ReelTwo `CommandEvent` strings used by built-in sequences/REST):
+
+| Token | Meaning |
+|---|---|
+| `FS1<ms>` | Spark effect for `<ms>` milliseconds |
+| `FS2<ms>` | Burn effect for `<ms>` milliseconds |
+| `FSOFF` | Off |
+
+---
+
+### ChargeBayIndicator
+
+**Purpose**: Body Charge Bay Indicator animations (MAX7219 LED chain) to keep body electronics-looking visuals alive during long static sessions.
+
+**Hardware**: MAX7219 LED driver chain on the AstroPixels AUX bus (`PIN_AUX1/2/3`). Can share the same chain with the DataPanel.
+
+| Parameter | Value |
+|---|---|
+| Bus pins | `PIN_AUX1` (GPIO 2, LOAD/CS), `PIN_AUX2` (GPIO 4, CLK), `PIN_AUX3` (GPIO 5, DIN) |
+| Build flag | `-DAP_ENABLE_CBI=1` |
+| Runtime pref key | `cbienb` (bool) |
+| ReelTwo source | [`src/body/ChargeBayIndicator.h`](https://github.com/reeltwo/Reeltwo/tree/master/src/body/ChargeBayIndicator.h) |
+
+**Commands** (Marcduino `#` domain):
+
+| Command | Action |
+|---|---|
+| `#CBION` | Enable (default pattern) |
+| `#CBIOFF` | Disable (all LEDs off) |
+| `#CBISET<n>` | Set pattern index (`0–9`) |
+
+---
+
+### DataPanel
+
+**Purpose**: Body Data Panel animations (MAX7219 LED chain) to present continuous "operating" activity.
+
+**Hardware**: MAX7219 LED driver chain, typically on the same AUX bus and chain as the ChargeBayIndicator.
+
+| Parameter | Value |
+|---|---|
+| Bus pins | Shared AUX bus (`PIN_AUX1/2/3`) |
+| Build flag | `-DAP_ENABLE_DATAPANEL=1` |
+| Runtime pref key | `dpenab` (bool) |
+| ReelTwo source | [`src/body/DataPanel.h`](https://github.com/reeltwo/Reeltwo/tree/master/src/body/DataPanel.h) |
+
+**Commands** (Marcduino `#` domain):
+
+| Command | Action |
+|---|---|
+| `#DPON` | Enable (default pattern) |
+| `#DPOFF` | Disable (all LEDs off) |
+| `#DPSET<n>` | Set pattern index (`0–9`) |
+
+---
+
+### Feature Toggle System
+
+Gadgets are controlled at two levels:
+
+**Build-time flags** (`platformio.ini`) — when a flag is `0`, the gadget and its command handlers are compiled out.
+
+```ini
+build_flags =
+    -DAP_ENABLE_BADMOTIVATOR=0
+    -DAP_ENABLE_FIRESTRIP=0
+    -DAP_ENABLE_CBI=0
+    -DAP_ENABLE_DATAPANEL=0
+
+    ; Optional pin overrides
+    -DPIN_AUX4=18
+    -DPIN_AUX5=19
+```
+
+**Runtime preferences** (ESP32 NVS, namespace `astro`) — when a gadget is compiled in, it can be enabled/disabled without reflashing via the Setup page or `GET/POST /api/pref`:
+
+| Gadget | Preference key | Type |
+|---|---|---|
+| BadMotivator | `badmot` | bool |
+| FireStrip | `firest` | bool |
+| ChargeBayIndicator | `cbienb` | bool |
+| DataPanel | `dpenab` | bool |
+
+---
+
+### Health Integration Notes
+
+Gadget support and runtime enablement are reported in `/api/health` under a `gadgets` object:
+
+- `present: false` means the gadget was compiled out (build flag `0`).
+- `present: true` means the gadget code exists in this build; `enabled` is then read from NVS.
+- Gadget health is presence/enablement reporting only (no physical smoke/LED feedback channel).
+
+---
+
+### Why These Features Were Added
+
+This fork operates R2 primarily as a **static display piece**. For live-performance droids, effects are driven by operator timing. For unattended exhibition use, reliable ambient automation and memorable moments matter more than real-time control:
+
+- **BadMotivator smoke** creates an interactive moment without requiring an operator.
+- **FireStrip sparks and fire** provide a strong visual complement in low-light exhibition spaces.
+- **ChargeBayIndicator and DataPanel** keep the body looking "alive" during long display sessions.
+
+---
+
+### Reference Documentation
+
+| Document | Content |
+|---|---|
+| `docs/HARDWARE_WIRING.md` | Gadget wiring, pin assignments, AUX bus layout, and power notes |
+| `docs/COMMANDS.md` | Full gadget command reference (`#BM*`, `#FIRE*`, `#CBI*`, `#DP*`) with examples |
+| `docs/SETUP.md` | Build flag enablement, runtime toggles, and first-time verification steps |
 
 ## Marcduino Protocol Extensions
 
