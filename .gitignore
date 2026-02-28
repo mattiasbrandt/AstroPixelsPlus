@@ -22,3 +22,8 @@ tasks/bench-testing.md
 # Local agent scratch/state
 .cache/*
 tasks/todo.md
+.sisyphus/
+AGENTS.md
+CODE_REVIEW_*.md
+ESP32_CODE_REVIEW_TEMPLATE.md
+data/AGENTS.md
