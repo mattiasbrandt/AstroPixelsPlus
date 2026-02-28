@@ -1,6 +1,5 @@
 static bool LogicEffectBitmap(LogicEngineRenderer &r)
 {
-    return false;
     if (r.hasEffectChanged())
     {
         r.setEffectDelay(25);

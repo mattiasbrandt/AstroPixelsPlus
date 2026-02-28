@@ -15,6 +15,7 @@ static bool LogicEffectFractal(LogicEngineRenderer& r)
             unsigned w = r.width();
             color = new int[w*h];
             level = new int[w*h];
+            if (color == nullptr || level == nullptr) { delete[] color; delete[] level; color = nullptr; level = nullptr; return; }
             memset(color, '\0', sizeof(color[0]) * w * h);
             memset(level, '\0', sizeof(level[0]) * w * h);
             for (int x = 0; x < w; x++)
@@ -41,6 +42,7 @@ static bool LogicEffectFractal(LogicEngineRenderer& r)
         r.setEffectObject(new FractalObject(r));
     }
     FractalObject* obj = (FractalObject*)r.getEffectObject();
+    if (obj == nullptr || obj->color == nullptr || obj->level == nullptr) return true;
     unsigned h = r.height();
     unsigned w = r.width();
 

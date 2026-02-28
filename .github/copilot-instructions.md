@@ -167,41 +167,53 @@ MARCDUINO_ACTION(FailureSequence, @0T4, ({
 }))
 ```
 
-## ESP32 Memory Management - CRITICAL
+## ESP32 Memory Management
 
-### The Memory Crisis (Solved December 2025)
+### Historical Context (WebPages.h — Now Inactive)
 
-**Problem**: ESP32 static initialization crashes with `vApplicationGetIdleTaskMemory` assert failure  
-**Root Cause**: WButton constructors allocate heap memory via `malloc()` during global object construction **before** ESP32 heap is fully initialized  
-**Symptom**: Boot crashes when WButton count + String arrays exceed ~12-15KB heap
+> **Note:** `WebPages.h` is no longer included in the active build. The web interface
+> was migrated to `AsyncWebInterface.h` using `ESPAsyncWebServer`. The WButton static
+> initialization constraints described below applied to the old `WifiWebServer.h`-based
+> web server and are **no longer a concern** for the current codebase.
 
-### PROVEN SAFE LIMITS (WebPages.h)
+The old `WebPages.h` file still exists in the repository but is not compiled. It used
+ReelTwo's `WButton` components which allocated heap during static initialization, causing
+boot crashes on ESP32 when too many were used. This constraint does not apply to the
+current `AsyncWebInterface.h` implementation.
+
+### Current Web Interface (AsyncWebInterface.h)
+
+- Uses `ESPAsyncWebServer` — no static initialization heap constraints
+- Web routes defined in `initAsyncWeb()` at runtime, not at static init
+- No WButton count limits to worry about
+- SPIFFS serves static assets from `data/` directory
+- Responsive HTML/CSS/JavaScript served from `data/` folder
+
+### Memory Optimization History (Reference)
+
+**Previous Crisis (December 2025)**: When using `WebPages.h` with `WifiWebServer.h`:
+
+- **Problem**: ESP32 static initialization crashes with `vApplicationGetIdleTaskMemory` assert failure
+- **Root Cause**: WButton constructors allocated heap memory via `malloc()` during global object construction **before** ESP32 heap was fully initialized
+- **Symptom**: Boot crashes when WButton count + String arrays exceeded ~12-15KB heap
+- **Solution**: Migrated to `AsyncWebInterface.h` using `ESPAsyncWebServer` (runtime route definition, no static init heap)
+
+**PROVEN SAFE LIMITS (WebPages.h — Historical Reference Only):**
 ```cpp
-// TESTED DECEMBER 2025 - DO NOT EXCEED:
+// These limits applied to the old WebPages.h implementation (now inactive):
 // - Maximum ~50 WButton instances (each ≈200 bytes heap)
 // - Maximum 6-7 String arrays (total size matters)
 // - Combined: WButtons + String arrays < 12-15KB
-
-// CURRENT STABLE CONFIGURATION:
-// - 27 WButton instances (46% margin remaining)
-// - 8 String arrays (panelSequences, holoLights, etc.)
-// Result: ✅ 100% stable boots, zero crashes
+//
+// CURRENT ACTIVE CONFIGURATION (AsyncWebInterface.h):
+// - No WButton static init constraints
+// - Routes defined at runtime in initAsyncWeb()
+// - Memory-safe for dynamic content
 ```
 
-### Memory Test Results (Documented)
-| WButtons | String Arrays | Boot Result |
-|----------|---------------|-------------|
-| 27 | 8 | ✅ STABLE (current) |
-| 37 | 7 | ✅ BOOTS |
-| 44 | 6 | ✅ BOOTS |
-| 52 | 6 | ✅ BOOTS |
-| 54 | 7 (large) | ❌ CRASH |
-| 65 | 6 | ❌ CRASH |
-| 97 | 6 | ❌ CRASH (before refactor) |
+### Safe vs Unsafe Component Patterns (Historical Reference)
 
-### Safe vs Unsafe Component Patterns
-
-**SAFE (no heap during static init):**
+**SAFE (no heap during static init) — WebPages.h only:**
 - ✅ `W1()`, `WLabel()`, `WHR()` - simple elements
 - ✅ `WSlider()`, `WTextField()`, `WSelect()` - form inputs
 - ✅ `WHorizontalAlign()`, `WVerticalAlign()` - layouts
@@ -209,7 +221,7 @@ MARCDUINO_ACTION(FailureSequence, @0T4, ({
 - ✅ `int var;` (uninitialized) - no heap
 - ✅ Unicode arrows: ↖↑↗←●→↙↓↘
 
-**UNSAFE (heap allocation during static init):**
+**UNSAFE (heap allocation during static init) — WebPages.h only:**
 - ❌ Too many `WButton()` instances (limit ~50)
 - ❌ Too many `String arrays[]` (limit 6-7)
 - ❌ `WStyle()` - uses appendCSS (heap)
@@ -217,26 +229,7 @@ MARCDUINO_ACTION(FailureSequence, @0T4, ({
 - ❌ `String var = "value";` in global scope
 - ❌ `int var = 0;` (initialized) - avoid if possible
 
-### How to Count Instances (Troubleshooting)
-```powershell
-# PowerShell - Count WButtons
-(Get-Content WebPages.h | Select-String -Pattern '\bWButton\(' -AllMatches).Matches.Count
-
-# PowerShell - Count String arrays
-(Get-Content WebPages.h | Select-String -Pattern '^String .*\[\]').Count
-```
-
-### Memory Optimization Strategy Applied
-**Before (97 WButtons)**: Constant boot crashes  
-**After (27 WButtons)**: 100% stable
-
-**Changes Made:**
-1. Consolidated 70 WButtons into WSelect dropdowns (memory efficient)
-2. Removed non-moving panel buttons (P5, P6, P8, P9, P13)
-3. Removed redundant Back/Home navigation buttons
-4. Organized by function: Panels by location, Holos by type
-5. Kept 23-button margin for future features (27/50 limit)
-
+**Note**: These constraints are **historical** and only apply if reverting to `WebPages.h`. The current `AsyncWebInterface.h` has no such limitations.
 ## Web Interface Organization
 
 ### Panels Page (WebPages.h lines 72-170)
@@ -792,7 +785,7 @@ When reviewing or modifying this firmware:
 
 ## Key Takeaway for Copilot Agents
 
-This is a **heavily modified fork** of AstroPixelsPlus focused on **memory optimization** and **web UI improvements**. The critical constraint is **ESP32 static initialization memory** - WButton count must stay under 50 instances (currently at 27, leaving 46% margin).
+This is a **heavily modified fork** of AstroPixelsPlus focused on **async web interface** and **reliability improvements**. The web interface was migrated from `WebPages.h` (static WButton initialization) to `AsyncWebInterface.h` (runtime route definition), eliminating the previous ESP32 memory constraints.
 
 **Current Configuration**: Standard R2-D2 dome controller with:
 - 7 moving panels (P1-P4, P7, P10, P11)
@@ -802,13 +795,13 @@ This is a **heavily modified fork** of AstroPixelsPlus focused on **memory optim
 - MarcDuino serial on Serial2 (2400 baud)
 - Credenda fork enhancements (All Holos On/Off, enhanced sequences, STAR WARS startup)
 
-**Architecture**: ESP32 with ReelTwo framework, PCA9685 I2C servo controllers, WS2812B RGB LEDs, web-based control, OTA updates.
+**Architecture**: ESP32 with ReelTwo framework, PCA9685 I2C servo controllers, WS2812B RGB LEDs, async web-based control, OTA updates.
 
-**When helping with changes**: 
-1. Check WButton count FIRST before adding web features
+**When helping with changes**:
+1. Understand that `WebPages.h` is **dead code** (not compiled) — all web routes are in `AsyncWebInterface.h`
 2. Understand MarcDuino command format (`:`, `*`, `@`, `#` prefixes)
 3. Reference IMPROVEMENTS.md for recent refactoring details
-4. Test memory safety with boot stability
-5. Respect the 50-WButton limit (current: 27/50)
+4. Test on actual hardware (servos, LEDs, WiFi)
+5. Remember: This is the **dome controller** in a multi-controller R2 build (body and WiFi bridge are separate projects)
 
-**Integration context**: This is the **dome controller** in a multi-controller R2 build. The **body controller** (BetterDuino) and **WiFi bridge** (protoAstroControl) are separate projects in the same workspace.
+**No WButton memory constraints** — the async web server eliminates the static initialization heap issues that plagued the old `WebPages.h` implementation.

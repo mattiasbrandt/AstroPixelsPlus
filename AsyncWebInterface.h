@@ -237,6 +237,7 @@ static String buildStateJson()
     portEXIT_CRITICAL(&sArtooTelemetryMux);
 
     String json = "{";
+    json.reserve(512);
     String droidName = getConfiguredDroidName();
     json += "\"wifiEnabled\":" + String(wifiEnabled ? "true" : "false");
     json += ",\"remoteEnabled\":" + String(remoteEnabled ? "true" : "false");
@@ -441,6 +442,7 @@ static String buildI2CDiagnosticsJson(bool forceScan = false)
     hints += "]";
 
     String json = "{";
+    json.reserve(1024);
     json += "\"scan_age_ms\":" + String(scanAgeMs);
     json += ",\"scan_mode\":\"" + String(cachedLastScanWasDeep ? "deep" : "quick") + "\"";
     json += ",\"deep_scan_age_ms\":" + String(deepScanAgeMs);
@@ -505,6 +507,7 @@ static void scheduleReboot(uint32_t delayMs)
 static String buildHealthJson()
 {
     String json = "{";
+    json.reserve(768);
 
     // I2C device probes
     refreshI2CHealthCache();

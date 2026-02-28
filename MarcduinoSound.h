@@ -324,7 +324,7 @@ public:
 
     void stopRandom()
     {
-        fRandomEnabled = true;
+        fRandomEnabled = false;
     }
 
     void suspendRandom()
