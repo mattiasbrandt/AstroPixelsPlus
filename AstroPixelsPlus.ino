@@ -908,7 +908,7 @@ void setup()
                                                Serial.println(hostName);
                                                if (!MDNS.begin(hostName.c_str()))
                                                {
-                                                   DEBUG_PRINTLN("Error setting up MDNS responder!");
+                                                   DEBUG_PRINTLN(F("Error setting up MDNS responder!"));
                                                }
                                            }
 #endif
@@ -930,9 +930,9 @@ void setup()
             {
                 type = "filesystem";
             }
-            DEBUG_PRINTLN("OTA START"); })
+            DEBUG_PRINTLN(F("OTA START")); })
             .onEnd([]()
-                   { DEBUG_PRINTLN("OTA END"); })
+                   { DEBUG_PRINTLN(F("OTA END")); })
             .onProgress([](unsigned int progress, unsigned int total)
                         {
                             // float range = (float)progress / (float)total;
@@ -966,7 +966,7 @@ void setup()
         &eventTask,
         0);
 #endif
-    DEBUG_PRINTLN("Ready");
+    DEBUG_PRINTLN(F("Ready"));
     if (soundLocalEnabled && !sSoundInitPending)
     {
         sMarcSound.playStartSound();
@@ -1014,12 +1014,12 @@ MARCDUINO_ACTION(WifiToggle, #APWIFI, ({
                          if (wifiSetting)
                          {
                              preferences.putBool(PREFERENCE_WIFI_ENABLED, true);
-                             DEBUG_PRINTLN("WiFi Enabled");
+                             DEBUG_PRINTLN(F("WiFi Enabled"));
                          }
                          else
                          {
                              preferences.putBool(PREFERENCE_WIFI_ENABLED, false);
-                             DEBUG_PRINTLN("WiFi Disabled");
+                             DEBUG_PRINTLN(F("WiFi Disabled"));
                          }
                          reboot();
                      }
@@ -1049,12 +1049,12 @@ MARCDUINO_ACTION(RemoteToggle, #APREMOTE, ({
                          if (remoteSetting)
                          {
                              preferences.putBool(PREFERENCE_REMOTE_ENABLED, true);
-                             DEBUG_PRINTLN("Remote Enabled");
+                             DEBUG_PRINTLN(F("Remote Enabled"));
                          }
                          else
                          {
                              preferences.putBool(PREFERENCE_REMOTE_ENABLED, false);
-                             DEBUG_PRINTLN("Remote Disabled");
+                             DEBUG_PRINTLN(F("Remote Disabled"));
                          }
                          reboot();
                      }
@@ -1112,7 +1112,7 @@ MARCDUINO_ACTION(RemoteUnpair, #APUNPAIR, ({
 
 MARCDUINO_ACTION(ClearPrefs, #APZERO, ({
                      preferences.clear();
-                     DEBUG_PRINT("Clearing preferences. ");
+                     DEBUG_PRINT(F("Clearing preferences. "));
                      reboot();
                  }))
 
@@ -1144,7 +1144,7 @@ SMQMESSAGE(BUTTON, {
 ///////////////////////////////////////////////////////////////////////////////
 
 SMQMESSAGE(SELECT, {
-    DEBUG_PRINTLN("REMOTE ACTIVE");
+    DEBUG_PRINTLN(F("REMOTE ACTIVE"));
     sDisplay.setEnabled(true);
     sDisplay.switchToScreen(kMainScreen);
     sMainScreen.init();
@@ -1278,7 +1278,7 @@ bool enterSoftSleepMode()
     sSleepModeActive = true;
     sSleepModeSinceMs = millis();
     sSleepEnforceAtMs = sSleepModeSinceMs + kSleepTransitionScrollMs;
-    DEBUG_PRINTLN("Soft sleep mode enabled");
+    DEBUG_PRINTLN(F("Soft sleep mode enabled"));
     return true;
 }
 
@@ -1294,7 +1294,7 @@ bool exitSoftSleepMode()
 
     sSleepModeActive = false;
     sSleepModeSinceMs = 0;
-    DEBUG_PRINTLN("Soft sleep mode disabled");
+    DEBUG_PRINTLN(F("Soft sleep mode disabled"));
     return true;
 }
 
@@ -1315,9 +1315,9 @@ static void processMarcduinoCommandWithSourceMain(const char *source, const char
 #ifdef USE_I2C_ADDRESS
 I2CReceiverBase<CONSOLE_BUFFER_SIZE> i2cReceiver(USE_I2C_ADDRESS, [](char *cmd)
                                                  {
-    DEBUG_PRINT("[I2C] RECEIVED=\"");
+    DEBUG_PRINT(F("[I2C] RECEIVED=\""));
     DEBUG_PRINT(cmd);
-    DEBUG_PRINTLN("\"");
+    DEBUG_PRINTLN(F("\""));
     processMarcduinoCommandWithSourceMain("i2c-slave", cmd); });
 #endif
 
@@ -1357,7 +1357,7 @@ void mainLoop()
             if (preferences.getInt(PREFERENCE_MARCSOUND_RANDOM, MARC_SOUND_RANDOM))
                 sMarcSound.startRandomInSeconds(13);
             sSoundInitPending = false;
-            DEBUG_PRINTLN("Sound module initialized (deferred)");
+            DEBUG_PRINTLN(F("Sound module initialized (deferred)"));
         }
         else
         {
@@ -1365,7 +1365,7 @@ void mainLoop()
             if (sSoundInitAttempts >= 5)
             {
                 sSoundInitPending = false;
-                DEBUG_PRINTLN("FAILED TO INITALIZE SOUND MODULE");
+                DEBUG_PRINTLN(F("FAILED TO INITALIZE SOUND MODULE"));
             }
             else
             {
