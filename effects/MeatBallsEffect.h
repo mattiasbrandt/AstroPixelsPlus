@@ -34,6 +34,13 @@ static bool LogicEffectMetaBalls(LogicEngineRenderer& r)
             mb_dy = new int[mb_number];
             mb_vx = new int[mb_number * w];
             mb_vy = new int[mb_number * h];
+            if (!mb_px || !mb_py || !mb_dx || !mb_dy || !mb_vx || !mb_vy)
+            {
+                delete[] mb_px; delete[] mb_py; delete[] mb_dx;
+                delete[] mb_dy; delete[] mb_vx; delete[] mb_vy;
+                mb_px = mb_py = mb_dx = mb_dy = mb_vx = mb_vy = nullptr;
+                return;
+            }
             for (int j = 0; j < mb_number; j++)
             {
                 mb_px[j] = (int)(randomDouble() * w);
@@ -59,6 +66,7 @@ static bool LogicEffectMetaBalls(LogicEngineRenderer& r)
         r.setEffectObject(new MetaBallsObject(r));
     }
     MetaBallsObject* obj = (MetaBallsObject*)r.getEffectObject();
+    if (obj == nullptr || obj->mb_px == nullptr) return true;
     unsigned h = r.height();
     unsigned w = r.width();
 

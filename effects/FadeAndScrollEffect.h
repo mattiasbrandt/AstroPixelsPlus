@@ -125,7 +125,9 @@ static bool LogicEffectFadeAndScroll(LogicEngineRenderer& r)
                     /* ignore */
                     break;
             }
+            if (fs_lut == nullptr && fs_palette != kPaletteRandom) return;
             fs_height = new int[w * h];
+            if (fs_height == nullptr) { delete[] fs_lut; fs_lut = nullptr; return; }
             switch (fs_scroll_type)
             {
                 case kFlat:
@@ -258,6 +260,7 @@ static bool LogicEffectFadeAndScroll(LogicEngineRenderer& r)
         r.setEffectObject(new FadeObject(r));
     }
     FadeObject* obj = (FadeObject*)r.getEffectObject();
+    if (obj == nullptr || obj->fs_height == nullptr || obj->fs_lut == nullptr) return true;
     unsigned h = r.height();
     unsigned w = r.width();
     if (obj->fs_height == NULL || obj->fs_lut == NULL)
