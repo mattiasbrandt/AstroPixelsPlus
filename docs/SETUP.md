@@ -14,7 +14,7 @@
 4. [Compile-Time vs Runtime Enablement](#4-compile-time-vs-runtime-enablement)
 5. [Step-by-Step First-Time Setup](#5-step-by-step-first-time-setup)
 6. [Web UI Enablement Process](#6-web-ui-enablement-process)
-7. [Hardware Wiring Overview](#7-hardware-wiring-overview)
+7. [Hardware Wiring](#7-hardware-wiring)
 8. [Verification Steps](#8-verification-steps)
 9. [Feature Toggle System](#9-feature-toggle-system)
 10. [Safety Checklist](#10-safety-checklist)
@@ -447,144 +447,41 @@ http://astropixels.local
 
 ---
 
-## 7. Hardware Wiring Overview
+## 7. Hardware Wiring
 
-### ESP32 Pin Assignments
+For detailed wiring diagrams, power requirements, and step-by-step instructions, see:
 
-```
-┌────────────────────────────────────────────────────────────────┐
-│                    AstroPixels ESP32                           │
-│                                                                │
-│  LED OUTPUTS                                                   │
-│  PIN 15  ──→  Front Logic Displays (FLD) — WS2812B data       │
-│  PIN 33  ──→  Rear Logic Display (RLD) — WS2812B data         │
-│  PIN 32  ──→  Front PSI — WS2812B data                        │
-│  PIN 23  ──→  Rear PSI — WS2812B data                         │
-│  PIN 25  ──→  Front Holo RGB — WS2812B data                   │
-│  PIN 26  ──→  Rear Holo RGB — WS2812B data                    │
-│  PIN 27  ──→  Top Holo RGB — WS2812B data                     │
-│                                                                │
-│  I2C BUS (Servo Controllers)                                   │
-│  PIN 21  ──→  SDA                                             │
-│  PIN 22  ──→  SCL                                             │
-│                                                                │
-│  SERIAL                                                        │
-│  PIN 16  ──→  Serial2 RX  (MarcDuino commands in)            │
-│  PIN 17  ──→  Serial2 TX  (pass-through out)                  │
-│                                                                │
-│  AUXILIARY PINS (multipurpose — depends on build flags)        │
-│  PIN 2   ──→  AUX1: CBI Load                                  │
-│  PIN 4   ──→  AUX2: CBI Clock                                 │
-│  PIN 5   ──→  AUX3: CBI Data In                              │
-│  PIN 18  ──→  AUX4: Sound RX / FireStrip data                 │
-│  PIN 19  ──→  AUX5: Sound TX / BadMotivator / RLD curved clk  │
-└────────────────────────────────────────────────────────────────┘
-```
+> **→ [`HARDWARE_WIRING.md`](./HARDWARE_WIRING.md)**
 
-### I2C Servo Controllers (PCA9685)
-
-Two PCA9685 boards are required:
+### Basic AstroPixels Wiring
 
 ```
-I2C Address 0x40 — Dome Panels Controller
-  Ch  0  →  Small Panel 1  (front lower left)
-  Ch  1  →  Small Panel 2  (front lower right)
-  Ch  2  →  Small Panel 3  (left side lower)
-  Ch  3  →  Small Panel 4  (right side lower)
-  Ch  4  →  Medium Panel 5 (Magic Panel — fixed, no servo)
-  Ch  5  →  Large Panel 6  (front upper)
-  Ch  6  →  Mini Panel A
-  Ch  7  →  Mini Panel B
-  Ch  8  →  Pie Panel 7
-  Ch  9  →  Pie Panel 8
-  Ch 10  →  Pie Panel 9
-  Ch 11  →  Pie Panel 10
-  Ch 12  →  Top Center Panel
-
-I2C Address 0x41 — Holoprojectors Controller
-  Ch  0  →  Front Holo — Horizontal servo
-  Ch  1  →  Front Holo — Vertical servo
-  Ch  2  →  Top Holo — Horizontal servo
-  Ch  3  →  Top Holo — Vertical servo
-  Ch  4  →  Rear Holo — Vertical servo
-  Ch  5  →  Rear Holo — Horizontal servo
+AstroPixels Board Connections:
+  PIN 15  →  Front Logic Displays (WS2812B)
+  PIN 33  →  Rear Logic Display (WS2812B)
+  PIN 32  →  Front PSI (WS2812B)
+  PIN 23  →  Rear PSI (WS2812B)
+  PIN 25  →  Front Holo (WS2812B)
+  PIN 26  →  Rear Holo (WS2812B)
+  PIN 27  →  Top Holo (WS2812B)
+  PIN 21  →  I2C SDA (PCA9685 servo controllers)
+  PIN 22  →  I2C SCL (PCA9685 servo controllers)
+  PIN 16  →  Serial2 RX (Marcduino commands)
+  PIN 17  →  Serial2 TX (Marcduino pass-through)
 ```
 
-> **I2C address jumpers:** Set the address on each PCA9685 board using the A0–A5 solder jumpers. For 0x40, all jumpers open (default). For 0x41, bridge only the A0 jumper.
+### Power Requirements
 
-### Gadget-Specific Wiring
+- **Logic:** 3.3V (from AstroPixels board)
+- **LEDs:** 5V external supply (not from ESP32 USB)
+- **Servos:** 5–6V external supply (high current, isolated)
+- **Common Ground:** All power supplies must share a common ground reference
 
-#### Bad Motivator (AP_ENABLE_BADMOTIVATOR=1)
-
-The Bad Motivator is a dome gadget with LEDs that smoke/spark. It connects to a single data pin.
-
-```
-BadMotivator data pin  →  PIN_AUX5 (default PIN 19)
-Power (5V)             →  5V supply (not ESP32)
-GND                    →  Common ground
-```
-
-> If `PIN_AUX5` conflicts with your sound module TX, you can remap using `-DPIN_AUX5=X` in `platformio.ini`.
-
-#### Fire Strip (AP_ENABLE_FIRESTRIP=1)
-
-The Fire Strip is an LED strip with a fire animation effect.
-
-```
-FireStrip data pin  →  PIN_AUX4 (default PIN 18)
-Power (5V)          →  5V supply (not ESP32)
-GND                 →  Common ground
-```
-
-> **Conflict note:** PIN_AUX4 doubles as Sound module RX. Do not enable both `AP_ENABLE_FIRESTRIP=1` and a sound module on the same pin without remapping.
-
-#### Charge Bay Indicator / Data Panel (AP_ENABLE_CBI=1 or AP_ENABLE_DATAPANEL=1)
-
-Both gadgets use a MAX7219 LED driver chain connected over SPI-like signals:
-
-```
-CBI / Data Panel  →  AUX3 (PIN 5)  — Data In
-CBI / Data Panel  →  AUX2 (PIN 4)  — Clock
-CBI / Data Panel  →  AUX1 (PIN 2)  — Load / CS
-Power (5V)        →  5V supply
-GND               →  Common ground
-```
-
-> You can enable CBI and DataPanel simultaneously on the same chain — they share the same `LedControlMAX7221` object.
-
-#### Sound Module (DFPlayer Mini)
-
-Sound is configured at runtime, not via a build flag. Wire it and enable it from the web UI:
-
-```
-DFPlayer Mini TX  →  PIN 18 (AUX4 / Sound RX)
-DFPlayer Mini RX  →  PIN 19 (AUX5 / Sound TX)
-DFPlayer Mini VCC →  5V supply
-DFPlayer Mini GND →  Common ground
-```
-
-Then in the web UI: **Setup** → **Sound** → select `DFPlayer Mini`.
-
-#### RSeries Logic Displays (Alternative Logic Hardware)
-
-If you use RSeries logic displays instead of standard AstroPixel displays:
-
-```ini
-; In AstroPixelsPlus.ino, uncomment the relevant line:
-#define USE_RSERIES_FLD         ; Front Logic Display (RSeries)
-#define USE_RSERIES_RLD         ; Rear Logic Display (RSeries, flat)
-#define USE_RSERIES_RLD_CURVED  ; Rear Logic Display (RSeries, curved — uses AUX5 as clock)
-```
-
-> These are code-level defines, not `platformio.ini` build flags. Edit `AstroPixelsPlus.ino` directly and rebuild.
-
-### Wiring Diagram
-
-See the included wiring diagram files in the repository root:
-- `Wiring-Diagram.pdf` — Full-resolution wiring reference
-- `Wiring-Diagram.png` — Quick-reference image
-
----
+See [`HARDWARE_WIRING.md`](./HARDWARE_WIRING.md) for complete wiring details including:
+- PCA9685 servo controller setup
+- Gadget wiring (BadMotivator, FireStrip, CBI, DataPanel)
+- Power architecture and DC-DC converters
+- Troubleshooting wiring issues
 
 ## 8. Verification Steps
 

@@ -1,17 +1,11 @@
 <!-- OMO_INTERNAL_INITIATOR -->
 
-# Hardware Wiring Guide — AstroPixelsPlus Gadgets
-
-**Covers:** BadMotivator (smoke), FireStrip (LED), CBI, DataPanel  
-**Board:** AstroPixels (ESP32-based) — https://we-make-things.co.uk/product/astropixels/  
-**Firmware:** AstroPixelsPlus (this repository)  
-**Reeltwo library:** https://github.com/reeltwo/Reeltwo (pinned: `23.5.3`)
-
+# Hardware Wiring Guide
 ---
 
 ## Table of Contents
 
-1. [AstroPixels Board Pin Reference](#1-astropixels-board-pin-reference)
+1. [PCA9685 Servo Controller Wiring](#1-pca9685-servo-controller-wiring)
 2. [FireStrip — WS2812B LED Strip](#2-firestrip--ws2812b-led-strip)
 3. [BadMotivator — Smoke Generator](#3-badmotivator--smoke-generator)
 4. [CBI — Charge Bay Indicator](#4-cbi--charge-bay-indicator)
@@ -24,72 +18,10 @@
 
 ---
 
-## 1. AstroPixels Board Pin Reference
-
-### Core Pin Assignments
-
-```cpp
-// I2C (for PCA9685 servo controllers — do not repurpose)
-PIN_SDA  = 21    // I2C Data
-PIN_SCL  = 22    // I2C Clock
-
-// RGB LED outputs (WS2812B NeoPixel data pins)
-PIN_FRONT_LOGIC = 15   // Front Logic Displays
-PIN_REAR_LOGIC  = 33   // Rear Logic Display
-PIN_FRONT_PSI   = 32   // Front PSI
-PIN_REAR_PSI    = 23   // Rear PSI
-PIN_FRONT_HOLO  = 25   // Front Holoprojector
-PIN_REAR_HOLO   = 26   // Rear Holoprojector
-PIN_TOP_HOLO    = 27   // Top Holoprojector
-
-// Serial2 (Marcduino commands — do not repurpose)
-SERIAL2_RX = 16
-SERIAL2_TX = 17
-
-// Auxiliary pins — shared/multipurpose (see §8 for conflicts)
-PIN_AUX1 = 2    // CBI LOAD  (chip-select)
-PIN_AUX2 = 4    // CBI CLK
-PIN_AUX3 = 5    // CBI DIN   (MOSI)
-PIN_AUX4 = 18   // FireStrip data  /OR/  Sound RX (Serial1)
-PIN_AUX5 = 19   // BadMotivator relay  /OR/  Sound TX (Serial1)
-                //                    /OR/  RLD clock (RSeries curved only)
-```
-
-### AUX Header on AstroPixels Board
-
-```
-AstroPixels board — AUX connector (physical pin order may vary, verify on silkscreen):
-
-  ┌──────────────────────────────────────────────────────┐
-  │  AUX1   AUX2   AUX3   AUX4   AUX5   3V3   5V   GND │
-  │  GP2    GP4    GP5    GP18   GP19                    │
-  └──────────────────────────────────────────────────────┘
-
-  AUX1 (GPIO 2)  → CBI LOAD   / CS
-  AUX2 (GPIO 4)  → CBI CLK
-  AUX3 (GPIO 5)  → CBI DIN    / MOSI
-  AUX4 (GPIO 18) → FireStrip data  [conflicts with Sound RX]
-  AUX5 (GPIO 19) → BadMotivator relay signal  [conflicts with Sound TX]
-```
-
-> **Note:** The 3V3 header is **logic only**. The board's 5V header is the same rail as
-> USB/VIN and is **not** a high-current distribution rail. Use a dedicated external 5V
-> supply (fused) for LED strips and MAX7221 devices, and treat the board 5V pin as a
-> convenience tap only — see §7.
-
-To explicitly pin the two gadget GPIOs at their defaults in PlatformIO:
-
-```ini
--DPIN_AUX4=18
--DPIN_AUX5=19
-```
-
----
-
-## 2. PCA9685 Servo Controller Wiring (Core Infrastructure)
+## 1. PCA9685 Servo Controller Wiring
 
 **Required for:** All servo-based dome functions (panels + holoprojectors)  
-**Not optional:** These boards are essential infrastructure — unlike the optional gadgets (FireStrip, BadMotivator, etc.), you cannot operate the dome without servo controllers.
+**Used for:** Dome panel and holoprojector servo control. These are the default and typical servo drivers for AstroPixels setups, though alternative servo control methods are possible.
 
 The AstroPixels firmware uses **two** Adafruit PCA9685 16-channel PWM servo driver boards communicating over I2C to control all dome servos:
 
@@ -362,9 +294,8 @@ Servo connector (female, looking at connector):
 
 ---
 
-## 3. FireStrip — WS2812B LED Strip
-
 ## 2. FireStrip — WS2812B LED Strip
+
 
 ### What it does
 
