@@ -16,46 +16,33 @@ including core commands and extended features.
 | **DataPanel** | `#DP*` | `MarcduinoEffects.h` |
 
 ---
-
 ## Table of Contents
 
 1. [Command Protocol Overview](#command-protocol-overview)
-2. [Feature Toggles](#feature-toggles)
-3. [REST API Endpoints](#rest-api-endpoints)
-4. [Configuration Commands](#configuration-commands)
-5. [Panel Commands](#panel-commands)
-6. [Logic Display Commands](#logic-display-commands)
-7. [Holo Projector Commands](#holo-projector-commands)
-8. [Sound Commands](#sound-commands)
-9. [Sequence Commands](#sequence-commands)
-10. [Panel Calibration Commands](#panel-calibration-commands)
-11. [Dynamic Panel Group Commands](#dynamic-panel-group-commands)
-12. [Direct Servo Commands](#direct-servo-commands)
-13. [Holo Projector — Position Commands](#holo-projector--position-commands)
-14. [Holo Projector — Random Movement Commands](#holo-projector--random-movement-commands)
-15. [Extended Logic Effects](#extended-logic-effects)
-16. [Extended Holo Commands](#extended-holo-commands)
-17. [BadMotivator — Smoke Commands](#badmotivator--smoke-commands)
-18. [FireStrip — Fire Commands](#firestrip--fire-commands)
-19. [CBI — Charge Bay Indicator Commands](#cbi--charge-bay-indicator-commands)
-20. [DataPanel Commands](#datapanel-commands)
-21. [ReelTwo Command Structure Reference](#reeltwo-command-structure-reference)
+2. [REST API Endpoints](#rest-api-endpoints)
+3. [Configuration Commands](#configuration-commands)
+4. [Panel Commands](#panel-commands)
+5. [Logic Display Commands](#logic-display-commands)
+6. [Holo Projector Commands](#holo-projector-commands)
+7. [Sound Commands](#sound-commands)
+8. [Sequence Commands](#sequence-commands)
+9. [Panel Calibration Commands](#panel-calibration-commands)
+10. [Dynamic Panel Group Commands](#dynamic-panel-group-commands)
+11. [Direct Servo Commands](#direct-servo-commands)
+12. [Holo Projector — Position Commands](#holo-projector--position-commands)
+13. [Holo Projector — Random Movement Commands](#holo-projector--random-movement-commands)
+14. [Extended Logic Effects](#extended-logic-effects)
+15. [Extended Holo Commands](#extended-holo-commands)
+16. [BadMotivator — Smoke Commands](#badmotivator--smoke-commands)
+17. [FireStrip — Fire Commands](#firestrip--fire-commands)
+18. [CBI — Charge Bay Indicator Commands](#cbi--charge-bay-indicator-commands)
+19. [DataPanel Commands](#datapanel-commands)
+20. [ReelTwo Command Structure Reference](#reeltwo-command-structure-reference)
 
-1. [Command Protocol Overview](#command-protocol-overview)
-2. [Feature Toggles](#feature-toggles)
-3. [REST API Endpoints](#rest-api-endpoints)
-4. [Configuration Commands](#configuration-commands)
-5. [Panel Commands](#panel-commands)
-6. [Logic Display Commands](#logic-display-commands)
-7. [Holo Projector Commands](#holo-projector-commands)
-8. [Holo Projector — Position Commands](#holo-projector--position-commands)
-9. [Holo Projector — Random Movement Commands](#holo-projector--random-movement-commands)
-10. [BadMotivator — Smoke Commands](#badmotivator--smoke-commands)
-11. [FireStrip — Fire Commands](#firestrip--fire-commands)
-12. [CBI — Charge Bay Indicator Commands](#cbi--charge-bay-indicator-commands)
-13. [DataPanel Commands](#datapanel-commands)
-14. [ReelTwo Command Structure Reference](#reeltwo-command-structure-reference)
+
+
 ---
+
 ## Command Protocol Overview
 
 All commands follow the MarcDuino serial protocol and must be terminated with `\r`
@@ -78,173 +65,72 @@ All commands follow the MarcDuino serial protocol and must be terminated with `\
 > 64 bytes. Keep commands, including parameters, well within this limit.
 
 ---
-## Feature Toggles
 
-The smoke, fire, CBI, and DataPanel commands are **compiled out by default**.
-Each gadget is gated by a build flag in `platformio.ini`:
-
-```ini
-# platformio.ini — build_flags section
--DAP_ENABLE_BADMOTIVATOR=1   # Enable smoke (#BM*) commands
--DAP_ENABLE_FIRESTRIP=1      # Enable fire (#FIRE*) commands
--DAP_ENABLE_CBI=1            # Enable charge bay (#CBI*) commands
--DAP_ENABLE_DATAPANEL=1      # Enable data panel (#DP*) commands
-```
-
-**Default state:** All four flags are set to `0` (disabled). Commands sent while a
-feature is disabled are silently ignored by the command parser.
-
-To enable a gadget, change the relevant flag from `0` to `1` in `platformio.ini`
-and rebuild/reflash. Hardware for the gadget must also be wired and configured in
-`AstroPixelsPlus.ino`.
-
----
 ## REST API Endpoints
 
-In addition to the Marcduino serial protocol, gadget commands are accessible via
-dedicated REST API endpoints for web-based control.
+Commands can be sent via REST API for web-based control.
 
-### Authentication
+### POST /api/cmd
 
-All gadget endpoints require authentication. Include the API token in the
-`Authorization` header or as a query parameter:
-
-```bash
-curl -H "Authorization: Bearer YOUR_API_TOKEN" http://192.168.4.1/api/smoke
-```
-
-### POST /api/smoke
-
-**Description:** Control BadMotivator smoke effects.
+**Description:** Send any Marcduino command via HTTP.
 
 **Parameters (form-data or query):**
 
-| Parameter | Values | Description |
-|-----------|--------|-------------|
-| `state` | `on`, `off` | Turn smoke on (BMON) or off (BMOFF) |
+| Parameter | Description |
+|-----------|-------------|
+| `cmd` | The Marcduino command (without `\r`) |
 
 **Examples:**
 
 ```bash
-# Turn smoke on
-curl -X POST http://192.168.4.1/api/smoke -d "state=on"
+# Open all panels
+curl -X POST http://192.168.4.1/api/cmd -d "cmd=:OP00"
 
-# Turn smoke off
-curl -X POST http://192.168.4.1/api/smoke -d "state=off"
+# Close all panels
+curl -X POST http://192.168.4.1/api/cmd -d "cmd=:CL00"
+
+# Trigger scream sequence
+curl -X POST http://192.168.4.1/api/cmd -d "cmd=:SE01"
+
+# Set front logics to red alert
+curl -X POST http://192.168.4.1/api/cmd -d "cmd=@0T5"
+
+# Play sound track 1
+curl -X POST http://192.168.4.1/api/cmd -d "cmd=\$1"
 ```
 
 **Response:**
 
 ```json
-{"ok":true,"state":"on"}
+{"ok":true}
 ```
 
-### POST /api/fire
+### GET /api/state
 
-**Description:** Control FireStrip fire effects.
+**Description:** Get current system state.
 
-**Parameters (form-data or query):**
-
-| Parameter | Values | Description |
-|-----------|--------|-------------|
-| `state` | `on`, `off` | Turn fire effect on (FS11000) or off (FSOFF) |
-
-**Examples:**
+**Example:**
 
 ```bash
-# Turn fire on
-curl -X POST http://192.168.4.1/api/fire -d "state=on"
-
-# Turn fire off
-curl -X POST http://192.168.4.1/api/fire -d "state=off"
+curl http://192.168.4.1/api/state
 ```
 
-**Response:**
+**Response:** System state JSON with panel positions, holo positions, logic effects, etc.
 
-```json
-{"ok":true,"state":"on"}
-```
+### GET /api/health
 
-### GET /api/cbi
+**Description:** Get system health status.
 
-**Description:** Get current Charge Bay Indicator state.
-
-**Response:**
-
-```json
-{"state":"unknown","gadget":"cbi"}
-```
-
-> Note: State is always `unknown` as the firmware does not track CBI state.
-
-### POST /api/cbi
-
-**Description:** Control Charge Bay Indicator effects.
-
-**Parameters (form-data or query):**
-
-| Parameter | Values | Description |
-|-----------|--------|-------------|
-| `action` | `flicker`, `disable` | Effect to activate |
-| `duration` | Integer (seconds) | Duration in seconds (default: 6 for flicker, 8 for disable) |
-
-**Examples:**
+**Example:**
 
 ```bash
-# Flicker effect for 6 seconds
-curl -X POST http://192.168.4.1/api/cbi -d "action=flicker"
-
-# Disable for 5 seconds
-curl -X POST http://192.168.4.1/api/cbi -d "action=disable&duration=5"
+curl http://192.168.4.1/api/health
 ```
 
-**Response:**
+**Response:** Health JSON with heap, I2C status, WiFi quality, etc.
 
-```json
-{"ok":true,"action":"flicker","duration":"6"}
-```
-
-### GET /api/datapanel
-
-**Description:** Get current DataPanel state.
-
-**Response:**
-
-```json
-{"state":"unknown","gadget":"datapanel"}
-```
-
-> Note: State is always `unknown` as the firmware does not track DataPanel state.
-
-### POST /api/datapanel
-
-**Description:** Control DataPanel effects.
-
-**Parameters (form-data or query):**
-
-| Parameter | Values | Description |
-|-----------|--------|-------------|
-| `action` | `flicker`, `disable` | Effect to activate |
-| `duration` | Integer (seconds) | Duration in seconds (default: 6 for flicker, 8 for disable) |
-
-**Examples:**
-
-```bash
-# Flicker effect for 6 seconds
-curl -X POST http://192.168.4.1/api/datapanel -d "action=flicker"
-
-# Disable for 3 seconds
-curl -X POST http://192.168.4.1/api/datapanel -d "action=disable&duration=3"
-```
-
-**Response:**
-
-```json
-{"ok":true,"action":"flicker","duration":"6"}
-```
 
 ---
-
 ## Configuration Commands
 
 **Source:** `AstroPixelsPlus.ino` · **Always enabled**
@@ -301,6 +187,14 @@ Panel commands control the dome panel servos via the PCA9685 controller at I2C a
 
 **Syntax:** `:OF00\r`
 
+**Description:** Rapidly opens and closes all dome panels in sequence, creating a "fluttering" effect. Each panel quickly moves to an intermediate open position and then closes, with panels firing in rapid succession for a rippling animation effect. Useful for showing off panel mechanics or creating attention-grabbing movements.
+
+**Use Cases:**
+- Demonstrating dome functionality
+- Attention-grabbing effect during displays
+- Testing panel servo response
+
+**Note:** Flutter is different from a standard open/close — panels move to partial positions and the motion overlaps between panels for a wave-like effect.
 **Description:** Flutters (rapidly opens and closes) all dome panels.
 
 ### `:CL<N>` — Close Panel N
@@ -340,7 +234,58 @@ Panel commands control the dome panel servos via the PCA9685 controller at I2C a
 |-----------|-------|-------------|
 | `<NN>` | 01–12 | Panel number to flutter |
 
+**Description:** Rapidly opens and closes a specific panel, creating a quick oscillating motion. The panel moves to a partial open position and back to closed several times in rapid succession.
+
+**Syntax:** `:OF<NN>\r`
+
+**Parameters:**
+
+| Parameter | Range | Description |
+|-----------|-------|-------------|
+| `<NN>` | 01–12 | Panel number to flutter |
+
 ### `:SF<servo>$<easing>` — Set Servo Easing
+
+**Syntax:** `:SF<servo>$<easing>\r`
+
+**Description:** Sets the motion easing curve for servo movements, controlling how smoothly panels accelerate and decelerate. Easing makes movements look more natural and mechanical by adding gradual acceleration instead of instant full-speed motion.
+
+**What is Easing?**
+Easing controls the acceleration curve of servo motion:
+- **Without easing (Linear/0):** Servo moves at constant speed — looks robotic and abrupt
+- **With easing:** Servo starts slow, accelerates, then decelerates to stop — looks natural and smooth
+
+**Parameters:**
+
+| Parameter | Range | Description |
+|-----------|-------|-------------|
+| `<servo>` | 0–15 or $ | Servo channel (0–15) or $ for all |
+| `<easing>` | 0–9 | Easing curve type (see table below) |
+
+**Easing Types:**
+
+| Value | Type | Best For |
+|-------|------|----------|
+| 0 | Linear | Testing, robotic look |
+| 1 | Ease In Quad | Gentle starts |
+| 2 | Ease Out Quad | Soft landings |
+| 3 | Ease In Out Quad | **General purpose — most natural** |
+| 4 | Ease In Cubic | Aggressive acceleration |
+| 5 | Ease Out Cubic | Strong deceleration |
+| 6 | Ease In Out Cubic | Heavy mechanical feel |
+| 7 | Ease In Quart | Very gentle start |
+| 8 | Ease Out Quart | Very soft landing |
+| 9 | Ease In Out Quart | Maximum smoothness |
+
+**Examples:**
+
+```
+:SF$3\r     → Set all servos to Ease In Out Quad (recommended)
+:SF5$2\r    → Set servo 5 to Ease Out Quad
+:SF$0\r     → Set all servos to Linear (no easing)
+```
+
+**Recommendation:** Use `3` (Ease In Out Quad) for most panel movements — it provides natural-looking motion without being too slow.
 
 **Syntax:** `:SF<servo>$<easing>\r`
 
