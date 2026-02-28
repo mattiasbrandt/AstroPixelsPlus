@@ -212,7 +212,10 @@ MARCDUINO_ACTION(FlutterAllPanels, :OF00, ({
 
 MARCDUINO_ACTION(SetServoEasing, :SF, ({
     uint32_t group = 0;
-    char* cmd = (char*)Marcduino::getCommand();
+    char cmdCopy[64];
+    strncpy(cmdCopy, Marcduino::getCommand(), sizeof(cmdCopy) - 1);
+    cmdCopy[sizeof(cmdCopy) - 1] = '\0';
+    char* cmd = cmdCopy;
     char* gstr = strchr(cmd, '$');
     if (gstr != nullptr)
     {
@@ -228,7 +231,10 @@ MARCDUINO_ACTION(SetServoEasing, :SF, ({
 
 MARCDUINO_ACTION(SetServoPosition, :SQ, ({
     int32_t args[4] = { 0, 0, 0, 0 };
-    char* cmd = (char*)Marcduino::getCommand();
+    char cmdCopy[64];
+    strncpy(cmdCopy, Marcduino::getCommand(), sizeof(cmdCopy) - 1);
+    cmdCopy[sizeof(cmdCopy) - 1] = '\0';
+    char* cmd = cmdCopy;
     uint8_t argcount = 0;
     numberparams(cmd, argcount, args, SizeOfArray(args));
     if (argcount >= 2)
@@ -239,7 +245,10 @@ MARCDUINO_ACTION(SetServoPosition, :SQ, ({
 
 MARCDUINO_ACTION(SetServoLimits, :SL, ({
     int32_t args[5] = { 0, 0, 0, 0, 0 };
-    char* cmd = (char*)Marcduino::getCommand();
+    char cmdCopy[64];
+    strncpy(cmdCopy, Marcduino::getCommand(), sizeof(cmdCopy) - 1);
+    cmdCopy[sizeof(cmdCopy) - 1] = '\0';
+    char* cmd = cmdCopy;
     uint8_t argcount = 0;
     numberparams(cmd, argcount, args, SizeOfArray(args));
     if (argcount >= 3)
@@ -255,7 +264,10 @@ MARCDUINO_ACTION(SetServoLimits, :SL, ({
 
 MARCDUINO_ACTION(MoveServos, :SM, ({
     int32_t args[5] = { 0, 0, 0, 0, 0 };
-    char* cmd = (char*)Marcduino::getCommand();
+    char cmdCopy[64];
+    strncpy(cmdCopy, Marcduino::getCommand(), sizeof(cmdCopy) - 1);
+    cmdCopy[sizeof(cmdCopy) - 1] = '\0';
+    char* cmd = cmdCopy;
     uint8_t argcount = 0;
     numberparams(cmd, argcount, args, SizeOfArray(args));
     if (argcount == 2)
@@ -278,7 +290,10 @@ MARCDUINO_ACTION(MoveServos, :SM, ({
 
 MARCDUINO_ACTION(OpenCloseRepeatPanelGroupDynamic, :OCR$, ({
     int32_t args[4] = { 10, 50, 0, 0 };
-    char* cmd = (char*)Marcduino::getCommand();
+    char cmdCopy[64];
+    strncpy(cmdCopy, Marcduino::getCommand(), sizeof(cmdCopy) - 1);
+    cmdCopy[sizeof(cmdCopy) - 1] = '\0';
+    char* cmd = cmdCopy;
     char* pstr = strchr(cmd, ',');
     if (pstr != nullptr)
     {
@@ -297,7 +312,10 @@ MARCDUINO_ACTION(OpenCloseRepeatPanelGroupDynamic, :OCR$, ({
 
 MARCDUINO_ACTION(FlutterPanelGroupDynamic, :OF$, ({
     int32_t args[4] = { 10, 50, 0, 0 };
-    char* cmd = (char*)Marcduino::getCommand();
+    char cmdCopy[64];
+    strncpy(cmdCopy, Marcduino::getCommand(), sizeof(cmdCopy) - 1);
+    cmdCopy[sizeof(cmdCopy) - 1] = '\0';
+    char* cmd = cmdCopy;
     char* pstr = strchr(cmd, ',');
     if (pstr != nullptr)
     {
@@ -316,7 +334,10 @@ MARCDUINO_ACTION(FlutterPanelGroupDynamic, :OF$, ({
 
 MARCDUINO_ACTION(OpenClosePanelGroupDynamic, :OC$, ({
     int32_t args[4] = { 10, 50, 0, 0 };
-    char* cmd = (char*)Marcduino::getCommand();
+    char cmdCopy[64];
+    strncpy(cmdCopy, Marcduino::getCommand(), sizeof(cmdCopy) - 1);
+    cmdCopy[sizeof(cmdCopy) - 1] = '\0';
+    char* cmd = cmdCopy;
     char* pstr = strchr(cmd, ',');
     if (pstr != nullptr)
     {
@@ -335,7 +356,10 @@ MARCDUINO_ACTION(OpenClosePanelGroupDynamic, :OC$, ({
 
 MARCDUINO_ACTION(OpenClosePanelLongGroupDynamic, :OCL$, ({
     int32_t args[4] = { 10, 50, 0, 0 };
-    char* cmd = (char*)Marcduino::getCommand();
+    char cmdCopy[64];
+    strncpy(cmdCopy, Marcduino::getCommand(), sizeof(cmdCopy) - 1);
+    cmdCopy[sizeof(cmdCopy) - 1] = '\0';
+    char* cmd = cmdCopy;
     char* pstr = strchr(cmd, ',');
     if (pstr != nullptr)
     {
@@ -354,7 +378,10 @@ MARCDUINO_ACTION(OpenClosePanelLongGroupDynamic, :OCL$, ({
 
 MARCDUINO_ACTION(WavePanelGroupDynamic, :OW$, ({
     int32_t args[4] = { 10, 50, 0, 0 };
-    char* cmd = (char*)Marcduino::getCommand();
+    char cmdCopy[64];
+    strncpy(cmdCopy, Marcduino::getCommand(), sizeof(cmdCopy) - 1);
+    cmdCopy[sizeof(cmdCopy) - 1] = '\0';
+    char* cmd = cmdCopy;
     char* pstr = strchr(cmd, ',');
     if (pstr != nullptr)
     {
@@ -373,7 +400,10 @@ MARCDUINO_ACTION(WavePanelGroupDynamic, :OW$, ({
 
 MARCDUINO_ACTION(FastWavePanelGroupDynamic, :OWF$, ({
     int32_t args[4] = { 10, 50, 0, 0 };
-    char* cmd = (char*)Marcduino::getCommand();
+    char cmdCopy[64];
+    strncpy(cmdCopy, Marcduino::getCommand(), sizeof(cmdCopy) - 1);
+    cmdCopy[sizeof(cmdCopy) - 1] = '\0';
+    char* cmd = cmdCopy;
     char* pstr = strchr(cmd, ',');
     if (pstr != nullptr)
     {
@@ -392,7 +422,10 @@ MARCDUINO_ACTION(FastWavePanelGroupDynamic, :OWF$, ({
 
 MARCDUINO_ACTION(OpenCloseWavePanelGroupDynamic, :OWC$, ({
     int32_t args[4] = { 10, 50, 0, 0 };
-    char* cmd = (char*)Marcduino::getCommand();
+    char cmdCopy[64];
+    strncpy(cmdCopy, Marcduino::getCommand(), sizeof(cmdCopy) - 1);
+    cmdCopy[sizeof(cmdCopy) - 1] = '\0';
+    char* cmd = cmdCopy;
     char* pstr = strchr(cmd, ',');
     if (pstr != nullptr)
     {
@@ -411,7 +444,10 @@ MARCDUINO_ACTION(OpenCloseWavePanelGroupDynamic, :OWC$, ({
 
 MARCDUINO_ACTION(MarchingAntPanelGroupDynamic, :OMA$, ({
     int32_t args[4] = { 10, 50, 0, 0 };
-    char* cmd = (char*)Marcduino::getCommand();
+    char cmdCopy[64];
+    strncpy(cmdCopy, Marcduino::getCommand(), sizeof(cmdCopy) - 1);
+    cmdCopy[sizeof(cmdCopy) - 1] = '\0';
+    char* cmd = cmdCopy;
     char* pstr = strchr(cmd, ',');
     if (pstr != nullptr)
     {
@@ -430,7 +466,10 @@ MARCDUINO_ACTION(MarchingAntPanelGroupDynamic, :OMA$, ({
 
 MARCDUINO_ACTION(AlternatePanelGroupDynamic, :OAP$, ({
     int32_t args[4] = { 10, 50, 0, 0 };
-    char* cmd = (char*)Marcduino::getCommand();
+    char cmdCopy[64];
+    strncpy(cmdCopy, Marcduino::getCommand(), sizeof(cmdCopy) - 1);
+    cmdCopy[sizeof(cmdCopy) - 1] = '\0';
+    char* cmd = cmdCopy;
     char* pstr = strchr(cmd, ',');
     if (pstr != nullptr)
     {
@@ -449,7 +488,10 @@ MARCDUINO_ACTION(AlternatePanelGroupDynamic, :OAP$, ({
 
 MARCDUINO_ACTION(DancePanelGroupDynamic, :OD$, ({
     int32_t args[4] = { 10, 50, 0, 0 };
-    char* cmd = (char*)Marcduino::getCommand();
+    char cmdCopy[64];
+    strncpy(cmdCopy, Marcduino::getCommand(), sizeof(cmdCopy) - 1);
+    cmdCopy[sizeof(cmdCopy) - 1] = '\0';
+    char* cmd = cmdCopy;
     char* pstr = strchr(cmd, ',');
     if (pstr != nullptr)
     {
@@ -468,7 +510,10 @@ MARCDUINO_ACTION(DancePanelGroupDynamic, :OD$, ({
 
 MARCDUINO_ACTION(ShakePanelGroupDynamic, :OS$, ({
     int32_t args[4] = { 10, 50, 0, 0 };
-    char* cmd = (char*)Marcduino::getCommand();
+    char cmdCopy[64];
+    strncpy(cmdCopy, Marcduino::getCommand(), sizeof(cmdCopy) - 1);
+    cmdCopy[sizeof(cmdCopy) - 1] = '\0';
+    char* cmd = cmdCopy;
     char* pstr = strchr(cmd, ',');
     if (pstr != nullptr)
     {
@@ -487,7 +532,10 @@ MARCDUINO_ACTION(ShakePanelGroupDynamic, :OS$, ({
 
 MARCDUINO_ACTION(OpenPanelGroupDynamic, :OP$, ({
     int32_t args[4] = { 10, 50, 0, 0 };
-    char* cmd = (char*)Marcduino::getCommand();
+    char cmdCopy[64];
+    strncpy(cmdCopy, Marcduino::getCommand(), sizeof(cmdCopy) - 1);
+    cmdCopy[sizeof(cmdCopy) - 1] = '\0';
+    char* cmd = cmdCopy;
     char* pstr = strchr(cmd, ',');
     if (pstr != nullptr)
     {
@@ -506,7 +554,10 @@ MARCDUINO_ACTION(OpenPanelGroupDynamic, :OP$, ({
 
 MARCDUINO_ACTION(ClosePanelGroupDynamic, :CL$, ({
     int32_t args[4] = { 10, 50, 0, 0 };
-    char* cmd = (char*)Marcduino::getCommand();
+    char cmdCopy[64];
+    strncpy(cmdCopy, Marcduino::getCommand(), sizeof(cmdCopy) - 1);
+    cmdCopy[sizeof(cmdCopy) - 1] = '\0';
+    char* cmd = cmdCopy;
     char* pstr = strchr(cmd, ',');
     if (pstr != nullptr)
     {
