@@ -151,6 +151,60 @@ static void processMarcduinoCommandWithSource(const char *source, const char *cm
         return;
     }
     logCapture.printf("[CMD][%s] %s\n", source, cmd);
+
+    // Calibration commands (:MV, #SO, #SC, #SW) use getCommand() inside
+    // MARCDUINO_ACTION which runs asynchronously via animateOnce(). By then
+    // the cmd buffer may be freed (dangling pointer). Handle them here
+    // synchronously while cmd is still valid, then return early.
+    if (strncmp(cmd, ":MV", 3) == 0)
+    {
+        const char *args = cmd + 3;
+        uint8_t tgt = 0; uint16_t val = 0; uint32_t msk = 0;
+        if (parseTwoDigitTarget(args, tgt) && parseFourDigitValue(args + 2, val) && panelTargetToMask(tgt, msk))
+        {
+            if (!movePanelMaskToValue(msk, val))
+                logCapture.println("[PANEL CAL] :MV unsupported target/value for this build");
+        }
+        else { logCapture.println("[PANEL CAL] Invalid :MV command"); }
+        return;
+    }
+    if (strncmp(cmd, "#SO", 3) == 0)
+    {
+        const char *args = cmd + 3;
+        uint8_t tgt = 0; uint16_t val = 0; uint32_t msk = 0;
+        if (parseTwoDigitTarget(args, tgt) && parseFourDigitValue(args + 2, val) && panelTargetToMask(tgt, msk))
+        {
+            if (!applyPanelCalibrationToMask(msk, true, false, val))
+                logCapture.println("[PANEL CAL] #SO unsupported target/value for this build");
+        }
+        else { logCapture.println("[PANEL CAL] Invalid #SO command"); }
+        return;
+    }
+    if (strncmp(cmd, "#SC", 3) == 0)
+    {
+        const char *args = cmd + 3;
+        uint8_t tgt = 0; uint16_t val = 0; uint32_t msk = 0;
+        if (parseTwoDigitTarget(args, tgt) && parseFourDigitValue(args + 2, val) && panelTargetToMask(tgt, msk))
+        {
+            if (!applyPanelCalibrationToMask(msk, false, true, val))
+                logCapture.println("[PANEL CAL] #SC unsupported target/value for this build");
+        }
+        else { logCapture.println("[PANEL CAL] Invalid #SC command"); }
+        return;
+    }
+    if (strncmp(cmd, "#SW", 3) == 0)
+    {
+        const char *args = cmd + 3;
+        uint8_t tgt = 0; uint32_t msk = 0;
+        if (parseTwoDigitTarget(args, tgt) && panelTargetToMask(tgt, msk))
+        {
+            if (!swapPanelCalibrationInMask(msk))
+                logCapture.println("[PANEL CAL] #SW unsupported target for this build");
+        }
+        else { logCapture.println("[PANEL CAL] Invalid #SW command"); }
+        return;
+    }
+
     Marcduino::processCommand(player, cmd);
 }
 

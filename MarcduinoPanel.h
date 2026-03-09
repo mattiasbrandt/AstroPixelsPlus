@@ -133,62 +133,20 @@ static bool swapPanelCalibrationInMask(uint32_t mask)
 }
 
 MARCDUINO_ACTION(MovePanelCalibration, :MV, ({
-    const char *cmd = Marcduino::getCommand();
-    uint8_t target = 0;
-    uint16_t value = 0;
-    uint32_t mask = 0;
-    if (cmd == nullptr || !parseTwoDigitTarget(cmd, target) || !parseFourDigitValue(cmd + 2, value) || !panelTargetToMask(target, mask))
-    {
-        DEBUG_PRINTLN("[PANEL CAL] Invalid :MV command");
-    }
-    else if (!movePanelMaskToValue(mask, value))
-    {
-        DEBUG_PRINTLN("[PANEL CAL] :MV unsupported target/value for this build");
-    }
+    // Handled synchronously in processMarcduinoCommandWithSource (AsyncWebInterface.h)
+    // to avoid dangling pointer from getCommand() running after animateOnce() defers.
 }))
 
 MARCDUINO_ACTION(SavePanelOpenCalibration, #SO, ({
-    const char *cmd = Marcduino::getCommand();
-    uint8_t target = 0;
-    uint16_t value = 0;
-    uint32_t mask = 0;
-    if (cmd == nullptr || !parseTwoDigitTarget(cmd, target) || !parseFourDigitValue(cmd + 2, value) || !panelTargetToMask(target, mask))
-    {
-        DEBUG_PRINTLN("[PANEL CAL] Invalid #SO command");
-    }
-    else if (!applyPanelCalibrationToMask(mask, true, false, value))
-    {
-        DEBUG_PRINTLN("[PANEL CAL] #SO unsupported target/value for this build");
-    }
+    // Handled synchronously in processMarcduinoCommandWithSource (AsyncWebInterface.h)
 }))
 
 MARCDUINO_ACTION(SavePanelClosedCalibration, #SC, ({
-    const char *cmd = Marcduino::getCommand();
-    uint8_t target = 0;
-    uint16_t value = 0;
-    uint32_t mask = 0;
-    if (cmd == nullptr || !parseTwoDigitTarget(cmd, target) || !parseFourDigitValue(cmd + 2, value) || !panelTargetToMask(target, mask))
-    {
-        DEBUG_PRINTLN("[PANEL CAL] Invalid #SC command");
-    }
-    else if (!applyPanelCalibrationToMask(mask, false, true, value))
-    {
-        DEBUG_PRINTLN("[PANEL CAL] #SC unsupported target/value for this build");
-    }
+    // Handled synchronously in processMarcduinoCommandWithSource (AsyncWebInterface.h)
 }))
 
 MARCDUINO_ACTION(SwapPanelOpenClosedCalibration, #SW, ({
-    const char *cmd = Marcduino::getCommand();
-    uint8_t target = 0;
-    uint32_t mask = 0;
-    if (cmd == nullptr || !parseTwoDigitTarget(cmd, target) || !panelTargetToMask(target, mask))
-    {
-        DEBUG_PRINTLN("[PANEL CAL] Invalid #SW command");
-    }
-    else if (!swapPanelCalibrationInMask(mask))
-    {
-        DEBUG_PRINTLN("[PANEL CAL] #SW unsupported target for this build");
-    }
+    // Handled synchronously in processMarcduinoCommandWithSource (AsyncWebInterface.h)
 }))
 
 MARCDUINO_ACTION(CloseAllPanels, :CL00, ({
