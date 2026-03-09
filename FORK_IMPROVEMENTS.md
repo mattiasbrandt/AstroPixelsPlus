@@ -394,6 +394,16 @@ Updated Panels calibration UI (`data/panels.html`) to expose extended compatibil
 
 Panel servo status card visibility is now conditional: hidden when panel I2C health is green and shown only for warning/error states.
 
+### Panel Calibration Command Fix (dangling pointer)
+
+Fixed a silent failure in `:MV`, `#SO`, `#SC`, `#SW` where the servo never moved despite the command being accepted.
+
+**Root cause:** `MARCDUINO_ACTION` wraps the handler body in `DO_ONCE()` inside `animateOnce()`, deferring execution to the next `AnimatedEvent::process()` loop iteration. The incoming `cmd` string is a temporary buffer that is freed before that iteration runs. `getCommand()` inside the deferred body returned a dangling pointer, causing all argument parsing to silently fail.
+
+**Fix:** `:MV`, `#SO`, `#SC`, `#SW` are now intercepted and executed synchronously in `processMarcduinoCommandWithSource()` (`AsyncWebInterface.h`) while `cmd` is still valid on the stack. The `MARCDUINO_ACTION` stubs in `MarcduinoPanel.h` are kept as empty registrations so the Marcduino command registry still recognises the prefixes.
+
+**Limitation:** Commands sent over physical Serial2 (Marcduino serial path) still go through `Marcduino::processCommand()` directly and will hit the empty stubs — calibration is a web UI workflow and is not expected to be driven over serial.
+
 ### Logic Effects UI Coverage
 Added a new **Custom effect** builder card on Logics page to construct full `@APLE` commands from UI controls instead of relying on shortcut-only coverage. Builder supports explicit target selection (both/front/rear), complete effect list, color chips, speed/sensitivity, and duration controls with live command preview.
 
