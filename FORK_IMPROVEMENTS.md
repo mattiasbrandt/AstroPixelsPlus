@@ -372,6 +372,24 @@ Holos position direction pads are centered for all three projectors to keep cont
 Holo servo status card visibility is now conditional: hidden when holo I2C health is green and shown only for warning/error states.
 
 ### Panel Calibration UI
+Redesigned Panels calibration section (`data/panels.html`) for improved usability and clarity:
+
+**Position Control:**
+- Replaced numerical text input with an intuitive slider (800–2200 μs range, matching MG90S servo limits)
+- Real-time microsecond value display updates as you drag
+- Visual range labels (800 μs / 1500 μs / 2200 μs) provide context
+
+**Easing Selection:**
+- Fixed dropdown labels to match actual easing implementation (was incorrectly showing non-existent options like "Bounce", "Elastic")
+- Each option now clearly describes its behavior (e.g., "3 — Ease In/Out Quad ⭐ (most natural)")
+- Added educational text explaining what easing is and how to choose the right type
+- Highlights recommendation: Ease In/Out Quad (#3) for most panel movements
+
+**Calibration Guidance:**
+- Added MG90S servo range explanation with safety notes (800–2200 μs, center at 1500 μs)
+- Step-by-step calibration instructions acknowledging manufacturing variance between servos
+- Practical tips: servo buzzing indicates mechanical stress—move away from extremes
+- Suggested starting values: ~900 μs (closed), ~2100 μs (open)
 Updated Panels calibration UI (`data/panels.html`) to expose extended compatibility targets (13/14/15). Added direct servo easing control via `:SFxx$easing` command builder and live preview.
 
 Panel servo status card visibility is now conditional: hidden when panel I2C health is green and shown only for warning/error states.

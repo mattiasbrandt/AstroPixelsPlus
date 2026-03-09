@@ -519,6 +519,18 @@ $42\r    → Play track 42
 
 **Source:** `MarcduinoPanel.h` · **Always enabled**
 
+**Web UI:** The Panels page (`/panels.html`) provides an intuitive calibration interface with a position slider (800–2200 μs), easing selection, and step-by-step guidance for MG90S servo calibration.
+
+### `:MV` — Move Panel (Temporary)
+
+**Syntax:** `:MV<group><pos>\r`
+
+Move panel group to temporary position for testing. Position is not saved—use `#SO` or `#SC` to persist.
+
+**Example:** `:MV011500\r` → Move panel 1 to center position (1500 μs)
+
+**Source:** `MarcduinoPanel.h` · **Always enabled**
+
 ### `:MV` — Move Panel (Temporary)
 
 **Syntax:** `:MV<group><pos>\r`

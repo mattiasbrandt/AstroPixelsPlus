@@ -685,3 +685,67 @@ table td {
   cursor: pointer;
   accent-color: var(--accent);
 }
+
+/* Servo position slider for panel calibration */
+.slider-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.servo-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  background: var(--surface-alt);
+  border-radius: 4px;
+  outline: none;
+  cursor: pointer;
+}
+
+.servo-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  background: var(--accent);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  transition: background 0.15s, transform 0.15s;
+}
+
+.servo-slider::-webkit-slider-thumb:hover {
+  background: var(--accent-bright);
+  transform: scale(1.1);
+}
+
+.servo-slider::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  background: var(--accent);
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.servo-value {
+  min-width: 70px;
+  text-align: right;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  color: var(--accent-bright);
+  font-weight: 600;
+}
+
+.slider-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75em;
+  color: var(--text-dim);
+  margin-top: 4px;
+  margin-left: auto;
+  padding-left: 62px; /* Align with slider start (label width + gap) */
+}

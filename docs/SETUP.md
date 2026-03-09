@@ -447,6 +447,67 @@ http://astropixels.local
 
 ---
 
+## 6a. Panel Servo Calibration
+
+After first boot, you must calibrate each panel's open and closed positions. The **Panels page** (`/panels.html`) provides an intuitive calibration interface.
+
+### Using the Calibration UI
+
+1. **Navigate to Panels page** → Scroll to "Panel Servo Calibration" section
+
+2. **Select a panel** from the dropdown (Pie Panels 1-6 or Lower Panels 1-10)
+
+3. **Set Position with the slider:**
+   - Range: **800–2200 μs** (safe for MG90S servos)
+   - Center: **1500 μs**
+   - Start with: **~900 μs** for closed, **~2100 μs** for open
+
+4. **Click "Move (:MV)"** to test the position temporarily
+   - The servo moves but the value isn't saved yet
+   - Listen for servo buzzing—if you hear it, move the slider slightly away from the extreme
+
+5. **Save the positions:**
+   - When satisfied with open position → Click **"Save Open (#SO)"**
+   - When satisfied with closed position → Click **"Save Closed (#SC)"**
+
+6. **Repeat for each panel**
+
+> **Note:** Each servo has slight manufacturing differences. Values that work for Panel 1 may not be perfect for Panel 2—calibrate each panel individually.
+
+### Setting Easing (Motion Smoothing)
+
+Easing controls how the servo accelerates/decelerates:
+
+| Easing | Effect | Best For |
+|--------|--------|----------|
+| 0 — Linear | Constant speed | Testing, robotic look |
+| 3 — Ease In/Out Quad ⭐ | Natural acceleration/deceleration | **Most panel movements** |
+| 5 — Ease Out Cubic | Strong deceleration | Soft landings |
+
+**Recommendation:** Use **3 — Ease In/Out Quad** for most panel movements. It provides natural-looking motion without being too slow.
+
+### Calibration Persistence
+
+Saved positions are stored in ESP32 NVS (non-volatile storage) and survive:
+- Power cycles
+- Firmware updates (OTA)
+- SPIFFS uploads
+
+Only a full `#APZERO` factory reset clears calibration data.
+
+---
+
+## 7. Hardware Wiring
+
+For detailed wiring diagrams, power requirements, and step-by-step instructions, see:
+
+> **→ [`HARDWARE_WIRING.md`](./HARDWARE_WIRING.md)**
+
+### Basic AstroPixels Wiring
+
+```
+AstroPixels Board Connections:
+
 ## 7. Hardware Wiring
 
 For detailed wiring diagrams, power requirements, and step-by-step instructions, see:

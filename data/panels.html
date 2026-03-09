@@ -169,27 +169,37 @@
 
     <div class="row mt-8">
       <label class="label-dim" for="cal-pos">Position:</label>
-      <input id="cal-pos" type="number" min="700" max="2300" step="1" value="1500" class="flex-1" oninput="updateCalPreview()">
+      <div class="slider-wrap flex-1">
+        <input id="cal-pos" type="range" min="800" max="2200" step="10" value="1500" class="servo-slider" oninput="updateCalPreview()">
+        <span id="cal-pos-value" class="servo-value">1500 μs</span>
+      </div>
       <button class="btn" onclick="sendMovePosition()">Move (:MV)</button>
+    </div>
+    <div class="slider-labels flex-1">
+      <span>800 μs</span>
+      <span>1500 μs</span>
+      <span>2200 μs</span>
     </div>
 
     <div class="row mt-8">
       <label class="label-dim" for="cal-easing">Easing:</label>
       <select id="cal-easing" class="flex-1" onchange="updateCalPreview()">
-        <option value="0" selected>0 - Standard</option>
-        <option value="1">1 - Ease In</option>
-        <option value="2">2 - Ease Out</option>
-        <option value="3">3 - Ease In/Out</option>
-        <option value="4">4 - Bounce</option>
-        <option value="5">5 - Elastic</option>
-        <option value="6">6 - Back</option>
-        <option value="7">7 - Smooth Step</option>
-        <option value="8">8 - Fast Start</option>
-        <option value="9">9 - Slow Start</option>
+        <option value="0" selected>0 — Linear (constant speed)</option>
+        <option value="1">1 — Ease In Quad (gentle start)</option>
+        <option value="2">2 — Ease Out Quad (soft landing)</option>
+        <option value="3">3 — Ease In/Out Quad ⭐ (most natural)</option>
+        <option value="4">4 — Ease In Cubic (aggressive start)</option>
+        <option value="5">5 — Ease Out Cubic (strong decel)</option>
+        <option value="6">6 — Ease In/Out Cubic (heavy mechanical)</option>
+        <option value="7">7 — Ease In Quart (very gentle start)</option>
+        <option value="8">8 — Ease Out Quart (very soft landing)</option>
+        <option value="9">9 — Ease In/Out Quart (maximum smooth)</option>
       </select>
       <button class="btn" onclick="setServoEasing()">Set (:SF)</button>
     </div>
-
+    <div class="desc mt-4"><strong>What is Easing?</strong> Easing controls how the servo accelerates and decelerates. Real objects don't instantly reach full speed—easing makes motion look natural.</div>
+    <div class="desc mt-4"><strong>Quick Guide:</strong> <em>Ease In</em> = starts slow, speeds up. <em>Ease Out</em> = starts fast, slows down. <em>In/Out</em> = both. Higher numbers = more pronounced effect.</div>
+    <div class="desc mt-4"><strong>Recommended:</strong> Use <strong>3 — Ease In/Out Quad</strong> for most panel movements. It provides natural motion without being too slow.</div>
     <div class="btn-grid mt-8">
       <button class="btn accent" onclick="saveOpenPosition()">Save Open (#SO)</button>
       <button class="btn" onclick="saveClosedPosition()">Save Closed (#SC)</button>
@@ -201,13 +211,15 @@
     <div id="cal-easing-preview" class="desc mt-4">:SF01$0</div>
 
     <div class="label-dim mt-10">Best Practice Panel Adjustment</div>
-    <div class="desc mt-4">3) Use <code>:MVxxdddd</code> to explore servo range.</div>
-    <div class="desc">4) When you find a good open position, store with <code>#SOxxdddd</code>.</div>
-    <div class="desc">5) When you find a good closed position, store with <code>#SCxxdddd</code>.</div>
-    <div class="desc">Example: <code>:MV010900</code> -> <code>#SO010900</code> (open), <code>:MV011750</code> -> <code>#SC011750</code> (closed).</div>
-    <div class="desc">6) <code>:MVxxdddd</code> does not store; it only moves the servo temporarily.</div>
-    <div class="desc mt-6">Quick swap shortcut: <code>#SWxx</code> swaps open/closed and stores immediately. Use only during calibration, never at every boot.</div>
-  </div>
+    <div class="desc mt-4"><strong>MG90S Servo Range:</strong> This slider controls the PWM pulse width sent to the servo. The safe operating range is <strong>800–2200 μs</strong> (center = 1500 μs). Values outside this range may cause servo buzzing or mechanical stress.</div>
+    <div class="desc mt-4"><strong>Calibration Steps:</strong></div>
+    <div class="desc">1) Select a panel from the dropdown above.</div>
+    <div class="desc">2) Drag the slider to find the ideal open and closed positions. <em>Note: Each servo has slight manufacturing differences—what works for Panel 1 may not be perfect for Panel 2.</em></div>
+    <div class="desc">3) Click <strong>Move (:MV)</strong> to test the position temporarily without saving.</div>
+    <div class="desc">4) When satisfied with the open position, click <strong>Save Open (#SO)</strong>.</div>
+    <div class="desc">5) Repeat for the closed position, then click <strong>Save Closed (#SC)</strong>.</div>
+    <div class="desc mt-4"><strong>Tips:</strong> If a servo buzzes at a position, move the slider slightly away from the extreme. Most panels work well with values around <strong>900 μs (closed)</strong> and <strong>2100 μs (open)</strong>.</div>
+    <div class="desc mt-4">Quick swap shortcut: <code>#SWxx</code> swaps open/closed values instantly. Use only during calibration, never at boot.</div>
 
   <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>
   <script src="/app.js"></script>
@@ -370,6 +382,8 @@
       var cmd = ':MV' + selectedPanel() + selectedPos();
       document.getElementById('cal-preview').textContent = cmd;
       document.getElementById('cal-easing-preview').textContent = ':SF' + selectedPanel() + '$' + selectedEasing();
+      var posValue = document.getElementById('cal-pos').value;
+      document.getElementById('cal-pos-value').textContent = posValue + ' μs';
     }
 
     function sendMovePosition() {
