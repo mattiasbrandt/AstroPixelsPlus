@@ -132,21 +132,32 @@ static bool swapPanelCalibrationInMask(uint32_t mask)
     return swapped;
 }
 
+// NOTE: :MV, #SO, #SC, #SW are intentionally empty stubs here.
+//
+// These calibration commands call getCommand() to read their arguments, but
+// MARCDUINO_ACTION defers the body via animateOnce() to the next loop iteration.
+// By then the incoming cmd buffer has been freed (dangling pointer), causing
+// all argument parsing to silently fail.
+//
+// The real implementations live in processMarcduinoCommandWithSource()
+// in AsyncWebInterface.h, where cmd is still valid on the stack. The stubs
+// below exist only so the Marcduino command registry recognises the prefixes
+// (required for the serial/Marcduino path to not fall through to Jawa handling).
+
 MARCDUINO_ACTION(MovePanelCalibration, :MV, ({
-    // Handled synchronously in processMarcduinoCommandWithSource (AsyncWebInterface.h)
-    // to avoid dangling pointer from getCommand() running after animateOnce() defers.
+    // See processMarcduinoCommandWithSource() in AsyncWebInterface.h
 }))
 
 MARCDUINO_ACTION(SavePanelOpenCalibration, #SO, ({
-    // Handled synchronously in processMarcduinoCommandWithSource (AsyncWebInterface.h)
+    // See processMarcduinoCommandWithSource() in AsyncWebInterface.h
 }))
 
 MARCDUINO_ACTION(SavePanelClosedCalibration, #SC, ({
-    // Handled synchronously in processMarcduinoCommandWithSource (AsyncWebInterface.h)
+    // See processMarcduinoCommandWithSource() in AsyncWebInterface.h
 }))
 
 MARCDUINO_ACTION(SwapPanelOpenClosedCalibration, #SW, ({
-    // Handled synchronously in processMarcduinoCommandWithSource (AsyncWebInterface.h)
+    // See processMarcduinoCommandWithSource() in AsyncWebInterface.h
 }))
 
 MARCDUINO_ACTION(CloseAllPanels, :CL00, ({

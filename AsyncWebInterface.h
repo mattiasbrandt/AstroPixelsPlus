@@ -152,13 +152,22 @@ static void processMarcduinoCommandWithSource(const char *source, const char *cm
     }
     logCapture.printf("[CMD][%s] %s\n", source, cmd);
 
-    // Calibration commands (:MV, #SO, #SC, #SW) use getCommand() inside
-    // MARCDUINO_ACTION which runs asynchronously via animateOnce(). By then
-    // the cmd buffer may be freed (dangling pointer). Handle them here
-    // synchronously while cmd is still valid, then return early.
+    // Panel calibration commands are handled here synchronously rather than
+    // via MARCDUINO_ACTION. The reason: MARCDUINO_ACTION wraps the body in
+    // DO_ONCE() inside animateOnce(), which defers execution to the next
+    // AnimatedEvent::process() loop iteration. By that point the incoming
+    // cmd buffer (a temporary String in the async web handler) has been
+    // freed, so getCommand() inside the macro body returns a dangling
+    // pointer and all parsing silently fails. Handling them here while cmd
+    // is still on the stack avoids the issue entirely.
+    // The corresponding MARCDUINO_ACTION stubs in MarcduinoPanel.h are kept
+    // as empty registrations so serial/Marcduino path commands still match
+    // (though they will no-op — serial callers should use this web path).
+
+    // :MV<pp><vvvv> — move panel <pp> to pulse width <vvvv> us (temporary, not saved)
     if (strncmp(cmd, ":MV", 3) == 0)
     {
-        const char *args = cmd + 3;
+        const char *args = cmd + 3;          // skip ":MV", args = "<pp><vvvv>"
         uint8_t tgt = 0; uint16_t val = 0; uint32_t msk = 0;
         if (parseTwoDigitTarget(args, tgt) && parseFourDigitValue(args + 2, val) && panelTargetToMask(tgt, msk))
         {
@@ -168,6 +177,7 @@ static void processMarcduinoCommandWithSource(const char *source, const char *cm
         else { logCapture.println("[PANEL CAL] Invalid :MV command"); }
         return;
     }
+    // #SO<pp><vvvv> — save open position for panel <pp> as pulse width <vvvv> us
     if (strncmp(cmd, "#SO", 3) == 0)
     {
         const char *args = cmd + 3;
@@ -180,6 +190,7 @@ static void processMarcduinoCommandWithSource(const char *source, const char *cm
         else { logCapture.println("[PANEL CAL] Invalid #SO command"); }
         return;
     }
+    // #SC<pp><vvvv> — save closed position for panel <pp> as pulse width <vvvv> us
     if (strncmp(cmd, "#SC", 3) == 0)
     {
         const char *args = cmd + 3;
@@ -192,6 +203,7 @@ static void processMarcduinoCommandWithSource(const char *source, const char *cm
         else { logCapture.println("[PANEL CAL] Invalid #SC command"); }
         return;
     }
+    // #SW<pp> — swap open/closed calibration values for panel <pp>
     if (strncmp(cmd, "#SW", 3) == 0)
     {
         const char *args = cmd + 3;
