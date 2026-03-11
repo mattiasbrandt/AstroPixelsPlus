@@ -111,6 +111,8 @@
 
 #define PREFERENCE_MARCWIFI_ENABLED "mwifi"
 #define PREFERENCE_MARCWIFI_SERIAL_PASS "mwifipass"
+#define PREFERENCE_BODY_LINK_ENABLED  "mbodylink"
+#define BODY_LINK_ENABLED             true   // on by default in this fork
 
 
 #define PREFERENCE_MARCSOUND "msound"
@@ -569,6 +571,88 @@ static MarcSound::Module sSoundInitModule;
 static int sSoundInitStartup;
 static float sSoundInitVolume;
 
+// Body link state — not persisted, reset on reboot
+static uint32_t sBodyLastSeenMs  = 0;   // millis() when last #PAHB received (0=never)
+static uint32_t sBodyHeartbeatRx = 0;   // count of #PAHB frames received from body
+static uint32_t sBodyLastTxMs    = 0;   // millis() of last #APHB sent
+
+static bool bodyLinkConnected()
+{
+    return sBodyLastSeenMs > 0 && (millis() - sBodyLastSeenMs) < 5000;
+}
+
+static void sendBodyCommand(const char* cmd)
+{
+    if (COMMAND_SERIAL && cmd && *cmd)
+    {
+        COMMAND_SERIAL.print(cmd);
+        COMMAND_SERIAL.print('\r');
+    }
+}
+
+static void handleBodySerial()
+{
+    static bool sBodyLinkEnabled = false;
+    static bool sBodyLinkInitDone = false;
+    if (!sBodyLinkInitDone)
+    {
+        sBodyLinkEnabled = preferences.getBool(PREFERENCE_BODY_LINK_ENABLED, BODY_LINK_ENABLED);
+        sBodyLinkInitDone = true;
+    }
+    if (!sBodyLinkEnabled) return;
+    static char sBuf[64];
+    static uint8_t sBufLen = 0;
+    while (COMMAND_SERIAL.available())
+    {
+        char c = (char)COMMAND_SERIAL.read();
+        if (c == '\r' || c == '\n')
+        {
+            if (sBufLen > 0)
+            {
+                sBuf[sBufLen] = '\0';
+                if (strcmp(sBuf, "#PAHB") == 0)
+                {
+                    sBodyLastSeenMs  = millis();
+                    sBodyHeartbeatRx++;
+                }
+                else
+                {
+                    // Forward non-heartbeat commands to Reeltwo
+                    CommandEvent::process(sBuf);
+                }
+                sBufLen = 0;
+            }
+        }
+        else if (sBufLen < 63)
+        {
+            sBuf[sBufLen++] = c;
+        }
+        else
+        {
+            // Buffer overflow — discard and reset
+            sBufLen = 0;
+        }
+    }
+}
+
+static void handleBodyLinkHeartbeat()
+{
+    static bool sBodyLinkEnabled = false;
+    static bool sBodyLinkInitDone = false;
+    if (!sBodyLinkInitDone)
+    {
+        sBodyLinkEnabled = preferences.getBool(PREFERENCE_BODY_LINK_ENABLED, BODY_LINK_ENABLED);
+        sBodyLinkInitDone = true;
+    }
+    if (!sBodyLinkEnabled) return;
+    uint32_t now = millis();
+    if (now - sBodyLastTxMs >= 1000)
+    {
+        COMMAND_SERIAL.print("#APHB\r");
+        sBodyLastTxMs = now;
+    }
+}
+
 #ifdef USE_WIFI_MARCDUINO
 WifiMarcduinoReceiver wifiMarcduinoReceiver(wifiAccess);
 #endif
@@ -731,9 +815,13 @@ void setup()
     if (preferences.getBool(PREFERENCE_MARCSERIAL_ENABLED, MARC_SERIAL_ENABLED))
     {
         COMMAND_SERIAL.begin(preferences.getInt(PREFERENCE_MARCSERIAL2, MARC_SERIAL2_BAUD_RATE), SERIAL_8N1, SERIAL2_RX_PIN, SERIAL2_TX_PIN);
-        // if (preferences.getBool(PREFERENCE_MARCSERIAL_PASS, MARC_SERIAL_PASS))
-
-        marcduinoSerial.setStream(&COMMAND_SERIAL, &Serial);
+        if (!preferences.getBool(PREFERENCE_BODY_LINK_ENABLED, BODY_LINK_ENABLED))
+        {
+            // Body link disabled — use legacy Reeltwo stream handler
+            // if (preferences.getBool(PREFERENCE_MARCSERIAL_PASS, MARC_SERIAL_PASS))
+            marcduinoSerial.setStream(&COMMAND_SERIAL, &Serial);
+        }
+        // When body link is enabled, handleBodySerial() in mainLoop() reads manually
     }
     if (!mountReadOnlyFileSystem())
     {
@@ -1376,6 +1464,9 @@ I2CReceiverBase<CONSOLE_BUFFER_SIZE> i2cReceiver(USE_I2C_ADDRESS, [](char *cmd)
 void mainLoop()
 {
     AnimatedEvent::process();
+
+    handleBodySerial();
+    handleBodyLinkHeartbeat();
 
     if (sSleepModeActive && sSleepEnforceAtMs != 0 && (int32_t)(millis() - sSleepEnforceAtMs) >= 0)
     {

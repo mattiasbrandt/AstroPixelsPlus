@@ -42,6 +42,10 @@ extern bool soundLocalEnabled;
 extern bool sSleepModeActive;
 extern uint32_t sSleepModeSinceMs;
 extern uint32_t sMinFreeHeap;
+extern uint32_t sBodyLastSeenMs;
+extern uint32_t sBodyHeartbeatRx;
+extern uint32_t sBodyLastTxMs;
+extern bool bodyLinkConnected();
 extern bool shouldBlockCommandDuringSleep(const char *cmd);
 extern bool enterSoftSleepMode();
 extern bool exitSoftSleepMode();
@@ -229,7 +233,8 @@ static bool isAllowedPrefKey(const String &key)
            key == "msound" || key == "msoundser" || key == "mvolume" ||
            key == "msoundstart" || key == "mrandom" || key == "mrandommin" ||
            key == "mrandommax" || key == "msoundlocal" || key == "apitoken" ||
-           key == "dname";
+           key == "dname" ||
+           key == "mbodylink";
 }
 
 static size_t maxPrefValueLen(const String &key)
@@ -786,7 +791,8 @@ static void initAsyncWeb()
                 // Boolean keys: firmware uses getBool/putBool for these
                 if (key == "wifi" || key == "ap" || key == "remote" || key == "msoundlocal" ||
                     key == PREFERENCE_BADMOTIVATOR_ENABLED || key == PREFERENCE_FIRESTRIP_ENABLED ||
-                    key == PREFERENCE_CBI_ENABLED || key == PREFERENCE_DATAPANEL_ENABLED)
+                    key == PREFERENCE_CBI_ENABLED || key == PREFERENCE_DATAPANEL_ENABLED ||
+                    key == "mbodylink")
                 {
                     bool val = preferences.getBool(key.c_str(), false);
                     json += "\"" + jsonEscape(key) + "\":" + (val ? "true" : "false");
@@ -840,7 +846,8 @@ static void initAsyncWeb()
                 return;
             }
             // Boolean keys — firmware uses getBool/putBool
-            else if (key == "wifi" || key == "ap" || key == "remote" || key == "msoundlocal")
+            else if (key == "wifi" || key == "ap" || key == "remote" || key == "msoundlocal" ||
+                     key == "mbodylink")
             {
                 bool bval = (val == "1" || val == "true");
                 preferences.putBool(key.c_str(), bval);
