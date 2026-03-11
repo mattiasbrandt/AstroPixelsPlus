@@ -649,7 +649,7 @@ static String buildHealthJson()
     json += ",\"body_link\":{";
     json += "\"enabled\":" + String(bodyLinkPrefEnabled ? "true" : "false");
     json += ",\"connected\":" + String(bodyLinkConnected() ? "true" : "false");
-    json += ",\"last_rx_ms\":" + String(sBodyLastSeenMs > 0 ? (millis() - sBodyLastSeenMs) : 0);
+    json += ",\"last_rx_ms\":" + String(sBodyLastSeenMs > 0 ? (int32_t)(millis() - sBodyLastSeenMs) : 0);
     json += ",\"hb_rx\":" + String(sBodyHeartbeatRx);
     json += "}";
 

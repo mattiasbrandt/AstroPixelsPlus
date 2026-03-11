@@ -600,7 +600,7 @@ static void handleBodySerial()
         sBodyLinkInitDone = true;
     }
     if (!sBodyLinkEnabled) return;
-    static char sBuf[64];
+    static char sBuf[65];  // 64 data + 1 null terminator
     static uint8_t sBufLen = 0;
     while (COMMAND_SERIAL.available())
     {
@@ -623,13 +623,15 @@ static void handleBodySerial()
                 sBufLen = 0;
             }
         }
-        else if (sBufLen < 63)
+        else if (sBufLen < sizeof(sBuf) - 1)
         {
             sBuf[sBufLen++] = c;
         }
         else
         {
             // Buffer overflow — discard and reset
+            DEBUG_PRINTLN(F("[BodyLink] Buffer overflow - command discarded"));
+            sBuf[0] = '\0';
             sBufLen = 0;
         }
     }
@@ -815,13 +817,18 @@ void setup()
     if (preferences.getBool(PREFERENCE_MARCSERIAL_ENABLED, MARC_SERIAL_ENABLED))
     {
         COMMAND_SERIAL.begin(preferences.getInt(PREFERENCE_MARCSERIAL2, MARC_SERIAL2_BAUD_RATE), SERIAL_8N1, SERIAL2_RX_PIN, SERIAL2_TX_PIN);
-        if (!preferences.getBool(PREFERENCE_BODY_LINK_ENABLED, BODY_LINK_ENABLED))
+        if (preferences.getBool(PREFERENCE_BODY_LINK_ENABLED, BODY_LINK_ENABLED))
+        {
+            // Body link enabled — disable Reeltwo stream handling to prevent race conditions
+            marcduinoSerial.setStream(nullptr, nullptr);
+            // handleBodySerial() in mainLoop() reads manually
+        }
+        else
         {
             // Body link disabled — use legacy Reeltwo stream handler
             // if (preferences.getBool(PREFERENCE_MARCSERIAL_PASS, MARC_SERIAL_PASS))
             marcduinoSerial.setStream(&COMMAND_SERIAL, &Serial);
         }
-        // When body link is enabled, handleBodySerial() in mainLoop() reads manually
     }
     if (!mountReadOnlyFileSystem())
     {
