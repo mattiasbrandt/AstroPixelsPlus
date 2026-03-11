@@ -112,8 +112,6 @@
 #define PREFERENCE_MARCWIFI_ENABLED "mwifi"
 #define PREFERENCE_MARCWIFI_SERIAL_PASS "mwifipass"
 
-#define PREFERENCE_ARTOO_ENABLED "artoo"
-#define PREFERENCE_ARTOO_BAUD "artoobaud"
 
 #define PREFERENCE_MARCSOUND "msound"
 #define PREFERENCE_MARCSOUND_SERIAL "msoundser"
@@ -182,8 +180,6 @@
 #define MARC_SERIAL_ENABLED true
 #define MARC_WIFI_ENABLED true
 #define MARC_WIFI_SERIAL_PASS true
-#define ARTOO_ENABLED false
-#define ARTOO_BAUD 2400
 #define MARC_SOUND_PLAYER MarcSound::kDisabled
 #define MARC_SOUND_SERIAL 0
 #define MARC_SOUND_VOLUME 500 // 0 - 1000
@@ -549,13 +545,8 @@ bool wifiEnabled;
 bool wifiActive;
 bool remoteEnabled;
 bool remoteActive;
-bool artooEnabled;
-int artooBaud;
 TaskHandle_t eventTask;
 bool otaInProgress;
-volatile uint32_t sArtooLastSignalMs;
-volatile uint32_t sArtooSignalBursts;
-portMUX_TYPE sArtooTelemetryMux = portMUX_INITIALIZER_UNLOCKED;
 #endif
 
 #ifdef USE_WIFI_WEB
@@ -631,7 +622,6 @@ bool sRemoteConnecting;
 SMQAddress sRemoteAddress;
 #endif
 
-static bool sArtooSignalActive;
 
 ////////////////////////////////
 
@@ -727,8 +717,6 @@ void setup()
 #else
     remoteEnabled = remoteActive = false;
 #endif
-    artooEnabled = preferences.getBool(PREFERENCE_ARTOO_ENABLED, ARTOO_ENABLED);
-    artooBaud = preferences.getInt(PREFERENCE_ARTOO_BAUD, ARTOO_BAUD);
 #endif
     soundLocalEnabled = preferences.getBool(PREFERENCE_MARCSOUND_LOCAL_ENABLED, MARC_SOUND_LOCAL_ENABLED);
     sSleepModeActive = false;
@@ -1441,18 +1429,6 @@ void mainLoop()
     sDisplay.process();
 #endif
 
-    bool artooSignal = (COMMAND_SERIAL.available() > 0);
-    if (artooSignal)
-    {
-        portENTER_CRITICAL(&sArtooTelemetryMux);
-        sArtooLastSignalMs = millis();
-        if (!sArtooSignalActive)
-        {
-            sArtooSignalBursts++;
-        }
-        portEXIT_CRITICAL(&sArtooTelemetryMux);
-    }
-    sArtooSignalActive = artooSignal;
 
     if (Serial.available())
     {

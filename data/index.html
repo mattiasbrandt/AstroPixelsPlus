@@ -60,7 +60,6 @@
       <div class="health-item" title="Panel servo controller at I2C address 0x40 (dome panel movement)"><div class="indicator" id="h-panels"></div><span>Servo Panels</span></div>
       <div class="health-item" title="Holo servo controller at I2C address 0x41 (holo pitch/yaw movement)"><div class="indicator" id="h-holos"></div><span>Servo Holos</span></div>
       <div class="health-item" title="Sound output availability based on sound module preference state"><div class="indicator" id="h-sound"></div><span>Sound Module</span></div>
-      <div class="health-item" title="Body-to-dome serial traffic telemetry profile for Artoo-style controllers"><div class="indicator" id="h-artoo"></div><span>Artoo Controller</span></div>
       <div class="health-item" title="Current WiFi service state on this controller"><div class="indicator" id="h-wifi"></div><span>WiFi</span></div>
       <div class="health-item" title="Droid remote link state (warn means remote feature disabled)"><div class="indicator" id="h-remote"></div><span>Droid Remote</span></div>
       <div class="health-item" title="SPI flash file system mount state used by web UI files"><div class="indicator" id="h-spiffs"></div><span>SPIFFS</span></div>
@@ -271,8 +270,6 @@
       setIndicator('h-panels', h.i2c_panels);
       setIndicator('h-holos', h.i2c_holos);
       setIndicatorWarn('h-sound', h.sound_module, h.sound_local_enabled);
-      setIndicatorWarn('h-artoo', h.artoo, h.artoo_enabled);
-      setHealthItemVisible('h-artoo', !!h.artoo_enabled);
       setIndicator('h-wifi', h.wifi);
       if (remoteSupported) {
         setIndicatorWarn('h-remote', h.remote, h.remote_enabled);
@@ -329,9 +326,6 @@
           }
         }
         html += '<div>Sound Playback Module: ' + (soundEnabled ? '<span class="dot green"></span>Enabled' : '<span class="dot yellow"></span>Disabled' + soundReason) + '</div>';
-      }
-      if (typeof s.artooEnabled !== 'undefined') {
-        html += '<div>Artoo Controller Communication: ' + (s.artooEnabled ? '<span class="dot green"></span>Enabled' : '<span class="dot yellow"></span>Disabled') + ' (' + s.artooBaud + ' baud)</div>';
       }
       if (s.otaInProgress) {
         html += '<div><span class="dot yellow"></span>Firmware update in progress</div>';
