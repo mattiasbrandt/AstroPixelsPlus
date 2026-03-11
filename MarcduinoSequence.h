@@ -11,6 +11,7 @@ MARCDUINO_ACTION(ScreamSequence, :SE01, ({
     // Send command to front logics
     CommandEvent::process("LE1010003");
     sMarcSound.handleCommand("$S");
+    sendBodyCommand("$S");
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpenClose, ALL_DOME_PANELS_MASK);
 }))
 
@@ -18,6 +19,7 @@ MARCDUINO_ACTION(ScreamSequence, :SE01, ({
 
 MARCDUINO_ACTION(WaveSequence, :SE02, ({
     sMarcSound.handleCommand("$213");
+    sendBodyCommand("$213");
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelWave, ALL_DOME_PANELS_MASK);
 }))
 
@@ -25,6 +27,7 @@ MARCDUINO_ACTION(WaveSequence, :SE02, ({
 
 MARCDUINO_ACTION(SmirkWaveSequence, :SE03, ({
     sMarcSound.handleCommand("$34");
+    sendBodyCommand("$34");
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelWaveFast, ALL_DOME_PANELS_MASK);
 }))
 
@@ -32,6 +35,7 @@ MARCDUINO_ACTION(SmirkWaveSequence, :SE03, ({
 
 MARCDUINO_ACTION(OpenCloseWaveSequence, :SE04, ({
     sMarcSound.handleCommand("$36");
+    sendBodyCommand("$36");
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelOpenCloseWave, ALL_DOME_PANELS_MASK);
 }))
 
@@ -41,6 +45,7 @@ MARCDUINO_ANIMATION(BeepCantinaSequence, :SE05)
 {
     DO_START()
     DO_ONCE({ sMarcSound.handleCommand("$c"); })
+    DO_ONCE({ sendBodyCommand("$c"); })
     // Wait 1 second
     DO_COMMAND(F(
         // Fire logics
@@ -113,6 +118,7 @@ MARCDUINO_ANIMATION(CantinaSequence, :SE07)
     DO_START()
     // Play Orchestral Cantina
     DO_ONCE({ sMarcSound.handleCommand("$C"); })
+    DO_ONCE({ sendBodyCommand("$C"); })
     // Wait 1 second
     DO_WAIT_SEC(1)
     DO_COMMAND(F(
@@ -136,6 +142,7 @@ MARCDUINO_ANIMATION(LeiaMessage, :SE08)
 {
     DO_START()
     DO_ONCE({ sMarcSound.handleCommand("$73"); })
+    DO_ONCE({ sendBodyCommand("$73"); })
     DO_COMMAND_AND_WAIT(F(
         "LE3030045\n"
         "LE1030045\n"
@@ -154,6 +161,7 @@ MARCDUINO_ANIMATION(DiscoSequence, :SE09)
 {
     DO_START()
     DO_ONCE({ sMarcSound.handleCommand("$D"); })
+    DO_ONCE({ sendBodyCommand("$D"); })
     DO_SEQUENCE(SeqPanelLongDisco, DOME_DANCE_PANELS_MASK)
     DO_ONCE({
         FLD.selectSequence(LogicEngineRenderer::RAINBOW);
@@ -174,6 +182,7 @@ MARCDUINO_ANIMATION(DiscoSequence, :SE09)
 MARCDUINO_ACTION(QuietModeReset, :SE10, ({
     // Stop sound, disable holo LEDs, close panels, and return logic displays to normal
     sMarcSound.handleCommand("$s");
+    sendBodyCommand("$s");
     CommandEvent::process(F("HPA096"));
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, ALL_DOME_PANELS_MASK);
     FLD.selectSequence(LogicEngineRenderer::NORMAL);
@@ -185,6 +194,7 @@ MARCDUINO_ACTION(QuietModeReset, :SE10, ({
 MARCDUINO_ACTION(FullAwakeModeReset, :SE11, ({
     // Resume random chatter baseline with holo movement while keeping holo LEDs off
     sMarcSound.handleCommand("$R");
+    sendBodyCommand("$R");
     CommandEvent::process(F("HPF104\nHPR104\nHPT104\n"));
     CommandEvent::process(F("HPA096"));
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, ALL_DOME_PANELS_MASK);
@@ -205,6 +215,7 @@ MARCDUINO_ACTION(TopPanelsShowcase, :SE12, ({
 MARCDUINO_ACTION(MidAwakeModeReset, :SE13, ({
     // Mid-awake mode: random sound baseline, holos stopped, panels closed
     sMarcSound.handleCommand("$R");
+    sendBodyCommand("$R");
     CommandEvent::process(F("HPA0000"));
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, ALL_DOME_PANELS_MASK);
     FLD.selectSequence(LogicEngineRenderer::NORMAL);
@@ -216,6 +227,7 @@ MARCDUINO_ACTION(MidAwakeModeReset, :SE13, ({
 MARCDUINO_ACTION(AwakePlusModeReset, :SE14, ({
     // Awake+ mode: random sound baseline, holo movement enabled, holo LEDs active
     sMarcSound.handleCommand("$R");
+    sendBodyCommand("$R");
     CommandEvent::process(F("HPF104\nHPR104\nHPT104\n"));
     CommandEvent::process(F("HPA0040"));
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, ALL_DOME_PANELS_MASK);
@@ -230,6 +242,7 @@ MARCDUINO_ACTION(ScreamNoPanelsAlias, :SE15, ({
     CommandEvent::process("LE3010003");
     CommandEvent::process("LE1010003");
     sMarcSound.handleCommand("$S");
+    sendBodyCommand("$S");
 }))
 
 ////////////////
