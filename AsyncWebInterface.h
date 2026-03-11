@@ -11,7 +11,6 @@
 #include <WiFi.h>
 #include <ctype.h>
 #include "SPIFFS.h"
-#include "SPIFFS.h"
 #include "LogCapture.h"
 
 // Gadget includes for extern declarations
@@ -137,7 +136,22 @@ static bool parseWsCommand(const uint8_t *data, size_t len, char *out, size_t ou
         if (!isAsciiPrintable(c)) return false;
     }
     memcpy(out, data, len);
-    out[len] = '\0';
+    out[len] = '\0'; // Ensure null termination
+    return true;
+}
+
+static bool parseDurationSeconds(const String &raw, uint8_t minValue, uint8_t maxValue, uint8_t &out)
+{
+    String value = raw;
+    value.trim();
+    if (value.length() == 0 || value.length() > 2) return false;
+    for (size_t i = 0; i < value.length(); i++)
+    {
+        if (!isdigit((unsigned char)value[i])) return false;
+    }
+    long parsed = value.toInt();
+    if (parsed < minValue || parsed > maxValue) return false;
+    out = (uint8_t)parsed;
     return true;
 }
 
@@ -159,9 +173,9 @@ static void processMarcduinoCommandWithSource(const char *source, const char *cm
     // freed, so getCommand() inside the macro body returns a dangling
     // pointer and all parsing silently fails. Handling them here while cmd
     // is still on the stack avoids the issue entirely.
-    // The corresponding MARCDUINO_ACTION stubs in MarcduinoPanel.h are kept
-    // as empty registrations so serial/Marcduino path commands still match
-    // (though they will no-op — serial callers should use this web path).
+    // MarcduinoPanel.h now also implements these commands for stable command
+    // buffers (e.g. MarcduinoSerial fBuffer), preserving serial parity while
+    // this synchronous path keeps async-web ingress safe.
 
     // :MV<pp><vvvv> — move panel <pp> to pulse width <vvvv> us (temporary, not saved)
     if (strncmp(cmd, ":MV", 3) == 0)
@@ -234,7 +248,9 @@ static bool isAllowedPrefKey(const String &key)
            key == "msoundstart" || key == "mrandom" || key == "mrandommin" ||
            key == "mrandommax" || key == "msoundlocal" || key == "apitoken" ||
            key == "dname" ||
-           key == "mbodylink";
+           key == "mbodylink" ||
+           key == PREFERENCE_BADMOTIVATOR_ENABLED || key == PREFERENCE_FIRESTRIP_ENABLED ||
+           key == PREFERENCE_CBI_ENABLED || key == PREFERENCE_DATAPANEL_ENABLED;
 }
 
 static size_t maxPrefValueLen(const String &key)
@@ -243,6 +259,24 @@ static size_t maxPrefValueLen(const String &key)
     if (key == "pass" || key == "rsecret" || key == "apitoken") return 64;
     if (key == "dname") return 24;
     return 16;
+}
+
+static bool defaultBoolForPrefKey(const String &key)
+{
+    if (key == "wifi") return WIFI_ENABLED;
+    if (key == "ap") return WIFI_ACCESS_POINT;
+    if (key == "remote") return REMOTE_ENABLED;
+    if (key == "msoundlocal") return MARC_SOUND_LOCAL_ENABLED;
+    if (key == "mserialpass") return MARC_SERIAL_PASS;
+    if (key == "mserial") return MARC_SERIAL_ENABLED;
+    if (key == "mwifi") return MARC_WIFI_ENABLED;
+    if (key == "mwifipass") return MARC_WIFI_SERIAL_PASS;
+    if (key == "mbodylink") return BODY_LINK_ENABLED;
+    if (key == PREFERENCE_BADMOTIVATOR_ENABLED) return AP_ENABLE_BADMOTIVATOR;
+    if (key == PREFERENCE_FIRESTRIP_ENABLED) return AP_ENABLE_FIRESTRIP;
+    if (key == PREFERENCE_CBI_ENABLED) return AP_ENABLE_CBI;
+    if (key == PREFERENCE_DATAPANEL_ENABLED) return AP_ENABLE_DATAPANEL;
+    return false;
 }
 
 static String jsonEscape(const String &in)
@@ -316,6 +350,9 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
             char cmd[64];
             if (parseWsCommand(data, len, cmd, sizeof(cmd)))
             {
+                // TODO(security): Known gap for early-development builds.
+                // WS command frames currently bypass checkWriteAuth(), unlike REST write endpoints.
+                // Keep behavior for now, but harden by authenticating WS sessions before command ingress.
                 processMarcduinoCommandWithSource("astropixel-web-ws", cmd);
                 broadcastState();
             }
@@ -353,7 +390,7 @@ static String buildStateJson()
     json += ",\"minFreeHeap\":" + String(sMinFreeHeap);
     json += ",\"i2c_probe_failures\":" + String(i2cProbeFailures);
     // Body link status (for real-time WebSocket updates)
-    bool bodyLinkPrefEnabled = preferences.getBool("mbodylink", true);
+    bool bodyLinkPrefEnabled = preferences.getBool("mbodylink", BODY_LINK_ENABLED);
     json += ",\"body_link\":{\"enabled\":" + String(bodyLinkPrefEnabled ? "true" : "false");
     json += ",\"connected\":" + String(bodyLinkConnected() ? "true" : "false") + "}";
     json += ",\"droidName\":\"" + jsonEscape(droidName) + "\"";
@@ -583,8 +620,6 @@ static String buildI2CDiagnosticsJson(bool forceScan = false)
     json += ",\"5\":\"timeout\"";
     json += "}";
     json += "}";
-
-    json += "}";
     return json;
 }
 
@@ -649,7 +684,7 @@ static String buildHealthJson()
     json += ",\"min_free_heap\":" + String(sMinFreeHeap);
     json += ",\"i2c_probe_failures\":" + String(i2cProbeFailures);
     // Body link status
-    bool bodyLinkPrefEnabled = preferences.getBool("mbodylink", true);
+    bool bodyLinkPrefEnabled = preferences.getBool("mbodylink", BODY_LINK_ENABLED);
     json += ",\"body_link\":{";
     json += "\"enabled\":" + String(bodyLinkPrefEnabled ? "true" : "false");
     json += ",\"connected\":" + String(bodyLinkConnected() ? "true" : "false");
@@ -660,31 +695,29 @@ static String buildHealthJson()
     // Gadget status
     json += ",\"gadgets\":{";
 #if AP_ENABLE_BADMOTIVATOR
-    bool badmotEnabled = preferences.getBool(PREFERENCE_BADMOTIVATOR_ENABLED, false);
+    bool badmotEnabled = preferences.getBool(PREFERENCE_BADMOTIVATOR_ENABLED, AP_ENABLE_BADMOTIVATOR);
     json += "\"badmotivator\":{\"enabled\":" + String(badmotEnabled ? "true" : "false") + ",\"present\":true}";
 #else
     json += "\"badmotivator\":{\"enabled\":false,\"present\":false}";
 #endif
 #if AP_ENABLE_FIRESTRIP
-    bool firestripEnabled = preferences.getBool(PREFERENCE_FIRESTRIP_ENABLED, false);
+    bool firestripEnabled = preferences.getBool(PREFERENCE_FIRESTRIP_ENABLED, AP_ENABLE_FIRESTRIP);
     json += ",\"firestrip\":{\"enabled\":" + String(firestripEnabled ? "true" : "false") + ",\"present\":true}";
 #else
     json += ",\"firestrip\":{\"enabled\":false,\"present\":false}";
 #endif
 #if AP_ENABLE_CBI
-    bool cbiEnabled = preferences.getBool(PREFERENCE_CBI_ENABLED, false);
+    bool cbiEnabled = preferences.getBool(PREFERENCE_CBI_ENABLED, AP_ENABLE_CBI);
     json += ",\"cbi\":{\"enabled\":" + String(cbiEnabled ? "true" : "false") + ",\"present\":true}";
 #else
     json += ",\"cbi\":{\"enabled\":false,\"present\":false}";
 #endif
 #if AP_ENABLE_DATAPANEL
-    bool datapanelEnabled = preferences.getBool(PREFERENCE_DATAPANEL_ENABLED, false);
+    bool datapanelEnabled = preferences.getBool(PREFERENCE_DATAPANEL_ENABLED, AP_ENABLE_DATAPANEL);
     json += ",\"datapanel\":{\"enabled\":" + String(datapanelEnabled ? "true" : "false") + ",\"present\":true}";
 #else
     json += ",\"datapanel\":{\"enabled\":false,\"present\":false}";
 #endif
-    json += "}";
-
     json += "}";
 
     json += "}";
@@ -800,13 +833,13 @@ static void initAsyncWeb()
                 if (!first) json += ",";
                 first = false;
                 // Boolean keys: firmware uses getBool/putBool for these
-                // Boolean keys: firmware uses getBool/putBool for these
                 if (key == "wifi" || key == "ap" || key == "remote" || key == "msoundlocal" ||
+                    key == "mserialpass" || key == "mserial" || key == "mwifi" || key == "mwifipass" ||
                     key == PREFERENCE_BADMOTIVATOR_ENABLED || key == PREFERENCE_FIRESTRIP_ENABLED ||
                     key == PREFERENCE_CBI_ENABLED || key == PREFERENCE_DATAPANEL_ENABLED ||
                     key == "mbodylink")
                 {
-                    bool val = preferences.getBool(key.c_str(), false);
+                    bool val = preferences.getBool(key.c_str(), defaultBoolForPrefKey(key));
                     json += "\"" + jsonEscape(key) + "\":" + (val ? "true" : "false");
                 }
                 else
@@ -859,7 +892,10 @@ static void initAsyncWeb()
             }
             // Boolean keys — firmware uses getBool/putBool
             else if (key == "wifi" || key == "ap" || key == "remote" || key == "msoundlocal" ||
-                     key == "mbodylink")
+                     key == "mserialpass" || key == "mserial" || key == "mwifi" || key == "mwifipass" ||
+                     key == "mbodylink" ||
+                     key == PREFERENCE_BADMOTIVATOR_ENABLED || key == PREFERENCE_FIRESTRIP_ENABLED ||
+                     key == PREFERENCE_CBI_ENABLED || key == PREFERENCE_DATAPANEL_ENABLED)
             {
                 bool bval = (val == "1" || val == "true");
                 preferences.putBool(key.c_str(), bval);
@@ -867,9 +903,8 @@ static void initAsyncWeb()
                 {
                     soundLocalEnabled = bval;
                 }
-                // Gadget preferences
-                else if (key == PREFERENCE_BADMOTIVATOR_ENABLED || key == PREFERENCE_FIRESTRIP_ENABLED ||
-                         key == PREFERENCE_CBI_ENABLED || key == PREFERENCE_DATAPANEL_ENABLED)
+                if (key == PREFERENCE_BADMOTIVATOR_ENABLED || key == PREFERENCE_FIRESTRIP_ENABLED ||
+                    key == PREFERENCE_CBI_ENABLED || key == PREFERENCE_DATAPANEL_ENABLED)
                 {
                     // Just store the preference value, actual enable/disable happens on next reboot
                     // or could be handled dynamically if needed
@@ -1023,19 +1058,33 @@ static void initAsyncWeb()
             String action = request->getParam("action", true)->value();
             if (action == "flicker")
             {
-                String duration = request->hasParam("duration", true) ? 
-                    request->getParam("duration", true)->value() : "6";
-                String cmd = "CB2" + duration + "006";
+                uint8_t durationSec = 6;
+                if (request->hasParam("duration", true) &&
+                    !parseDurationSeconds(request->getParam("duration", true)->value(), 1, 99, durationSec))
+                {
+                    request->send(400, "application/json", "{\"error\":\"invalid duration, use 1-99 seconds\"}");
+                    return;
+                }
+                char duration[3];
+                snprintf(duration, sizeof(duration), "%02u", durationSec);
+                String cmd = "CB2" + String(duration) + "006";
                 processMarcduinoCommandWithSource("astropixel-web-api", cmd.c_str());
-                request->send(200, "application/json", "{\"ok\":true,\"action\":\"flicker\",\"duration\":\"" + duration + "\"}");
+                request->send(200, "application/json", "{\"ok\":true,\"action\":\"flicker\",\"duration\":" + String(durationSec) + "}");
             }
             else if (action == "disable")
             {
-                String duration = request->hasParam("duration", true) ? 
-                    request->getParam("duration", true)->value() : "8";
-                String cmd = "CB1" + duration + "008";
+                uint8_t durationSec = 8;
+                if (request->hasParam("duration", true) &&
+                    !parseDurationSeconds(request->getParam("duration", true)->value(), 1, 99, durationSec))
+                {
+                    request->send(400, "application/json", "{\"error\":\"invalid duration, use 1-99 seconds\"}");
+                    return;
+                }
+                char duration[3];
+                snprintf(duration, sizeof(duration), "%02u", durationSec);
+                String cmd = "CB1" + String(duration) + "008";
                 processMarcduinoCommandWithSource("astropixel-web-api", cmd.c_str());
-                request->send(200, "application/json", "{\"ok\":true,\"action\":\"disable\",\"duration\":\"" + duration + "\"}");
+                request->send(200, "application/json", "{\"ok\":true,\"action\":\"disable\",\"duration\":" + String(durationSec) + "}");
             }
             else
             {
@@ -1067,19 +1116,33 @@ static void initAsyncWeb()
             String action = request->getParam("action", true)->value();
             if (action == "flicker")
             {
-                String duration = request->hasParam("duration", true) ? 
-                    request->getParam("duration", true)->value() : "6";
-                String cmd = "DP2" + duration + "006";
+                uint8_t durationSec = 6;
+                if (request->hasParam("duration", true) &&
+                    !parseDurationSeconds(request->getParam("duration", true)->value(), 1, 99, durationSec))
+                {
+                    request->send(400, "application/json", "{\"error\":\"invalid duration, use 1-99 seconds\"}");
+                    return;
+                }
+                char duration[3];
+                snprintf(duration, sizeof(duration), "%02u", durationSec);
+                String cmd = "DP2" + String(duration) + "006";
                 processMarcduinoCommandWithSource("astropixel-web-api", cmd.c_str());
-                request->send(200, "application/json", "{\"ok\":true,\"action\":\"flicker\",\"duration\":\"" + duration + "\"}");
+                request->send(200, "application/json", "{\"ok\":true,\"action\":\"flicker\",\"duration\":" + String(durationSec) + "}");
             }
             else if (action == "disable")
             {
-                String duration = request->hasParam("duration", true) ? 
-                    request->getParam("duration", true)->value() : "8";
-                String cmd = "DP1" + duration + "008";
+                uint8_t durationSec = 8;
+                if (request->hasParam("duration", true) &&
+                    !parseDurationSeconds(request->getParam("duration", true)->value(), 1, 99, durationSec))
+                {
+                    request->send(400, "application/json", "{\"error\":\"invalid duration, use 1-99 seconds\"}");
+                    return;
+                }
+                char duration[3];
+                snprintf(duration, sizeof(duration), "%02u", durationSec);
+                String cmd = "DP1" + String(duration) + "008";
                 processMarcduinoCommandWithSource("astropixel-web-api", cmd.c_str());
-                request->send(200, "application/json", "{\"ok\":true,\"action\":\"disable\",\"duration\":\"" + duration + "\"}");
+                request->send(200, "application/json", "{\"ok\":true,\"action\":\"disable\",\"duration\":" + String(durationSec) + "}");
             }
             else
             {
@@ -1089,6 +1152,70 @@ static void initAsyncWeb()
         else
         {
             request->send(400, "application/json", "{\"error\":\"missing action param\"}");
+        }
+    });
+
+    // ---- REST API: Panel calibration reset ----
+    asyncServer.on("/api/panelcal/reset", HTTP_POST, [](AsyncWebServerRequest *request)
+    {
+        if (!checkWriteAuth(request))
+        {
+            request->send(401, "application/json", "{\"error\":\"unauthorized\"}");
+            return;
+        }
+        if (!request->hasParam("target", true))
+        {
+            request->send(400, "application/json", "{\"error\":\"missing target param\"}");
+            return;
+        }
+
+        String target = request->getParam("target", true)->value();
+        target.trim();
+        uint8_t tgt = 0;
+        uint32_t mask = 0;
+        if (!parseTwoDigitTarget(target.c_str(), tgt) || target.length() != 2 || !panelTargetToMask(tgt, mask))
+        {
+            request->send(400, "application/json", "{\"error\":\"invalid target (use 00-15)\"}");
+            return;
+        }
+
+        uint16_t matchedServos = 0;
+        uint16_t removedKeys = 0;
+        for (uint16_t i = 0; i < servoDispatch.getNumServos(); i++)
+        {
+            uint32_t group = servoDispatch.getGroup(i);
+            bool panelServo = (group & (SMALL_PANEL | MEDIUM_PANEL | BIG_PANEL | PIE_PANEL | TOP_PIE_PANEL | MINI_PANEL)) != 0;
+            if (!panelServo || (group & mask) == 0) continue;
+
+            matchedServos++;
+
+            char openKey[8];
+            char closeKey[8];
+            snprintf(openKey, sizeof(openKey), "so%02u", i);
+            snprintf(closeKey, sizeof(closeKey), "sc%02u", i);
+
+            if (preferences.remove(openKey)) removedKeys++;
+            if (preferences.remove(closeKey)) removedKeys++;
+        }
+
+        bool doReboot = true;
+        if (request->hasParam("reboot", true))
+        {
+            String rebootVal = request->getParam("reboot", true)->value();
+            rebootVal.toLowerCase();
+            doReboot = (rebootVal == "1" || rebootVal == "true");
+        }
+
+        String json = "{\"ok\":true";
+        json += ",\"target\":\"" + target + "\"";
+        json += ",\"matched_servos\":" + String(matchedServos);
+        json += ",\"removed_keys\":" + String(removedKeys);
+        json += ",\"rebooting\":" + String(doReboot ? "true" : "false") + "}";
+        request->send(200, "application/json", json);
+
+        if (doReboot)
+        {
+            scheduleReboot(800);
         }
     });
 
@@ -1121,6 +1248,9 @@ static void initAsyncWeb()
         [](AsyncWebServerRequest *request, const String &filename,
            size_t index, uint8_t *data, size_t len, bool final)
         {
+            // TODO(security): Known gap for early-development builds.
+            // Auth is currently enforced in the POST completion callback, not here.
+            // Harden by checking checkWriteAuth(request) before Update.begin()/Update.write.
             if (index == 0)
             {
                 // First chunk — start the update

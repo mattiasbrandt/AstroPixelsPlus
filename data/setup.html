@@ -21,62 +21,119 @@
   </nav>
 
   <div class="card">
-    <h3>Settings</h3>
-    <div class="label-dim">Droid Name</div>
-    <div class="row mt-4 mb-10">
-      <input type="text" id="droid-name" maxlength="24" placeholder="AstroPixels" class="flex-1">
-      <button class="btn accent" onclick="saveDroidName()">Save Name</button>
-    </div>
-    <div class="desc">Used in web page titles and startup logic scroll text.</div>
-    <div class="stack-6">
-      <a href="/wifi.html" class="btn link-btn">WiFi Configuration</a>
-      <a href="/serial.html" class="btn link-btn">Serial / Marcduino</a>
-      <a href="/sound.html" class="btn link-btn">Sound Player</a>
-      <a href="/remote.html" class="btn link-btn" id="remote-link">Droid Remote (ESPNOW only)</a>
-      <a href="/firmware.html" class="btn link-btn">Firmware Update</a>
-    </div>
+    <h3>System Identity</h3>
+    <div class="desc">Set the droid name used in page branding and startup logic text.</div>
+    <details class="gadget-details mt-10">
+      <summary>Edit Droid Name</summary>
+      <div class="label-dim mt-10">Droid Name</div>
+      <div class="row mt-4 mb-10">
+        <input type="text" id="droid-name" maxlength="24" placeholder="AstroPixels" class="flex-1">
+        <button class="btn accent" onclick="saveDroidName()">Save Name</button>
+      </div>
+    </details>
   </div>
+
+  <div class="card">
+    <h3>Configuration Areas</h3>
+    <div class="stack-6 mt-10">
+      <a href="/wifi.html" class="btn link-btn">WiFi Configuration</a>
+      <div class="desc">Access point/client mode, network credentials, and connectivity behavior.</div>
+
+      <a href="/serial.html" class="btn link-btn">Serial Communication</a>
+      <div class="desc">Serial2 transport, JawaLite bridging, and body controller link settings.</div>
+
+      <a href="/sound.html" class="btn link-btn">Sound Player</a>
+      <div class="desc">Sound module mode, local playback behavior, and startup/random options.</div>
+
+      <a href="/remote.html" class="btn link-btn" id="remote-link">Droid Remote (ESPNOW only)</a>
+      <div class="desc" id="remote-desc">Pairing and host/secret settings for ESPNOW Droid Remote mode.</div>
+
+      <a href="/firmware.html" class="btn link-btn">Firmware Update</a>
+      <div class="desc">Upload app firmware and monitor OTA progress.</div>
+    </div>
   </div>
 
   <div class="card">
     <h3>Hardware Gadgets</h3>
-    <div class="desc">Enable or disable optional hardware components. Changes require reboot.</div>
-    <div class="stack-6">
-      <div class="toggle-row">
-        <label>BadMotivator</label>
-        <input type="checkbox" id="gadget-badmot" onchange="saveGadgetPref('badmot')">
+    <div class="desc">Feature toggles for optional hardware modules. Preferences are saved to NVS and applied after reboot.</div>
+
+    <div class="gadget-list mt-10">
+      <div class="gadget-item">
+        <details class="gadget-details">
+          <summary>BadMotivator (Smoke)</summary>
+          <div class="desc">Controls smoke output through the BadMotivator module.</div>
+          <div class="desc">Key: <code>badmot</code> | Commands: <code>#BMSMOKE</code>, <code>#BMSTOP</code>, <code>#BMPULSE&lt;sec&gt;</code></div>
+          <div class="toggle-row mt-8">
+            <label for="gadget-badmot">Enable Feature</label>
+            <input type="checkbox" id="gadget-badmot" onchange="saveGadgetPref('badmot')">
+          </div>
+        </details>
       </div>
-      <div class="toggle-row">
-        <label>FireStrip</label>
-        <input type="checkbox" id="gadget-firest" onchange="saveGadgetPref('firest')">
+
+      <div class="gadget-item">
+        <details class="gadget-details">
+          <summary>FireStrip (Fire LEDs)</summary>
+          <div class="desc">Controls the optional auxiliary fire/spark LED strip.</div>
+          <div class="desc">Key: <code>firest</code> | Commands: <code>#FIRESPARK&lt;ms&gt;</code>, <code>#FIREBURN&lt;ms&gt;</code>, <code>#FIRESTOP</code></div>
+          <div class="toggle-row mt-8">
+            <label for="gadget-firest">Enable Feature</label>
+            <input type="checkbox" id="gadget-firest" onchange="saveGadgetPref('firest')">
+          </div>
+        </details>
       </div>
-      <div class="toggle-row">
-        <label>Charge Bay Indicator (CBI)</label>
-        <input type="checkbox" id="gadget-cbienb" onchange="saveGadgetPref('cbienb')">
+
+      <div class="gadget-item">
+        <details class="gadget-details">
+          <summary>Charge Bay Indicator (CBI)</summary>
+          <div class="desc">Enables MAX7219 charge-bay panel animation output.</div>
+          <div class="desc">Key: <code>cbienb</code> | Typical commands: <code>#CBION</code>, <code>#CBIOFF</code>, <code>#CBISET&lt;n&gt;</code></div>
+          <div class="toggle-row mt-8">
+            <label for="gadget-cbienb">Enable Feature</label>
+            <input type="checkbox" id="gadget-cbienb" onchange="saveGadgetPref('cbienb')">
+          </div>
+        </details>
       </div>
-      <div class="toggle-row">
-        <label>DataPanel</label>
-        <input type="checkbox" id="gadget-dpenab" onchange="saveGadgetPref('dpenab')">
+
+      <div class="gadget-item">
+        <details class="gadget-details">
+          <summary>DataPanel</summary>
+          <div class="desc">Enables MAX7219 body datapanel animation output.</div>
+          <div class="desc">Key: <code>dpenab</code> | Typical commands: <code>#DPON</code>, <code>#DPOFF</code>, <code>#DPSET&lt;n&gt;</code></div>
+          <div class="toggle-row mt-8">
+            <label for="gadget-dpenab">Enable Feature</label>
+            <input type="checkbox" id="gadget-dpenab" onchange="saveGadgetPref('dpenab')">
+          </div>
+        </details>
       </div>
     </div>
-    <div class="desc mt-8">Note: Hardware must be physically connected and build flags enabled in firmware.</div>
+
+    <div class="desc mt-8">Hardware must be physically connected and compiled in with the corresponding build flags.</div>
   </div>
+
   <div class="card">
-    <h3>Write API Token (Optional)</h3>
-    <div class="desc">Used by this browser when write endpoints are protected</div>
-    <div class="row mt-8">
-      <input type="password" id="api-token" placeholder="Enter token..." class="flex-1">
-      <button class="btn accent" onclick="saveApiToken()">Save</button>
-      <button class="btn danger" onclick="clearApiToken()">Clear</button>
-    </div>
+    <h3>Write API Token</h3>
+    <div class="desc">Optional. Stored only in this browser and sent with write requests when API protection is enabled.</div>
+    <details class="gadget-details mt-10">
+      <summary>Edit API Token</summary>
+      <div class="row mt-8">
+        <input type="password" id="api-token" placeholder="Enter token..." class="flex-1">
+        <button class="btn accent" onclick="saveApiToken()">Save</button>
+        <button class="btn danger" onclick="clearApiToken()">Clear</button>
+      </div>
+    </details>
     <div class="desc mt-8" id="api-token-status">Not set</div>
   </div>
 
   <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>
   <script src="/app.js"></script>
   <script>
+    function isTrue(v) {
+      return v === true || v === 'true' || v === '1' || v === 1;
+    }
+
     fetch('/api/state').then(function(r){return r.json();}).then(function(s){
       var link = document.getElementById('remote-link');
+      var desc = document.getElementById('remote-desc');
       if (!link) return;
       if (s && s.droidName) {
         var nameInput = document.getElementById('droid-name');
@@ -85,9 +142,11 @@
       if (typeof s.remoteSupported !== 'undefined' && !s.remoteSupported) {
         link.textContent = 'Droid Remote (Disabled in this build)';
         link.title = 'Droid Remote ESPNOW support is compiled out in this firmware build.';
+        if (desc) desc.textContent = 'Droid Remote support is disabled at build time in this firmware image.';
       } else {
         link.textContent = 'Droid Remote (ESPNOW only)';
         link.title = 'Configure ESPNOW Droid Remote pairing.';
+        if (desc) desc.textContent = 'Pairing and host/secret settings for ESPNOW Droid Remote mode.';
       }
     }).catch(function(){});
 
@@ -140,10 +199,10 @@
     fetch('/api/pref?keys=badmot,firest,cbienb,dpenab')
       .then(function(r){return r.json();})
       .then(function(prefs) {
-        document.getElementById('gadget-badmot').checked = prefs.badmot === 'true';
-        document.getElementById('gadget-firest').checked = prefs.firest === 'true';
-        document.getElementById('gadget-cbienb').checked = prefs.cbienb === 'true';
-        document.getElementById('gadget-dpenab').checked = prefs.dpenab === 'true';
+        document.getElementById('gadget-badmot').checked = isTrue(prefs.badmot);
+        document.getElementById('gadget-firest').checked = isTrue(prefs.firest);
+        document.getElementById('gadget-cbienb').checked = isTrue(prefs.cbienb);
+        document.getElementById('gadget-dpenab').checked = isTrue(prefs.dpenab);
       })
       .catch(function(err) {
         console.warn('Failed to load gadget preferences:', err);

@@ -400,14 +400,21 @@
       uiToast('Invalid command format', 'warn');
       return;
     }
-    // Try WebSocket first for lower latency, fall back to REST
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(cmd);
-    } else {
-      apiPostForm('/api/cmd', 'cmd=' + encodeURIComponent(cmd)).catch(function() {
+    // REST-first command dispatch is currently more reliable for panel actions.
+    // Keep WS only as a fallback if the HTTP command path fails.
+    apiPostForm('/api/cmd', 'cmd=' + encodeURIComponent(cmd))
+      .then(function(resp) {
+        if (!resp.ok && ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(cmd);
+        }
+      })
+      .catch(function() {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(cmd);
+          return;
+        }
         uiToast('Command send failed (network)', 'error');
       });
-    }
     // Brief visual feedback on the clicked button
     var ev = (typeof event !== 'undefined') ? event : null;
     if (ev && ev.target) {

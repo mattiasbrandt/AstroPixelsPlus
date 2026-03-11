@@ -60,9 +60,9 @@ static bool LogicEffectFadeAndScroll(LogicEngineRenderer& r)
             if (fs_palette == kPaletteRandom)
                 fs_palette = Palette(random(int(kPaletteLast) + 1));
             if (fs_dir == kRandomDirection)
-                fs_dir = Direction(random(int(kLastDirection)));
+                fs_dir = Direction(random(int(kLastDirection) + 1));
             if (fs_scroll_type == kRandomType)
-                fs_scroll_type = Type(random(int(kTypeLast)));
+                fs_scroll_type = Type(random(int(kTypeLast) + 1));
             switch (fs_palette)
             {
                 case kPaletteRGB:

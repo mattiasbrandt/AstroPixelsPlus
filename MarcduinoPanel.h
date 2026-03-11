@@ -11,6 +11,7 @@ static bool parseTwoDigitTarget(const char *cmd, uint8_t &target)
 static bool parseFourDigitValue(const char *cmd, uint16_t &value)
 {
     if (cmd == nullptr) return false;
+    if (cmd[0] == '\0' || cmd[1] == '\0' || cmd[2] == '\0' || cmd[3] == '\0' || cmd[4] != '\0') return false;
     for (uint8_t i = 0; i < 4; i++)
     {
         if (cmd[i] < '0' || cmd[i] > '9') return false;
@@ -132,32 +133,54 @@ static bool swapPanelCalibrationInMask(uint32_t mask)
     return swapped;
 }
 
-// NOTE: :MV, #SO, #SC, #SW are intentionally empty stubs here.
+// NOTE: :MV, #SO, #SC, #SW use getCommand() suffix parsing here.
 //
-// These calibration commands call getCommand() to read their arguments, but
-// MARCDUINO_ACTION defers the body via animateOnce() to the next loop iteration.
-// By then the incoming cmd buffer has been freed (dangling pointer), causing
-// all argument parsing to silently fail.
-//
-// The real implementations live in processMarcduinoCommandWithSource()
-// in AsyncWebInterface.h, where cmd is still valid on the stack. The stubs
-// below exist only so the Marcduino command registry recognises the prefixes
-// (required for the serial/Marcduino path to not fall through to Jawa handling).
+// This works for stable ingress buffers such as MarcduinoSerial's internal
+// fBuffer. For async web ingress, command memory can be temporary; those paths
+// are handled synchronously in processMarcduinoCommandWithSource() before
+// reaching Marcduino::processCommand().
 
 MARCDUINO_ACTION(MovePanelCalibration, :MV, ({
-    // See processMarcduinoCommandWithSource() in AsyncWebInterface.h
+    const char *args = Marcduino::getCommand();
+    uint8_t tgt = 0;
+    uint16_t val = 0;
+    uint32_t msk = 0;
+    if (parseTwoDigitTarget(args, tgt) && parseFourDigitValue(args + 2, val) && panelTargetToMask(tgt, msk))
+    {
+        movePanelMaskToValue(msk, val);
+    }
 }))
 
 MARCDUINO_ACTION(SavePanelOpenCalibration, #SO, ({
-    // See processMarcduinoCommandWithSource() in AsyncWebInterface.h
+    const char *args = Marcduino::getCommand();
+    uint8_t tgt = 0;
+    uint16_t val = 0;
+    uint32_t msk = 0;
+    if (parseTwoDigitTarget(args, tgt) && parseFourDigitValue(args + 2, val) && panelTargetToMask(tgt, msk))
+    {
+        applyPanelCalibrationToMask(msk, true, false, val);
+    }
 }))
 
 MARCDUINO_ACTION(SavePanelClosedCalibration, #SC, ({
-    // See processMarcduinoCommandWithSource() in AsyncWebInterface.h
+    const char *args = Marcduino::getCommand();
+    uint8_t tgt = 0;
+    uint16_t val = 0;
+    uint32_t msk = 0;
+    if (parseTwoDigitTarget(args, tgt) && parseFourDigitValue(args + 2, val) && panelTargetToMask(tgt, msk))
+    {
+        applyPanelCalibrationToMask(msk, false, true, val);
+    }
 }))
 
 MARCDUINO_ACTION(SwapPanelOpenClosedCalibration, #SW, ({
-    // See processMarcduinoCommandWithSource() in AsyncWebInterface.h
+    const char *args = Marcduino::getCommand();
+    uint8_t tgt = 0;
+    uint32_t msk = 0;
+    if (parseTwoDigitTarget(args, tgt) && panelTargetToMask(tgt, msk))
+    {
+        swapPanelCalibrationInMask(msk);
+    }
 }))
 
 MARCDUINO_ACTION(CloseAllPanels, :CL00, ({

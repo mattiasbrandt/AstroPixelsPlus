@@ -204,6 +204,7 @@
       <button class="btn accent" onclick="saveOpenPosition()">Save Open (#SO)</button>
       <button class="btn" onclick="saveClosedPosition()">Save Closed (#SC)</button>
       <button class="btn danger" onclick="swapOpenClosed()">Swap Open/Closed (#SW)</button>
+      <button class="btn danger" onclick="resetSelectedCalibration()">Reset Saved Calibration</button>
     </div>
 
     <div class="label-dim mt-8">Command preview:</div>
@@ -415,6 +416,37 @@
       sendCmd(cmd);
       document.getElementById('cal-preview').textContent = cmd;
       document.getElementById('cal-easing-preview').textContent = cmd;
+    }
+
+    function resetSelectedCalibration() {
+      var target = selectedPanel();
+      if (!confirm('Reset saved calibration for panel target ' + target + ' and reboot now?')) {
+        return;
+      }
+      apiPostForm('/api/panelcal/reset', 'target=' + encodeURIComponent(target) + '&reboot=1')
+        .then(function(resp) {
+          if (!resp.ok) {
+            throw new Error('HTTP ' + resp.status);
+          }
+          return resp.json();
+        })
+        .then(function(result) {
+          var msg = 'Calibration reset for target ' + target + '. Removed keys: ' +
+            (typeof result.removed_keys !== 'undefined' ? result.removed_keys : '?') +
+            '. Rebooting...';
+          if (typeof window.uiToast === 'function') {
+            window.uiToast(msg, 'warn');
+          } else {
+            alert(msg);
+          }
+        })
+        .catch(function() {
+          if (typeof window.uiToast === 'function') {
+            window.uiToast('Failed to reset calibration', 'error');
+          } else {
+            alert('Failed to reset calibration');
+          }
+        });
     }
 
     updateCalPreview();

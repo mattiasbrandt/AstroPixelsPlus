@@ -827,10 +827,21 @@ void setup()
     String droidName = getConfiguredDroidName();
     PrintReelTwoInfo(Serial, droidName.c_str());
 
-    if (preferences.getBool(PREFERENCE_MARCSERIAL_ENABLED, MARC_SERIAL_ENABLED))
+    bool serial2Enabled = preferences.getBool(PREFERENCE_MARCSERIAL_ENABLED, MARC_SERIAL_ENABLED);
+    bool bodyLinkEnabled = preferences.getBool(PREFERENCE_BODY_LINK_ENABLED, BODY_LINK_ENABLED);
+
+    // Body link depends on Serial2 transport. If user disabled mserial but kept
+    // body link enabled, keep Serial2 active to avoid a broken heartbeat link.
+    if (bodyLinkEnabled && !serial2Enabled)
+    {
+        DEBUG_PRINTLN(F("[BodyLink] Forcing Serial2 active because body link is enabled"));
+        serial2Enabled = true;
+    }
+
+    if (serial2Enabled)
     {
         COMMAND_SERIAL.begin(preferences.getInt(PREFERENCE_MARCSERIAL2, MARC_SERIAL2_BAUD_RATE), SERIAL_8N1, SERIAL2_RX_PIN, SERIAL2_TX_PIN);
-        if (preferences.getBool(PREFERENCE_BODY_LINK_ENABLED, BODY_LINK_ENABLED))
+        if (bodyLinkEnabled)
         {
             // Body link enabled — disable Reeltwo stream handling to prevent race conditions
             marcduinoSerial.setStream(nullptr, nullptr);
@@ -1022,6 +1033,9 @@ void setup()
             preferences.getString(PREFERENCE_WIFI_PASS, WIFI_AP_PASSPHRASE),
             preferences.getBool(PREFERENCE_WIFI_AP, WIFI_ACCESS_POINT),
             preferences.getBool(PREFERENCE_WIFI_ENABLED, WIFI_ENABLED));
+        // Keep WiFi fully awake to avoid multi-second UI/API latency spikes
+        // seen with default ESP32 modem sleep in STA mode.
+        WiFi.setSleep(false);
         // CRITICAL: setNetworkCredentials changes WiFi mode to STA
         // If remote is enabled, we need APSTA mode for ESP-NOW, so override it here
         if (remoteEnabled)
@@ -1045,6 +1059,7 @@ void setup()
         wifiAccess.notifyWifiConnected([](WifiAccess &wifi)
                                        {
                                            wifiActive = true;
+                                           WiFi.setSleep(false);
                                            Serial.print("Connect to http://");
                                            Serial.println(wifi.getIPAddress());
 #ifdef USE_WIFI_WEB

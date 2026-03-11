@@ -140,6 +140,7 @@ public:
     void playSound(uint8_t bank, uint8_t sound)
     {
         uint8_t filenum;
+        uint8_t bankIndex = 0;
 
         if (bank > MP3_MAX_BANKS)
             return;
@@ -152,25 +153,27 @@ public:
 
         else if (sound != 0)
         {
+            bankIndex = bank - 1;
             // calculate actual file number on the MP3 memory card
             filenum = (bank - 1) * MP3_MAX_SOUNDS_PER_BANK + sound;
             // also adjust last sound played index for the next sound command
             // make sure not to go past max sounds
-            if (sound > fMaxSounds[bank])
-                fBankIndexes[bank] = fMaxSounds[bank];
+            if (sound > fMaxSounds[bankIndex])
+                fBankIndexes[bankIndex] = fMaxSounds[bankIndex];
             else
-                fBankIndexes[bank] = sound;
+                fBankIndexes[bankIndex] = sound;
         }
         // sound "0", play first or next sound depending on bank
         else
         {
+            bankIndex = bank - 1;
             if (bank <= MP3_BANK_CUTOFF)
             {
                 // advance index, rewind to first sound if at end
-                if ((++fBankIndexes[bank]) > fMaxSounds[bank])
-                    fBankIndexes[bank] = 1;
+                if ((++fBankIndexes[bankIndex]) > fMaxSounds[bankIndex])
+                    fBankIndexes[bankIndex] = 1;
                 // we'll play the new indexed sound
-                sound = fBankIndexes[bank];
+                sound = fBankIndexes[bankIndex];
             }
             else
             {
@@ -205,13 +208,13 @@ public:
                         sendHCR("<MT><MT>");
                         break;
                     case kHappySounds:
-                        if (filenum < fMaxSounds[bank] / 2)
+                        if (filenum < fMaxSounds[bankIndex] / 2)
                             sendHCR("<SH0>");
                         else
                             sendHCR("<SH1>");
                         break;
                     case kSadSounds:
-                        if (filenum < fMaxSounds[bank] / 2)
+                        if (filenum < fMaxSounds[bankIndex] / 2)
                             sendHCR("<SS0>");
                         else
                             sendHCR("<SS1>");
@@ -255,7 +258,7 @@ public:
         }
         uint8_t num;
         // Plays a random sound from the first 5 banks only
-        num = random(1, MP3_BANK1_SOUNDS + MP3_BANK2_SOUNDS + MP3_BANK3_SOUNDS + MP3_BANK4_SOUNDS + MP3_BANK5_SOUNDS);
+        num = random(1, MP3_BANK1_SOUNDS + MP3_BANK2_SOUNDS + MP3_BANK3_SOUNDS + MP3_BANK4_SOUNDS + MP3_BANK5_SOUNDS + 1);
         if(num <= MP3_BANK1_SOUNDS)
         {
             playSound(1, num);

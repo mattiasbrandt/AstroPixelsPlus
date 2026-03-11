@@ -303,6 +303,52 @@ input:focus {
   margin-bottom: 10px;
 }
 
+.gadget-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gadget-item {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.toggle-row label {
+  color: var(--silver-bright);
+  font-size: 0.9em;
+  font-weight: 600;
+}
+
+.gadget-details {
+  margin-top: 6px;
+}
+
+.gadget-details summary {
+  color: var(--accent-bright);
+  font-size: 0.82em;
+  cursor: pointer;
+  user-select: none;
+  font-weight: 600;
+}
+
+.gadget-details[open] summary {
+  margin-bottom: 4px;
+}
+
+.gadget-details > summary::marker {
+  color: var(--silver-bright);
+}
+
 .input-full {
   width: 100%;
   margin-top: 4px;

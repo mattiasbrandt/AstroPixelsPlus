@@ -62,9 +62,9 @@ Added runtime soft sleep state tracking in firmware (`sleepMode`, `sleepSinceMs`
 
 Sleep entry uses existing Marcduino/ReelTwo command patterns: `:SE10` (quiet reset), `*ST00` (disable holo twitch), `@0T15` (logic lights-out). Wake exit restores active baseline using `:SE14` (awake+ profile). While in sleep mode, incoming Marcduino commands are gated (blocked) except wake-profile commands.
 
-### Body Controller Link (protoArtoo Integration)
+### Body Controller Link (Artoo Controller with protoArtoo firmware Integration)
 
-Replaced the vague "Artoo Telemetry" feature with a proper bidirectional serial link protocol for integration with protoArtoo body controllers.
+Introduces a proper bidirectional serial link protocol for integration with the [Artoo Controller](https://www.artoo.uk/artooinventions) running the [protoArtoo firmware](https://github.com/mattiasbrandt/protoArtoo)
 
 **Protocol:**
 - `#APHB\r` — Dome → Body heartbeat (sent at 1Hz)
@@ -108,6 +108,41 @@ Comprehensive review of correctness, robustness, and static-analysis issues comp
 | H1 | Null-check heap allocations | `d302208` |
 | L3 | Makefile documentation | `2145da1` |
 | L5 | F() macro for DEBUG_PRINT | `054893e`, `cd48053` |
+
+### March 2026 Review Patchset (Items 1-8 Follow-up)
+
+Implemented a targeted reliability patchset after a full fork review:
+
+- Added inline TODO security notes (intentionally deferred in early development) for:
+    - WebSocket command auth parity (`/ws` write path)
+    - OTA upload-chunk auth enforcement sequencing (`/upload/firmware`)
+- Fixed sound bank indexing to avoid out-of-bounds array access for bank 9.
+- Fixed random-sound upper-bound exclusion so the last candidate sound can be selected.
+- Hardened panel calibration value parsing (`#SO/#SC/:MV`) to require exactly four digits.
+- Re-enabled gadget preference keys (`badmot`, `firest`, `cbienb`, `dpenab`) in pref-key allowlist.
+- Added strict duration input validation (`1-99` seconds, digits-only) for `/api/cbi` and `/api/datapanel`.
+- Fixed FadeAndScroll random enum selection to include terminal enum values.
+
+### March 2026 Stability + Calibration Recovery Follow-up
+
+Additional reliability and operator workflow updates after live bench validation:
+
+- Fixed malformed async JSON assembly in health/diagnostic payload paths (removed extra closing braces) to restore stable `/api/health` parsing in the web UI.
+- Added consistent boolean preference handling for setup/serial/gadget keys:
+    - unified default bool mapping for reads
+    - bool write handling for `mserialpass`, `mserial`, `mwifi`, `mwifipass`, `mbodylink`, and gadget toggles.
+- Added runtime compatibility guard for body link mode:
+    - if body link is enabled while serial ingest is disabled, firmware forces Serial2 active to prevent heartbeat link breakage.
+- Added WiFi modem-sleep mitigation (`WiFi.setSleep(false)`) to reduce intermittent multi-second API/UI latency spikes.
+- Added panel calibration recovery API and UI:
+    - `POST /api/panelcal/reset` clears persisted `soXX/scXX` keys for a selected panel target mask (or aliases), with optional reboot.
+    - Panels page includes `Reset Saved Calibration` action in calibration section.
+- Confirmed in-field root cause of non-moving panels during this session was invalid persisted panel calibration values; reset workflow restored panel movement.
+- Updated command dispatch in web UI to REST-first (`/api/cmd`) with WebSocket fallback for improved consistency on panel commands.
+- Serial page performance/clarity updates:
+    - reduced duplicate state fetches by reusing a single state request
+    - body-link badge now uses lightweight state data path
+    - revised labeling (`Serial Communication`) and body-link constraint messaging.
 
 ---
 
