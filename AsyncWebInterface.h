@@ -352,6 +352,10 @@ static String buildStateJson()
     json += ",\"freeHeap\":" + String(ESP.getFreeHeap());
     json += ",\"minFreeHeap\":" + String(sMinFreeHeap);
     json += ",\"i2c_probe_failures\":" + String(i2cProbeFailures);
+    // Body link status (for real-time WebSocket updates)
+    bool bodyLinkPrefEnabled = preferences.getBool("mbodylink", true);
+    json += ",\"body_link\":{\"enabled\":" + String(bodyLinkPrefEnabled ? "true" : "false");
+    json += ",\"connected\":" + String(bodyLinkConnected() ? "true" : "false") + "}";
     json += ",\"droidName\":\"" + jsonEscape(droidName) + "\"";
 
     // WiFi details

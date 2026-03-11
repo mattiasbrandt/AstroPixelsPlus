@@ -647,6 +647,19 @@ static void handleBodyLinkHeartbeat()
         sBodyLinkInitDone = true;
     }
     if (!sBodyLinkEnabled) return;
+    
+    // Connection state tracking for logging
+    static bool sPrevConnected = false;
+    bool nowConnected = bodyLinkConnected();
+    if (nowConnected != sPrevConnected)
+    {
+        if (nowConnected)
+            DEBUG_PRINTLN(F("[BodyLink] Body controller connected"));
+        else
+            DEBUG_PRINTLN(F("[BodyLink] Body controller LOST"));
+        sPrevConnected = nowConnected;
+    }
+    
     uint32_t now = millis();
     if (now - sBodyLastTxMs >= 1000)
     {
