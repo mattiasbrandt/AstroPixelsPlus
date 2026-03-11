@@ -62,12 +62,34 @@ Added runtime soft sleep state tracking in firmware (`sleepMode`, `sleepSinceMs`
 
 Sleep entry uses existing Marcduino/ReelTwo command patterns: `:SE10` (quiet reset), `*ST00` (disable holo twitch), `@0T15` (logic lights-out). Wake exit restores active baseline using `:SE14` (awake+ profile). While in sleep mode, incoming Marcduino commands are gated (blocked) except wake-profile commands.
 
-### Artoo Serial Telemetry Profile
-Added preference keys:
-- `artoo` (enable telemetry profile)
-- `artoobaud` (expected upstream baud)
+### Body Controller Link (protoArtoo Integration)
 
-Added API/health visibility fields: `artoo`, `artoo_enabled`, `artoo_baud`, `artoo_last_seen_ms`, `artoo_signal_bursts`. Added Serial setup UI section for Artoo communication context. Implemented lock-protected telemetry reads/writes for shared Artoo counters.
+Replaced the vague "Artoo Telemetry" feature with a proper bidirectional serial link protocol for integration with protoArtoo body controllers.
+
+**Protocol:**
+- `#APHB\r` — Dome → Body heartbeat (sent at 1Hz)
+- `#PAHB\r` — Body → Dome heartbeat (received and tracked)
+- 5-second timeout for "lost" detection
+
+**New preference key:**
+- `mbodylink` (bool, default `true`) — Enable body controller link
+
+**Implementation:**
+- `sendBodyCommand()` — Sends Marcduino commands to body during sequences
+- `handleBodySerial()` — Manual serial read loop intercepting heartbeats before Reeltwo dispatch
+- `handleBodyLinkHeartbeat()` — Transmits dome heartbeats at 1Hz
+- `bodyLinkConnected()` — Connection state helper with 5s timeout
+
+**Integration points:**
+- 13 sequences (:SE01–:SE15) now call `sendBodyCommand()` to synchronize body actions
+- Health JSON exposes `body_link` object with `enabled`, `connected`, `last_rx_ms`, `hb_rx`
+- Real-time WebSocket state broadcasts include body link status
+- Web UI shows toggle + status badge (Connected/Lost/Not seen/Disabled)
+
+**Safety:**
+- When body link is enabled, Reeltwo's `marcduinoSerial.setStream()` is explicitly disabled to prevent serial race conditions
+- When disabled, falls back to standard Reeltwo stream handling
+- 65-byte buffer with overflow logging and null-termination safety
 
 ### Local Sound Execution Feature Toggle
 Added `msoundlocal` preference. When disabled, sound commands may still be accepted but local playback/startup/random local sound behavior is not actuated.
