@@ -35,6 +35,12 @@ body {
 }
 
 /* Header — R2's white dome panel feel */
+.topbar-logo {
+  height: 1.5em;
+  vertical-align: middle;
+  margin-right: 4px;
+}
+
 h1 {
   color: var(--white);
   font-size: 1.4em;
