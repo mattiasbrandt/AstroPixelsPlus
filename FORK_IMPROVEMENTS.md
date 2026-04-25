@@ -62,34 +62,55 @@ Added runtime soft sleep state tracking in firmware (`sleepMode`, `sleepSinceMs`
 
 Sleep entry uses existing Marcduino/ReelTwo command patterns: `:SE10` (quiet reset), `*ST00` (disable holo twitch), `@0T15` (logic lights-out). Wake exit restores active baseline using `:SE14` (awake+ profile). While in sleep mode, incoming Marcduino commands are gated (blocked) except wake-profile commands.
 
-### Body Controller Link (Artoo Controller with protoArtoo firmware Integration)
+### Body Controller Link (protoR2link — UART + WiFi fallback)
 
-Introduces a proper bidirectional serial link protocol for integration with the [Artoo Controller](https://www.artoo.uk/artooinventions) running the [protoArtoo firmware](https://github.com/mattiasbrandt/protoArtoo)
+Bidirectional integration with the [Artoo Controller](https://www.artoo.uk/artooinventions) running the [protoArtoo firmware](https://github.com/mattiasbrandt/protoArtoo). Transport is UART (primary, over slip ring) with automatic WiFi/UDP fallback when the UART heartbeat stales.
 
 **Protocol:**
-- `#APHB\r` — Dome → Body heartbeat (sent at 1Hz)
-- `#PAHB\r` — Body → Dome heartbeat (received and tracked)
-- 5-second timeout for "lost" detection
 
-**New preference key:**
+| Command | Direction | Transport | Purpose |
+|---|---|---|---|
+| `#APHB\r` | Dome→Body | UART or UDP:4901 | Dome heartbeat (1 Hz) |
+| `#PAHB\r` | Body→Dome | UART or UDP:4901 | Body heartbeat (1 Hz) |
+| `#APSL\r` | Dome→Body | UART or UDP:4901 | Dome entered sleep |
+| `#APWU\r` | Dome→Body | UART or UDP:4901 | Dome exited sleep |
+| `#PASL\r` | Body→Dome | UART or UDP:4901 | Body entered sleep |
+| `#PAWU\r` | Body→Dome | UART or UDP:4901 | Body exited sleep |
+| `:SExx\r`, `$x\r`, `:OPxx\r` etc. | Dome→Body | UART or UDP:4901 | Sequence/sound/panel commands |
+
+Body→dome commands (WiFi path) use HTTP POST to the dome's `/api/cmd` endpoint.
+
+**Preference keys:**
 - `mbodylink` (bool, default `true`) — Enable body controller link
+- `mbodywifi` (bool, default `true`) — Enable WiFi/UDP fallback transport
+- `bodypeerip` (string) — Manual body peer IP override (optional; mDNS preferred)
 
-**Implementation:**
-- `sendBodyCommand()` — Sends Marcduino commands to body during sequences
-- `handleBodySerial()` — Manual serial read loop intercepting heartbeats before Reeltwo dispatch
-- `handleBodyLinkHeartbeat()` — Transmits dome heartbeats at 1Hz
-- `bodyLinkConnected()` — Connection state helper with 5s timeout
+**Core implementation:**
+- `BodyLinkWiFi.h` — UDP socket management, peer discovery (mDNS `protoartoo.local` + received-packet source learning), transport selection, WiFi RX/TX helpers
+- `sendBodyCommand()` — routes to UART or UDP based on active transport
+- `handleBodySerial()` — manual Serial2 read loop, intercepts heartbeats before ReelTwo dispatch
+- `handleBodyLinkHeartbeat()` — sends `#APHB` at 1 Hz on active transport, logs transport transitions
+- `bodyLinkConnected()` / `bodyLinkActiveTransport()` — connection state and transport selection helpers
+- `bodyLinkResolvePeer()` — mDNS hostname resolution for body peer IP (runs in WiFi event task)
+
+**Bilateral sleep/wake sync:**
+- `enterSoftSleepMode()` sends `#APSL` to body on local sleep entry
+- `exitSoftSleepMode()` sends `#APWU` to body on local wake
+- `MARCDUINO_ACTION(BodySleepSync, #PASL)` — mirrors body sleep to dome locally
+- `MARCDUINO_ACTION(BodyWakeSync, #PAWU)` — mirrors body wake to dome locally
+- Echo suppression via `fromPeer` flag: peer-initiated transitions do not re-send sync back
 
 **Integration points:**
-- 13 sequences (:SE01–:SE15) now call `sendBodyCommand()` to synchronize body actions
-- Health JSON exposes `body_link` object with `enabled`, `connected`, `last_rx_ms`, `hb_rx`
+- 13 sequences (:SE01–:SE15) call `sendBodyCommand()` to synchronize body-side sound and panel actions
+- `/api/health` exposes `body_link` object: `enabled`, `connected`, `transport`, `uart_hb_age_ms`, `wifi_hb_age_ms`, `hb_rx`, `peer_ip`, `peer_source`
 - Real-time WebSocket state broadcasts include body link status
-- Web UI shows toggle + status badge (Connected/Lost/Not seen/Disabled)
+- `serial.html` shows live badge: `Connected (UART)` / `Connected (WiFi)` / `Waiting` / `Disabled`
+- `index.html` health indicator reflects transport in tooltip
 
 **Safety:**
-- When body link is enabled, Reeltwo's `marcduinoSerial.setStream()` is explicitly disabled to prevent serial race conditions
-- When disabled, falls back to standard Reeltwo stream handling
-- 65-byte buffer with overflow logging and null-termination safety
+- When body link is enabled, ReelTwo's `marcduinoSerial.setStream()` is explicitly disabled to prevent Serial2 race conditions
+- 65-byte UART buffer with overflow logging and null-termination safety
+- `#PAWU` whitelisted in sleep gate so a body-initiated wake is never blocked by dome sleep mode
 
 ### Local Sound Execution Feature Toggle
 Added `msoundlocal` preference. When disabled, sound commands may still be accepted but local playback/startup/random local sound behavior is not actuated.
@@ -349,6 +370,8 @@ Added source-tagged command logging for ingress paths:
 - `wifi-marcduino`
 - `usb-serial`
 - `i2c-slave`
+- `body-link-uart`
+- `body-link-wifi`
 
 ### Holo Command Corrections
 Corrected holo OFF semantics to ReelTwo clear command form:
