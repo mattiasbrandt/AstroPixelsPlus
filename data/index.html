@@ -63,7 +63,7 @@
       <div class="health-item" title="Current WiFi service state on this controller"><div class="indicator" id="h-wifi"></div><span>WiFi</span></div>
       <div class="health-item" title="Droid remote link state (warn means remote feature disabled)"><div class="indicator" id="h-remote"></div><span>Droid Remote</span></div>
       <div class="health-item" title="SPI flash file system mount state used by web UI files"><div class="indicator" id="h-spiffs"></div><span>SPIFFS</span></div>
-      <div class="health-item" title="Body controller serial link state (warn means body link disabled)"><div class="indicator" id="h-bodylink"></div><span>Body Link</span></div>
+      <div class="health-item" title="protoR2link health and active transport (UART or WiFi fallback)"><div class="indicator" id="h-bodylink"></div><span>protoR2link</span></div>
     </div>
     <div class="i2c-list" id="i2c-list" title="Detected I2C addresses responding on the bus"></div>
   </div>
@@ -280,7 +280,15 @@
       }
       setIndicator('h-spiffs', h.spiffs);
       if (h.body_link) {
-        setIndicatorWarn('h-bodylink', h.body_link.connected, h.body_link.enabled);
+        var bodyNode = document.getElementById('h-bodylink');
+        if (bodyNode && bodyNode.parentElement) {
+          var transport = (h.body_link.transport || 'disconnected').toUpperCase();
+          var statusText = !h.body_link.enabled ? 'disabled' : (h.body_link.connected ? 'connected' : 'waiting');
+          bodyNode.parentElement.title = 'protoR2link: ' + statusText + ', transport=' + transport;
+          if (!h.body_link.enabled) bodyNode.className = 'indicator';
+          else if (h.body_link.connected) bodyNode.className = 'indicator ok';
+          else bodyNode.className = 'indicator warn';
+        }
         setHealthItemVisible('h-bodylink', true);
       } else {
         setHealthItemVisible('h-bodylink', false);

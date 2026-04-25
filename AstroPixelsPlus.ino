@@ -112,7 +112,10 @@
 #define PREFERENCE_MARCWIFI_ENABLED "mwifi"
 #define PREFERENCE_MARCWIFI_SERIAL_PASS "mwifipass"
 #define PREFERENCE_BODY_LINK_ENABLED  "mbodylink"
+#define PREFERENCE_BODY_WIFI_ENABLED  "mbodywifi"
+#define PREFERENCE_BODY_PEER_IP      "bodypeerip"
 #define BODY_LINK_ENABLED             true   // on by default in this fork
+#define BODY_WIFI_ENABLED             true   // WiFi fallback enabled by default
 
 
 #define PREFERENCE_MARCSOUND "msound"
@@ -575,6 +578,7 @@ static float sSoundInitVolume;
 static uint32_t sBodyLastSeenMs  = 0;   // millis() when last #PAHB received (0=never)
 static uint32_t sBodyHeartbeatRx = 0;   // count of #PAHB frames received from body
 static uint32_t sBodyLastTxMs    = 0;   // millis() of last #APHB sent
+#include "BodyLinkWiFi.h"
 
 static bool bodyLinkConnected()
 {
@@ -583,10 +587,17 @@ static bool bodyLinkConnected()
 
 static void sendBodyCommand(const char* cmd)
 {
-    if (COMMAND_SERIAL && cmd && *cmd)
+    if (cmd == nullptr || *cmd == '\0') return;
+
+    BodyLinkTransport transport = bodyLinkActiveTransport();
+    if (transport == BODY_LINK_UART && COMMAND_SERIAL)
     {
         COMMAND_SERIAL.print(cmd);
         COMMAND_SERIAL.print('\r');
+    }
+    else if (transport == BODY_LINK_WIFI)
+    {
+        bodyLinkWiFiSendUDP(cmd);
     }
 }
 
@@ -610,15 +621,15 @@ static void handleBodySerial()
             if (sBufLen > 0)
             {
                 sBuf[sBufLen] = '\0';
+                uint32_t now = millis();
                 if (strcmp(sBuf, "#PAHB") == 0)
                 {
-                    sBodyLastSeenMs  = millis();
-                    sBodyHeartbeatRx++;
+                    bodyLinkMarkUartHeartbeat(now);
                 }
                 else
                 {
-                    // Forward non-heartbeat commands to Reeltwo
-                    CommandEvent::process(sBuf);
+                    bodyLinkMarkUartActivity(now);
+                    processMarcduinoCommandWithSourceMain("body-link-uart", sBuf);
                 }
                 sBufLen = 0;
             }
@@ -647,7 +658,7 @@ static void handleBodyLinkHeartbeat()
         sBodyLinkInitDone = true;
     }
     if (!sBodyLinkEnabled) return;
-    
+
     // Connection state tracking for logging
     static bool sPrevConnected = false;
     bool nowConnected = bodyLinkConnected();
@@ -659,12 +670,31 @@ static void handleBodyLinkHeartbeat()
             DEBUG_PRINTLN(F("[BodyLink] Body controller LOST"));
         sPrevConnected = nowConnected;
     }
-    
+
+    static BodyLinkTransport sPrevTransport = BODY_LINK_DISCONNECTED;
+    BodyLinkTransport transport = bodyLinkActiveTransport();
+    if (transport != sPrevTransport)
+    {
+        DEBUG_PRINT(F("[BodyLink] Active transport: "));
+        DEBUG_PRINTLN(bodyLinkGetTransportName());
+        sPrevTransport = transport;
+    }
+
     uint32_t now = millis();
     if (now - sBodyLastTxMs >= 1000)
     {
-        COMMAND_SERIAL.print("#APHB\r");
-        sBodyLastTxMs = now;
+        if (transport == BODY_LINK_UART && COMMAND_SERIAL)
+        {
+            COMMAND_SERIAL.print("#APHB\r");
+            sBodyLastTxMs = now;
+        }
+        else if (transport == BODY_LINK_WIFI)
+        {
+            if (bodyLinkWiFiSendUDP("#APHB"))
+            {
+                sBodyLastTxMs = now;
+            }
+        }
     }
 }
 
@@ -1069,27 +1099,14 @@ void setup()
                                                sAsyncWebStarted = true;
                                            }
 #endif
-#ifdef USE_MDNS
-                                           // No point in setting up mDNS if R2 is the access point
-                                           if (!wifi.isSoftAP())
-                                           {
-                                               String mac = wifi.getMacAddress();
-                                               String hostName = mac.substring(mac.length() - 5, mac.length());
-                                               hostName.remove(2, 1);
-                                               hostName = String(WIFI_AP_NAME) + String("-") + hostName;
-                                               Serial.print("Host name: ");
-                                               Serial.println(hostName);
-                                               if (!MDNS.begin(hostName.c_str()))
-                                               {
-                                                   DEBUG_PRINTLN(F("Error setting up MDNS responder!"));
-                                               }
-                                           }
-#endif
+                                           bodyLinkWiFiInit();
+                                           bodyLinkSetupMDNS();
                                        });
         wifiAccess.notifyWifiDisconnected([](WifiAccess &)
                                           {
                                               wifiActive = false;
                                           });
+        bodyLinkWiFiInit();
 #endif
 #ifdef USE_OTA
         ArduinoOTA.onStart([]()
@@ -1297,6 +1314,20 @@ MARCDUINO_ACTION(Restart, #APRESTART, ({
 
 ////////////////
 
+MARCDUINO_ACTION(BodySleepSync, #PASL, ({
+                     // Body entered sleep — mirror locally, suppress echo back
+                     enterSoftSleepMode(true);
+                 }))
+
+////////////////
+
+MARCDUINO_ACTION(BodyWakeSync, #PAWU, ({
+                     // Body exited sleep — mirror locally, suppress echo back
+                     exitSoftSleepMode(true);
+                 }))
+
+////////////////
+
 #ifdef USE_SMQ
 // SMQ messages are received via ESPNOW.
 SMQMESSAGE(DIAL, {
@@ -1403,7 +1434,8 @@ String getConfiguredDroidName()
 
 static bool isWakeProfileCommand(const char *cmd)
 {
-    return strcmp(cmd, ":SE11") == 0 || strcmp(cmd, ":SE13") == 0 || strcmp(cmd, ":SE14") == 0;
+    return strcmp(cmd, ":SE11") == 0 || strcmp(cmd, ":SE13") == 0 || strcmp(cmd, ":SE14") == 0
+        || strcmp(cmd, "#PAWU") == 0;
 }
 
 bool shouldBlockCommandDuringSleep(const char *cmd)
@@ -1437,7 +1469,7 @@ static void applySoftWakeOutputs()
     Marcduino::processCommand(player, "@0P1");
 }
 
-bool enterSoftSleepMode()
+bool enterSoftSleepMode(bool fromPeer)
 {
     if (sSleepModeActive) return false;
 
@@ -1452,10 +1484,12 @@ bool enterSoftSleepMode()
     sSleepModeSinceMs = millis();
     sSleepEnforceAtMs = sSleepModeSinceMs + kSleepTransitionScrollMs;
     DEBUG_PRINTLN(F("Soft sleep mode enabled"));
+    if (!fromPeer)
+        sendBodyCommand("#APSL");
     return true;
 }
 
-bool exitSoftSleepMode()
+bool exitSoftSleepMode(bool fromPeer)
 {
     if (!sSleepModeActive) return false;
 
@@ -1468,6 +1502,8 @@ bool exitSoftSleepMode()
     sSleepModeActive = false;
     sSleepModeSinceMs = 0;
     DEBUG_PRINTLN(F("Soft sleep mode disabled"));
+    if (!fromPeer)
+        sendBodyCommand("#APWU");
     return true;
 }
 
@@ -1501,6 +1537,7 @@ void mainLoop()
     AnimatedEvent::process();
 
     handleBodySerial();
+    bodyLinkWiFiRx();
     handleBodyLinkHeartbeat();
 
     if (sSleepModeActive && sSleepEnforceAtMs != 0 && (int32_t)(millis() - sSleepEnforceAtMs) >= 0)
@@ -1593,6 +1630,7 @@ void eventLoopTask(void *)
 #ifdef USE_WIFI_WEB
             asyncWebLoop();
 #endif
+            bodyLinkResolvePeer();
         }
         if (remoteActive)
         {

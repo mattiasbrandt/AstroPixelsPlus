@@ -45,9 +45,16 @@ extern uint32_t sBodyLastSeenMs;
 extern uint32_t sBodyHeartbeatRx;
 extern uint32_t sBodyLastTxMs;
 extern bool bodyLinkConnected();
+extern BodyLinkTransport bodyLinkActiveTransport();
+extern const char *bodyLinkGetTransportName();
+extern bool bodyLinkWifiEnabled();
+extern String bodyLinkGetPeerIP();
+extern const char *bodyLinkGetPeerSource();
+extern uint32_t bodyLinkUartHeartbeatAgeMs();
+extern uint32_t bodyLinkWifiHeartbeatAgeMs();
 extern bool shouldBlockCommandDuringSleep(const char *cmd);
-extern bool enterSoftSleepMode();
-extern bool exitSoftSleepMode();
+extern bool enterSoftSleepMode(bool fromPeer = false);
+extern bool exitSoftSleepMode(bool fromPeer = false);
 extern String getConfiguredDroidName();
 
 // Gadget preference constants (must match AstroPixelsPlus.ino)
@@ -248,7 +255,7 @@ static bool isAllowedPrefKey(const String &key)
            key == "msoundstart" || key == "mrandom" || key == "mrandommin" ||
            key == "mrandommax" || key == "msoundlocal" || key == "apitoken" ||
            key == "dname" ||
-           key == "mbodylink" ||
+           key == "mbodylink" || key == "mbodywifi" || key == "bodypeerip" ||
            key == PREFERENCE_BADMOTIVATOR_ENABLED || key == PREFERENCE_FIRESTRIP_ENABLED ||
            key == PREFERENCE_CBI_ENABLED || key == PREFERENCE_DATAPANEL_ENABLED;
 }
@@ -258,6 +265,7 @@ static size_t maxPrefValueLen(const String &key)
     if (key == "ssid" || key == "rhost") return 32;
     if (key == "pass" || key == "rsecret" || key == "apitoken") return 64;
     if (key == "dname") return 24;
+    if (key == "bodypeerip") return 15;
     return 16;
 }
 
@@ -272,7 +280,7 @@ static bool defaultBoolForPrefKey(const String &key)
     if (key == "mwifi") return MARC_WIFI_ENABLED;
     if (key == "mwifipass") return MARC_WIFI_SERIAL_PASS;
     if (key == "mbodylink") return BODY_LINK_ENABLED;
-    if (key == PREFERENCE_BADMOTIVATOR_ENABLED) return AP_ENABLE_BADMOTIVATOR;
+    if (key == "mbodywifi") return BODY_WIFI_ENABLED;
     if (key == PREFERENCE_FIRESTRIP_ENABLED) return AP_ENABLE_FIRESTRIP;
     if (key == PREFERENCE_CBI_ENABLED) return AP_ENABLE_CBI;
     if (key == PREFERENCE_DATAPANEL_ENABLED) return AP_ENABLE_DATAPANEL;
@@ -392,7 +400,10 @@ static String buildStateJson()
     // Body link status (for real-time WebSocket updates)
     bool bodyLinkPrefEnabled = preferences.getBool("mbodylink", BODY_LINK_ENABLED);
     json += ",\"body_link\":{\"enabled\":" + String(bodyLinkPrefEnabled ? "true" : "false");
-    json += ",\"connected\":" + String(bodyLinkConnected() ? "true" : "false") + "}";
+    json += ",\"connected\":" + String(bodyLinkConnected() ? "true" : "false");
+    json += ",\"transport\":\"" + String(bodyLinkGetTransportName()) + "\"";
+    json += ",\"wifi_enabled\":" + String(bodyLinkWifiEnabled() ? "true" : "false");
+    json += ",\"peer_ip\":\"" + jsonEscape(bodyLinkGetPeerIP()) + "\"}";
     json += ",\"droidName\":\"" + jsonEscape(droidName) + "\"";
 
     // WiFi details
@@ -688,8 +699,14 @@ static String buildHealthJson()
     json += ",\"body_link\":{";
     json += "\"enabled\":" + String(bodyLinkPrefEnabled ? "true" : "false");
     json += ",\"connected\":" + String(bodyLinkConnected() ? "true" : "false");
+    json += ",\"transport\":\"" + String(bodyLinkGetTransportName()) + "\"";
+    json += ",\"wifi_enabled\":" + String(bodyLinkWifiEnabled() ? "true" : "false");
+    json += ",\"peer_ip\":\"" + jsonEscape(bodyLinkGetPeerIP()) + "\"";
     json += ",\"last_rx_ms\":" + String(sBodyLastSeenMs > 0 ? (int32_t)(millis() - sBodyLastSeenMs) : 0);
     json += ",\"hb_rx\":" + String(sBodyHeartbeatRx);
+    json += ",\"uart_hb_age_ms\":" + String(bodyLinkUartHeartbeatAgeMs());
+    json += ",\"wifi_hb_age_ms\":" + String(bodyLinkWifiHeartbeatAgeMs());
+    json += ",\"peer_source\":\"" + String(bodyLinkGetPeerSource()) + "\"";
     json += "}";
 
     // Gadget status
@@ -837,7 +854,7 @@ static void initAsyncWeb()
                     key == "mserialpass" || key == "mserial" || key == "mwifi" || key == "mwifipass" ||
                     key == PREFERENCE_BADMOTIVATOR_ENABLED || key == PREFERENCE_FIRESTRIP_ENABLED ||
                     key == PREFERENCE_CBI_ENABLED || key == PREFERENCE_DATAPANEL_ENABLED ||
-                    key == "mbodylink")
+                    key == "mbodylink" || key == "mbodywifi")
                 {
                     bool val = preferences.getBool(key.c_str(), defaultBoolForPrefKey(key));
                     json += "\"" + jsonEscape(key) + "\":" + (val ? "true" : "false");
@@ -893,7 +910,7 @@ static void initAsyncWeb()
             // Boolean keys — firmware uses getBool/putBool
             else if (key == "wifi" || key == "ap" || key == "remote" || key == "msoundlocal" ||
                      key == "mserialpass" || key == "mserial" || key == "mwifi" || key == "mwifipass" ||
-                     key == "mbodylink" ||
+                     key == "mbodylink" || key == "mbodywifi" ||
                      key == PREFERENCE_BADMOTIVATOR_ENABLED || key == PREFERENCE_FIRESTRIP_ENABLED ||
                      key == PREFERENCE_CBI_ENABLED || key == PREFERENCE_DATAPANEL_ENABLED)
             {
