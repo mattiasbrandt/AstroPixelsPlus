@@ -252,6 +252,45 @@
     m = cmd.match(/^\*HP([0-8])0([1-3])$/);
     if (m) return 'Set ' + holoName(m[2]) + ' position preset ' + m[1];
 
+    // FlthyHoloExtras
+    // DomeSequences (DM: prefix)
+    var dmNames = {
+      'DM:PIES':      'Toggle pie panels open/close',
+      'DM:LOW':       'Toggle lower panels open/close',
+      'DM:OPENALL':   'Toggle all panels open/close',
+      'DM:FLUTTER':   'Flutter all panels then snap closed',
+      'DM:BLOOM':     'Pie panels ease open, wiggle, close',
+      'DM:SCREAM':    'Scream — all panels burst open, red alert, random flutter',
+      'DM:CANTINA':   'Cantina dance — 15-second 130 BPM panel sequence',
+      'DM:LEIA':      'Leia message — front holo + logic sequence (36s)',
+      'DM:VADER':     'Imperial March — red logics/holos + body cue (47s)',
+      'DM:ROCKMARCH': 'Rock March — same as Vader, alternate body cue (47s)',
+      'DM:DISCO':     'Disco — triggers SE09 + dome=seqon coordination',
+      'DM:ALARM':     'Alarm — red flashing holos and logics (10s)',
+      'DM:HELLO':     'Hello There — panel wave + logic scroll greeting',
+      'DM:HEART':     'Heart — rainbow holos + sweet logic message (10s)',
+      'DM:OVERLOAD':  'Overload — failure logics + random panels sluggishly drift',
+      'DM:RANDOM':    'Random — pick one of 15 standard sequences',
+      'DM:RESET':     'Reset — close all panels, reset all subsystems',
+      'DM:TOPPANELS': 'Top panels showcase (SE12)',
+      'DM:WIGGLE':    'Panel wiggle showcase (SE16)',
+      'DM:BYEBYE':    'Bye-bye wave with holo pulse accent (SE58)',
+    };
+    if (cmd.startsWith('DM:') && dmNames[cmd]) return dmNames[cmd];
+    if (cmd.startsWith('DM:')) return 'Dome sequence: ' + cmd.slice(3);
+
+    // FlthyHoloExtras
+    m = cmd.match(/^\*SC0([0-3])$/);
+    if (m) return 'Short circuit flash ' + (['all', 'front', 'rear', 'top'][+m[1]] || m[1]) + ' holo';
+    if (cmd === '*CY00') return 'Cycle all holos (spinning random color)';
+    if (cmd === '*PL00') return 'Dim pulse all holos (slow color breathe)';
+    m = cmd.match(/^\*SB0([0-3])$/);
+    if (m) return 'Solid blue ' + (['all', 'front', 'rear', 'top'][+m[1]] || m[1]) + ' holo';
+    m = cmd.match(/^\*SW0([0-3])$/);
+    if (m) return 'Solid white ' + (['all', 'front', 'rear', 'top'][+m[1]] || m[1]) + ' holo';
+    if (cmd === '*ML00') return 'Start autonomous random mode loop on all holos';
+    if (cmd === '*RL00') return 'Reset all holos to random mode loop';
+
     m = cmd.match(/^@([012])T(\d{1,2})$/);
     if (m) return 'Set sequence ' + m[2] + ' on ' + logicTarget(m[1]);
     m = cmd.match(/^@([012])P(11|[1-6])$/);

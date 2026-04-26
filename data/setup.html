@@ -111,6 +111,20 @@
   </div>
 
   <div class="card">
+    <h3>Dome Behaviour</h3>
+    <div class="desc">Startup and autonomous behaviour settings. Changes take effect after reboot.</div>
+    <div class="gadget-list mt-10">
+      <div class="gadget-item">
+        <div class="toggle-row">
+          <label for="gadget-holo_boot_loop">Start holo random mode loop on boot</label>
+          <input type="checkbox" id="gadget-holo_boot_loop" onchange="saveGadgetPref('holo_boot_loop')">
+        </div>
+        <div class="desc mt-4">Fires HPS9 at the end of setup() to put all three holos into the autonomous random LED mode loop immediately on power-up. NVS key: <code>holo_boot_loop</code></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
     <h3>Write API Token</h3>
     <div class="desc">Optional. Stored only in this browser and sent with write requests when API protection is enabled.</div>
     <details class="gadget-details mt-10">
@@ -196,13 +210,15 @@
     refreshTokenStatus();
 
     // Load gadget preferences on page load
-    fetch('/api/pref?keys=badmot,firest,cbienb,dpenab')
+    fetch('/api/pref?keys=badmot,firest,cbienb,dpenab,holo_boot_loop')
       .then(function(r){return r.json();})
       .then(function(prefs) {
         document.getElementById('gadget-badmot').checked = isTrue(prefs.badmot);
         document.getElementById('gadget-firest').checked = isTrue(prefs.firest);
         document.getElementById('gadget-cbienb').checked = isTrue(prefs.cbienb);
         document.getElementById('gadget-dpenab').checked = isTrue(prefs.dpenab);
+        var hbl = document.getElementById('gadget-holo_boot_loop');
+        if (hbl) hbl.checked = isTrue(prefs.holo_boot_loop !== undefined ? prefs.holo_boot_loop : true);
       })
       .catch(function(err) {
         console.warn('Failed to load gadget preferences:', err);

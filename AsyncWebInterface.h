@@ -257,7 +257,8 @@ static bool isAllowedPrefKey(const String &key)
            key == "dname" ||
            key == "mbodylink" || key == "mbodywifi" || key == "bodypeerip" ||
            key == PREFERENCE_BADMOTIVATOR_ENABLED || key == PREFERENCE_FIRESTRIP_ENABLED ||
-           key == PREFERENCE_CBI_ENABLED || key == PREFERENCE_DATAPANEL_ENABLED;
+           key == PREFERENCE_CBI_ENABLED || key == PREFERENCE_DATAPANEL_ENABLED ||
+           key == "holo_boot_loop" || key == "dm_happy_sound";
 }
 
 static size_t maxPrefValueLen(const String &key)
@@ -284,6 +285,8 @@ static bool defaultBoolForPrefKey(const String &key)
     if (key == PREFERENCE_FIRESTRIP_ENABLED) return AP_ENABLE_FIRESTRIP;
     if (key == PREFERENCE_CBI_ENABLED) return AP_ENABLE_CBI;
     if (key == PREFERENCE_DATAPANEL_ENABLED) return AP_ENABLE_DATAPANEL;
+    if (key == "holo_boot_loop") return true;
+    if (key == "dm_happy_sound") return true;
     return false;
 }
 

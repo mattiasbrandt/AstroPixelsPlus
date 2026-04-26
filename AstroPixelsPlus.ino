@@ -537,6 +537,7 @@ bool numberparams(const char *cmd, uint8_t &argcount, int32_t *args, uint8_t max
 ////////////////////////////////
 
 #include "MarcduinoHolo.h"
+#include "FlthyHoloExtras.h"
 #include "MarcduinoLogics.h"
 #include "MarcduinoSequence.h"
 #include "MarcduinoPanel.h"
@@ -579,6 +580,11 @@ static uint32_t sBodyLastSeenMs  = 0;   // millis() when last #PAHB received (0=
 static uint32_t sBodyHeartbeatRx = 0;   // count of #PAHB frames received from body
 static uint32_t sBodyLastTxMs    = 0;   // millis() of last #APHB sent
 #include "BodyLinkWiFi.h"
+#include "DomeSequences.h"
+bool dome_PiesOpen   = false;
+bool dome_AllOpen    = false;
+bool dome_LowOpen    = false;
+bool dome_seqRunning = false;
 
 static bool bodyLinkConnected()
 {
@@ -1157,6 +1163,8 @@ void setup()
         0);
 #endif
     DEBUG_PRINTLN(F("Ready"));
+    if (preferences.getBool("holo_boot_loop", true))
+        CommandEvent::process(F("HPS9"));
     if (soundLocalEnabled && !sSoundInitPending)
     {
         sMarcSound.playStartSound();

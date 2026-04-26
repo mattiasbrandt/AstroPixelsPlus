@@ -52,6 +52,53 @@
     </div>
   </div>
 
+  <!-- Extended Effects (FlthyHoloExtras) -->
+  <div class="card">
+    <h3>Extended Holo Effects</h3>
+    <div class="desc">Additional holo effects ported from the FlthyHPs sketch by Ryan Sondgeroth.</div>
+    <div class="mt-6">
+      <span class="label-dim">Short Circuit:</span>
+      <div class="btn-grid mt-4">
+        <button class="btn" title="All holos short circuit flash (orange)" onclick="sendCmd('*SC00')">All</button>
+        <button class="btn" title="Front holo short circuit flash" onclick="sendCmd('*SC01')">Front</button>
+        <button class="btn" title="Rear holo short circuit flash" onclick="sendCmd('*SC02')">Rear</button>
+        <button class="btn" title="Top holo short circuit flash" onclick="sendCmd('*SC03')">Top</button>
+      </div>
+    </div>
+    <div class="mt-6">
+      <span class="label-dim">All-Holo Effects:</span>
+      <div class="btn-grid mt-4">
+        <button class="btn" title="All holos spinning color cycle" onclick="sendCmd('*CY00')">Cycle All</button>
+        <button class="btn" title="All holos slow color breathe" onclick="sendCmd('*PL00')">Dim Pulse All</button>
+      </div>
+    </div>
+    <div class="mt-6">
+      <span class="label-dim">Solid Blue:</span>
+      <div class="btn-grid mt-4">
+        <button class="btn" title="All holos solid blue" onclick="sendCmd('*SB00')">All</button>
+        <button class="btn" title="Front holo solid blue" onclick="sendCmd('*SB01')">Front</button>
+        <button class="btn" title="Rear holo solid blue" onclick="sendCmd('*SB02')">Rear</button>
+        <button class="btn" title="Top holo solid blue" onclick="sendCmd('*SB03')">Top</button>
+      </div>
+    </div>
+    <div class="mt-6">
+      <span class="label-dim">Solid White:</span>
+      <div class="btn-grid mt-4">
+        <button class="btn" title="All holos solid white" onclick="sendCmd('*SW00')">All</button>
+        <button class="btn" title="Front holo solid white" onclick="sendCmd('*SW01')">Front</button>
+        <button class="btn" title="Rear holo solid white" onclick="sendCmd('*SW02')">Rear</button>
+        <button class="btn" title="Top holo solid white" onclick="sendCmd('*SW03')">Top</button>
+      </div>
+    </div>
+    <div class="mt-6">
+      <span class="label-dim">Mode Loop:</span>
+      <div class="btn-grid mt-4">
+        <button class="btn accent" title="Start autonomous random mode loop on all holos" onclick="sendCmd('*ML00')">Start Mode Loop</button>
+        <button class="btn" title="Reset all holos to random mode loop (not to off)" onclick="sendCmd('*RL00')">Reset to Loop</button>
+      </div>
+    </div>
+  </div>
+
   <div class="card">
     <h3>HP1 - Holoprojector 1 Front (FHP)</h3>
     <div class="btn-grid">

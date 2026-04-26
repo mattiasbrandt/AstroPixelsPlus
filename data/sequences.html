@@ -28,6 +28,60 @@
     </div>
   </div>
 
+  <!-- Dome Sequences (DM: prefix) -->
+  <div class="card">
+    <h3>Dome Sequences (DM: prefix)</h3>
+    <div class="desc">Choreographed dome sequences with eased servo motion, holos, and body cues.</div>
+
+    <div class="mt-10">
+      <span class="label-dim">Panels:</span>
+      <div class="btn-grid mt-4">
+        <button class="btn" title="Toggle pie panels open/close" onclick="sendCmd('DM:PIES')">Toggle Pies</button>
+        <button class="btn" title="Toggle lower panels open/close" onclick="sendCmd('DM:LOW')">Toggle Lower</button>
+        <button class="btn" title="Toggle all panels open/close" onclick="sendCmd('DM:OPENALL')">Toggle All</button>
+        <button class="btn" title="Flutter all panels to 75% then snap closed" onclick="sendCmd('DM:FLUTTER')">Flutter</button>
+        <button class="btn" title="Pie panels ease open, wiggle, then close" onclick="sendCmd('DM:BLOOM')">Bloom</button>
+      </div>
+    </div>
+
+    <div class="mt-6">
+      <span class="label-dim">Full Shows:</span>
+      <div class="btn-grid mt-4">
+        <button class="btn" title="All panels burst open, red alert logics, random flutter" onclick="sendCmd('DM:SCREAM')">Scream</button>
+        <button class="btn" title="Alternating panel dance at 130 BPM for 15 seconds" onclick="sendCmd('DM:CANTINA')">Cantina</button>
+        <button class="btn" title="Front holo Leia effect, logic Leia sequence (36s)" onclick="sendCmd('DM:LEIA')">Leia</button>
+        <button class="btn" title="Imperial March — red logics and holos (47s)" onclick="sendCmd('DM:VADER')">Vader</button>
+        <button class="btn" title="Imperial March alternate — red logics and holos (47s)" onclick="sendCmd('DM:ROCKMARCH')">Rock March</button>
+        <button class="btn" title="Disco — triggers SE09 sequence" onclick="sendCmd('DM:DISCO')">Disco</button>
+        <button class="btn" title="Alarm — pulsing red holos and logics (10s)" onclick="sendCmd('DM:ALARM')">Alarm</button>
+      </div>
+    </div>
+
+    <div class="mt-6">
+      <span class="label-dim">Character:</span>
+      <div class="btn-grid mt-4">
+        <button class="btn" title="Hello There — panel wave + logic scroll greeting" onclick="sendCmd('DM:HELLO')">Hello There</button>
+        <button class="btn" title="Heart — rainbow holos + sweet logic message (10s)" onclick="sendCmd('DM:HEART')">Heart</button>
+        <button class="btn" title="Overload — failure logics + random panels sluggishly drift" onclick="sendCmd('DM:OVERLOAD')">Overload</button>
+        <button class="btn" title="Pick one of 15 standard sequences at random" onclick="sendCmd('DM:RANDOM')">Random</button>
+      </div>
+    </div>
+
+    <div class="mt-6">
+      <span class="label-dim">Reset:</span>
+      <div class="btn-grid mt-4">
+        <button class="btn danger" title="Close all panels and reset all subsystems" onclick="sendCmd('DM:RESET')">Reset All</button>
+      </div>
+    </div>
+
+    <div class="mt-10">
+      <div class="toggle-row">
+        <label for="pref-dm-happy-sound">Play happy body sound on panel toggle (PIES / LOW / OPENALL)</label>
+        <input type="checkbox" id="pref-dm-happy-sound" onchange="saveDmPref('dm_happy_sound', this.checked)">
+      </div>
+    </div>
+  </div>
+
   <!-- Full Choreography (panels + logics + holos + sound) -->
   <div class="card">
     <h3>Full Choreography</h3>
@@ -179,5 +233,31 @@
 
   <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>
   <script src="/app.js"></script>
+  <script>
+    (function() {
+      function isTrue(v) { return v === true || v === 'true' || v === '1' || v === 1; }
+
+      fetch('/api/pref?keys=dm_happy_sound')
+        .then(function(r) { return r.json(); })
+        .then(function(prefs) {
+          var el = document.getElementById('pref-dm-happy-sound');
+          if (el) el.checked = isTrue(prefs.dm_happy_sound !== undefined ? prefs.dm_happy_sound : true);
+        })
+        .catch(function() {});
+
+      window.saveDmPref = function(key, val) {
+        var el = document.getElementById('pref-dm-happy-sound');
+        if (typeof window.apiPostForm !== 'function') return;
+        window.apiPostForm('/api/pref', 'key=' + key + '&val=' + (val ? 'true' : 'false'))
+          .then(function(resp) {
+            if (el) { el.style.opacity = '0.5'; setTimeout(function() { el.style.opacity = '1'; }, 300); }
+          })
+          .catch(function() {
+            if (el) el.checked = !el.checked;
+            alert('Failed to save preference.');
+          });
+      };
+    })();
+  </script>
 </body>
 </html>
