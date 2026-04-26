@@ -508,6 +508,128 @@ Added build flag default: `-DAP_ENABLE_DROID_REMOTE=0`. `USE_DROID_REMOTE` now d
 
 ---
 
+## Ported from thePunderWoman Fork
+
+Feature additions ported from [Jessica Janiuk's AstroPixelsPlus fork](https://github.com/thePunderWoman/AstroPixelsPlus).
+All ported files carry attribution headers linking back to her repo.
+
+Hardware-specific aspects of her fork (serial baud, servo pulse ranges, holo channel offsets) were intentionally left behind — this fork's values take precedence and are not overridden.
+
+---
+
+### Extended Holo Effects (`FlthyHoloExtras.h`)
+
+New file adding 7 command groups to the holo projector system, inspired by the FlthyHPs sketch by Ryan Sondgeroth and ported verbatim (with adapted attribution header). All commands use `CommandEvent::process()` internally and were confirmed conflict-free with existing `MarcduinoHolo.h` prefixes.
+
+| Command | Scope | Effect |
+|---|---|---|
+| `*SC00`–`*SC03` | All / Front / Rear / Top | Short circuit orange flicker (`HPx0077`) |
+| `*CY00` | All | Cycle — spinning LED, random color (`HPA0040`) |
+| `*PL00` | All | Dim Pulse — slow breathe, random color (`HPA0030`) |
+| `*SB00`–`*SB03` | All / Front / Rear / Top | Solid Blue (`HPx0055`) |
+| `*SW00`–`*SW03` | All / Front / Rear / Top | Solid White (`HPx0059`) |
+| `*ML00` | All | Mode Loop — autonomous random cycle (`HPS9`) |
+| `*RL00` | All | Reset to Loop — resets to random loop, not off |
+
+**Integration:** included in `AstroPixelsPlus.ino` immediately after `MarcduinoHolo.h`.
+
+**Web UI:** new "Extended Holo Effects" card added to `data/holos.html` with button groups for Short Circuit, Solid Blue, Solid White, Mode controls, and the all-holo effect shortcuts.
+
+**`describeCmd()` coverage:** all `*SC`/`*CY`/`*PL`/`*SB`/`*SW`/`*ML`/`*RL` prefixes return human-readable labels in `data/app.js`.
+
+---
+
+### Dome Choreography Sequences (`DomeSequences.h`)
+
+New file adding 17 named dome sequences plus 22 aliases — all reachable via the `DM:` Marcduino prefix (e.g. `DM:SCREAM\r`). Sequences use eased servo motion, coordinated holos/logics, PSI effects, and protoR2link body cues.
+
+#### Adapted from source
+Panel defines were remapped from her `P1–P13/PP1–PP6` indices (tuned to her dome wiring) to this fork's `DP1–DPB/DPP1–DPP4` names matching the `servoSettings[]` array positions here. Servo pulse range constants updated to match this fork's defaults (`800–2200 µs`). Per-panel calibration continues to live in NVS via the web UI — not in code.
+
+#### Body link integration
+All body-facing calls go through `sendBodyCommand()` (the protoR2link transport function), supporting both UART-primary and WiFi-fallback to protoArtoo. Direct `COMMAND_SERIAL.print()` calls from her fork were replaced throughout.
+
+Two new protocol messages are sent over the link:
+- `dome=seqon,N` — notifies protoArtoo a dome sequence is starting for `N` seconds (pauses autonomous body sounds/motion)
+- `dome=seqoff` — notifies protoArtoo the sequence has ended (resumes autonomous behavior)
+- `BD:<CUE>` — named body cue (e.g. `BD:SCREAM`, `BD:LEIA`) requesting sound/animation on the body side
+
+#### PSI effects
+Her Teeces `4Tx|N` serial calls (body-PSI-addressed) were replaced with direct duration-aware PSI API calls on this fork's dome-local `frontPSI`/`rearPSI` objects:
+
+| Sequence | PSI call |
+|---|---|
+| Reset | `selectSequence(NORMAL)` — permanent |
+| Alarm (10 s) | `selectSequence(ALARM, kDefault, 0, 10)` |
+| Overload (12 s) | `selectSequence(FAILURE, kDefault, 0, 12)` |
+| Scream (15 s) | `selectSequence(REDALERT, kDefault, 0, 15)` |
+| Leia (36 s) | `selectSequence(LEIA, kDefault, 0, 36)` |
+| Heart (10 s, front only) | `selectSequence(FLASHCOLOR, kDefault, 0, 10)` |
+| Vader / Rock March (47 s) | `selectSequence(MARCH, kDefault, 0, 47)` |
+| Cantina (15 s) | `selectSequence(FLASHCOLOR, kDefault, 0, 15)` |
+
+#### Happy sound gate
+`DM:PIES`, `DM:LOW`, and `DM:OPENALL` call `BD:HAPPY` on each toggle (random happy bank sound on the body). Gated by the `dm_happy_sound` NVS preference (default `true`) so it can be disabled for quieter operation without reflashing.
+
+#### Command reference
+
+| Command | Effect |
+|---|---|
+| `DM:PIES` | Toggle pie panels open/close |
+| `DM:LOW` | Toggle lower panels open/close |
+| `DM:OPENALL` | Toggle all panels open/close |
+| `DM:FLUTTER` | Flutter all panels to 75% then snap closed |
+| `DM:BLOOM` | Pie panels ease open, wiggle, then close |
+| `DM:SCREAM` | All panels burst open, red alert logics + holos, random flutter |
+| `DM:CANTINA` | Alternating panel dance at 130 BPM, 15 s |
+| `DM:LEIA` | Front holo Leia effect, logic Leia sequence, 36 s |
+| `DM:VADER` | Imperial March — red logics/holos/PSI, 47 s |
+| `DM:ROCKMARCH` | Imperial March alternate, 47 s |
+| `DM:DISCO` | Triggers `:SE09` (disco sound is owned by SE09) |
+| `DM:ALARM` | Pulsing red holos and logics, 10 s |
+| `DM:HELLO` | Panel wave + logic scroll greeting |
+| `DM:HEART` | Rainbow holos + sweet logic message, 10 s |
+| `DM:OVERLOAD` | Failure logics + random panels sluggishly drift |
+| `DM:RANDOM` | Pick one of 16 standard sequences at random |
+| `DM:RESET` | Close all panels, reset holos to mode loop, logics to normal |
+
+Aliases forward to fork-specific `:SE` sequences:
+
+| Alias | Forwards to |
+|---|---|
+| `DM:TOPPANELS` | `:SE12` |
+| `DM:WIGGLE` | `:SE16` |
+| `DM:BYEBYE` | `:SE58` |
+
+And to upstream sequences: `DM:WAVE→:SE02`, `DM:SESCREAM→:SE01`, `DM:SMIRK→:SE03`, `DM:OPENCLOSWAVE→:SE04`, `DM:BEEPCANTINA→:SE05`, `DM:SHORTCIRCUIT→:SE06`, `DM:CANTINA→:SE07`, etc.
+
+**Re-entrancy:** a `dome_seqRunning` guard drops any new `DM:` call that arrives while a sequence is active.
+
+**Integration:** included in `AstroPixelsPlus.ino` after `BodyLinkWiFi.h` (so `sendBodyCommand()` is in scope).
+
+**Web UI:** new "Dome Sequences (DM: prefix)" card added at the top of `data/sequences.html` with sub-groups: Panels, Full Shows, Character, Reset, and a `dm_happy_sound` preference toggle.
+
+**`describeCmd()` coverage:** all 17 named `DM:` commands return human-readable labels in `data/app.js`.
+
+---
+
+### Auto-Start Holo Random Mode on Boot
+
+At the end of `setup()`, fires `HPS9` to put all three holo projectors into the autonomous random LED mode loop immediately on power-up. Gated by the `holo_boot_loop` NVS preference (default `true`).
+
+**Runtime preference:** `holo_boot_loop` (bool, default `true`). Exposed on the Setup page under "Dome Behaviour" using the standard gadget preference toggle pattern. When disabled, holos stay in their last state on boot.
+
+**NVS keys added in this port:**
+
+| Key | Type | Default | Purpose |
+|---|---|---|---|
+| `holo_boot_loop` | bool | `true` | Fire `HPS9` at end of `setup()` to auto-start holo random mode |
+| `dm_happy_sound` | bool | `true` | Play `BD:HAPPY` body sound on panel toggle sequences |
+
+Both keys are added to the `/api/pref` allowlist and `defaultBoolForPrefKey()` in `AsyncWebInterface.h`.
+
+---
+
 ## Build System & Tooling
 
 Changes to build configuration, development workflow, and validation tools.
