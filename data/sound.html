@@ -9,19 +9,14 @@
   <link rel="apple-touch-icon" href="/r2d2dome-favicon.png">
   <link rel="stylesheet" href="/style.css">
 </head>
-<body>
-  <h1>Sound Player 🔊</h1>
-  <div class="subtitle">DFPlayer Mini audio configuration</div>
-  <nav>
-    <a href="/">Home</a>
-    <a href="/setup.html">Setup</a>
-  </nav>
+<body data-page="sound">
+  <div id="shell-top"></div>
 
   <div class="card">
     <h3>Sound Module</h3>
 
     <label class="check-row mb-10" title="Master toggle for AstroPixels local sound actuation. Useful when body controller handles all audio playback.">
-      <input type="checkbox" id="sound-local-enabled" checked title="Enable or disable local sound execution on AstroPixels.">
+      <input type="checkbox" id="sound-local-enabled" title="Enable or disable local sound execution on AstroPixels.">
       <span>Local sound execution on AstroPixels</span>
     </label>
     <div class="desc">Disable when another controller handles audio. Sound commands are still accepted but AstroPixels does not actuate local playback.</div>
@@ -91,15 +86,21 @@
 
   <button class="btn accent w-100 mt-8" onclick="saveSound()">Save</button>
 
-  <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>
+  <div id="shell-status"></div>
+  <script src="/shell.js"></script>
   <script src="/app.js"></script>
   <script>
     document.getElementById('sound-volume').addEventListener('input', function() {
       document.getElementById('vol-label').textContent = Math.round(this.value / 10) + '%';
     });
 
-    fetch('/api/pref?keys=msoundlocal,msound,msoundser,mvolume,msoundstart,mrandom,mrandommin,mrandommax').then(function(r){return r.json();}).then(function(d){
-      if (typeof d.msoundlocal !== 'undefined') document.getElementById('sound-local-enabled').checked = d.msoundlocal === 'true' || d.msoundlocal === true || d.msoundlocal === '1';
+    // Read soundLocalEnabled from runtime state — reflects the compile-time default + NVS override.
+    // This is more reliable than reading the raw NVS pref, which may not exist on first boot.
+    fetch('/api/state').then(function(r){return r.json();}).then(function(s){
+      if (typeof s.soundLocalEnabled !== 'undefined') document.getElementById('sound-local-enabled').checked = s.soundLocalEnabled;
+    }).catch(function(){});
+
+    fetch('/api/pref?keys=msound,msoundser,mvolume,msoundstart,mrandom,mrandommin,mrandommax').then(function(r){return r.json();}).then(function(d){
       if (d.msound) document.getElementById('sound-player').value = d.msound;
       if (d.msoundser) document.getElementById('sound-serial').value = d.msoundser;
       if (d.mvolume) { document.getElementById('sound-volume').value = d.mvolume; document.getElementById('vol-label').textContent = Math.round(d.mvolume/10) + '%'; }
@@ -126,7 +127,7 @@
           return apiPostForm('/api/pref', 'key=' + encodeURIComponent(p.key) + '&val=' + encodeURIComponent(p.val));
         });
       });
-      chain.then(function(){ alert('Sound settings saved.'); });
+      chain.then(function(){ if (typeof window.uiToast === 'function') window.uiToast('Sound settings saved.'); });
     }
   </script>
 </body>

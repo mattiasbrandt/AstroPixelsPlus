@@ -9,61 +9,187 @@
   <link rel="apple-touch-icon" href="/r2d2dome-favicon.png">
   <link rel="stylesheet" href="/style.css">
 </head>
-<body>
-  <h1>Setup ⚙️</h1>
-  <div class="subtitle">Configuration and system settings</div>
-  <nav>
-    <a href="/">Home</a>
-    <a href="/panels.html">Panels</a>
-    <a href="/holos.html">Holos</a>
-    <a href="/logics.html">Logics</a>
-    <a href="/sequences.html">Sequences</a>
-  </nav>
+<body data-page="setup">
+  <div id="shell-top"></div>
 
+  <!-- System Identity -->
   <div class="card">
     <h3>System Identity</h3>
-    <div class="desc">Set the droid name used in page branding and startup logic text.</div>
+    <div class="desc">Droid name used in page titles and startup logic text.</div>
+    <div class="row mt-8">
+      <input type="text" id="droid-name" maxlength="24" placeholder="AstroPixels" class="flex-1">
+      <button class="btn accent" onclick="saveDroidName()">Save</button>
+    </div>
+    <div id="identity-feedback" class="feedback mt-6"></div>
+  </div>
+
+  <!-- WiFi -->
+  <div class="card">
+    <h3>WiFi</h3>
+    <div class="desc">Changes require reboot. Note: WiFi and ESPNOW Remote cannot run simultaneously.</div>
+
+    <div class="mt-10">
+      <div class="toggle-row">
+        <label for="wifi-enabled">WiFi Enabled</label>
+        <input type="checkbox" id="wifi-enabled" checked>
+      </div>
+      <div class="toggle-row">
+        <label for="wifi-ap">Access Point Mode</label>
+        <input type="checkbox" id="wifi-ap" checked>
+      </div>
+      <div class="desc mt-4">Uncheck to join an existing WiFi network as a station instead.</div>
+    </div>
+
+    <div class="mt-10">
+      <label class="label-dim">SSID</label>
+      <input type="text" id="wifi-ssid" value="AstroPixels" class="input-full mt-4">
+    </div>
+    <div class="mt-8">
+      <label class="label-dim">Password</label>
+      <input type="password" id="wifi-pass" value="Astromech" class="input-full mt-4">
+    </div>
+
+    <button class="btn accent w-100 mt-10" onclick="saveWifi()">Save &amp; Reboot</button>
+    <div id="wifi-feedback" class="feedback mt-6"></div>
+  </div>
+
+  <!-- Serial Interfaces -->
+  <div class="card">
+    <h3>Serial Interfaces</h3>
+
+    <!-- R2 Touch App connection info -->
+    <div class="sub-section mt-8">
+      <div class="section-header">R2 Touch App</div>
+      <div class="desc mt-4">Connect to controller IP on port <code>2000</code> using WiFi transport.</div>
+      <div id="r2touch-status" class="sys-status mt-6">Loading controller IP...</div>
+    </div>
+
+    <!-- protoR2link body/dome bidirectional link -->
+    <div class="sub-section">
+      <div class="section-header">protoR2link</div>
+      <div class="desc mt-4">
+        Body–dome link for
+        <a href="https://github.com/mattiasbrandt/protoArtoo" target="_blank" rel="noopener">protoArtoo</a>.
+        Dome sends <code>#APHB</code>, expects <code>#PAHB</code> once per second. UART primary; WiFi fallback if UART drops.
+      </div>
+      <div class="toggle-row mt-8">
+        <label for="bodylink-enabled">Enable protoR2link</label>
+        <input type="checkbox" id="bodylink-enabled">
+      </div>
+      <div class="toggle-row">
+        <label for="bodylink-wifi-enabled">WiFi fallback transport</label>
+        <input type="checkbox" id="bodylink-wifi-enabled">
+      </div>
+      <div class="mt-8">
+        <label class="label-dim" for="bodylink-peer-ip">protoArtoo (Body) IP</label>
+        <input id="bodylink-peer-ip" type="text" maxlength="15" placeholder="auto (mDNS)" class="input-full mt-4"
+               title="Optional static IPv4 override for body controller (e.g. 192.168.4.2)">
+        <div class="desc mt-4">Leave empty for auto-discovery via mDNS (<code>protoartoo</code>) or incoming UDP source.</div>
+      </div>
+      <div class="mt-8">
+        <span class="label-dim">Link Status:</span>
+        <span id="bodylink-status" class="badge badge-off ml-6">Loading...</span>
+      </div>
+    </div>
+
+    <!-- Serial2 baud rate, JawaLite command ingest toggles -->
+    <div class="sub-section">
+      <div class="section-header">Serial2 &amp; JawaLite</div>
+      <div class="mt-8 mb-8">
+        <label class="label-dim">Baud Rate</label>
+        <select id="serial2-baud" class="mt-4" style="width:auto;">
+          <option value="2400">2400</option>
+          <option value="9600">9600</option>
+        </select>
+      </div>
+      <div class="toggle-row">
+        <label for="serial-pass">Serial pass-through to Serial2</label>
+        <input type="checkbox" id="serial-pass">
+      </div>
+      <div class="toggle-row">
+        <label for="jawalite-serial">JawaLite on Serial2</label>
+        <input type="checkbox" id="jawalite-serial">
+      </div>
+      <div class="toggle-row">
+        <label for="jawalite-wifi">JawaLite on WiFi (port 2000)</label>
+        <input type="checkbox" id="jawalite-wifi">
+      </div>
+      <div class="toggle-row">
+        <label for="wifi-serial-pass">WiFi JawaLite pass-through to Serial2</label>
+        <input type="checkbox" id="wifi-serial-pass">
+      </div>
+      <div class="desc mt-6" id="serial-mode-hint"></div>
+    </div>
+
+    <button class="btn accent w-100 mt-10" onclick="saveSerial()">Save Serial Settings</button>
+    <div id="serial-feedback" class="feedback mt-6"></div>
+  </div>
+
+  <!-- Droid Remote -->
+  <div class="card">
+    <h3>Droid Remote (ESPNOW)</h3>
+    <div class="info-note mt-6" id="remote-info">Changes require reboot. WiFi and ESPNOW cannot run simultaneously — enabling remote disables WiFi.</div>
+
+    <div class="mt-10" id="remote-settings">
+      <div class="toggle-row">
+        <label for="remote-enabled">Droid Remote Enabled</label>
+        <input type="checkbox" id="remote-enabled">
+      </div>
+      <div class="mt-8">
+        <label class="label-dim">Device Name</label>
+        <input type="text" id="remote-host" value="Astro" class="input-full mt-4">
+      </div>
+      <div class="mt-8">
+        <label class="label-dim">Pairing Secret</label>
+        <input type="password" id="remote-secret" value="Astromech" class="input-full mt-4">
+      </div>
+      <div class="btn-grid mt-8">
+        <button class="btn" onclick="sendCmd('#APPAIR')">Start Pairing</button>
+        <button class="btn danger" onclick="sendCmd('#APUNPAIR')">Unpair</button>
+      </div>
+    </div>
+
+    <button class="btn accent w-100 mt-8" id="remote-save-btn" onclick="saveRemote()">Save &amp; Reboot</button>
+    <div id="remote-feedback" class="feedback mt-6"></div>
+  </div>
+
+  <!-- Firmware & System -->
+  <div class="card">
+    <h3>Firmware &amp; System</h3>
+    <div class="btn-grid mt-8">
+      <a href="/firmware.html" class="btn link-btn">Firmware Update</a>
+      <button class="btn" onclick="confirmReboot()">Reboot</button>
+      <button class="btn danger" onclick="confirmFactoryReset()">Factory Reset</button>
+    </div>
+    <div class="desc mt-4">OTA firmware flashing, diagnostic log, and factory reset are on the firmware page.</div>
+  </div>
+
+  <!-- API Token -->
+  <div class="card">
+    <h3>Write API Token</h3>
+    <div class="desc">Optional. Stored in this browser only and sent with write requests when API protection is enabled.</div>
     <details class="gadget-details mt-10">
-      <summary>Edit Droid Name</summary>
-      <div class="label-dim mt-10">Droid Name</div>
-      <div class="row mt-4 mb-10">
-        <input type="text" id="droid-name" maxlength="24" placeholder="AstroPixels" class="flex-1">
-        <button class="btn accent" onclick="saveDroidName()">Save Name</button>
+      <summary>Edit API Token</summary>
+      <div class="row mt-8">
+        <input type="password" id="api-token" placeholder="Enter token..." class="flex-1">
+        <button class="btn accent" onclick="saveApiToken()">Save</button>
+        <button class="btn danger" onclick="clearApiToken()">Clear</button>
       </div>
     </details>
+    <div class="desc mt-6" id="api-token-status">Not set</div>
   </div>
 
-  <div class="card">
-    <h3>Configuration Areas</h3>
-    <div class="stack-6 mt-10">
-      <a href="/wifi.html" class="btn link-btn">WiFi Configuration</a>
-      <div class="desc">Access point/client mode, network credentials, and connectivity behavior.</div>
-
-      <a href="/serial.html" class="btn link-btn">Serial Communication</a>
-      <div class="desc">Serial2 transport, JawaLite bridging, and body controller link settings.</div>
-
-      <a href="/sound.html" class="btn link-btn">Sound Player</a>
-      <div class="desc">Sound module mode, local playback behavior, and startup/random options.</div>
-
-      <a href="/remote.html" class="btn link-btn" id="remote-link">Droid Remote (ESPNOW only)</a>
-      <div class="desc" id="remote-desc">Pairing and host/secret settings for ESPNOW Droid Remote mode.</div>
-
-      <a href="/firmware.html" class="btn link-btn">Firmware Update</a>
-      <div class="desc">Upload app firmware and monitor OTA progress.</div>
-    </div>
-  </div>
-
-  <div class="card">
-    <h3>Hardware Gadgets</h3>
-    <div class="desc">Feature toggles for optional hardware modules. Preferences are saved to NVS and applied after reboot.</div>
+  <!-- Hardware Gadgets (collapsed) -->
+  <details class="card">
+    <summary>Hardware Gadgets <span class="label-dim" style="font-weight:400"> — optional hardware modules</span></summary>
+    <div class="desc mt-8">Feature toggles for optional hardware modules. Saved to NVS, applied after reboot. Hardware must be physically connected and compiled with the corresponding build flags.</div>
 
     <div class="gadget-list mt-10">
       <div class="gadget-item">
         <details class="gadget-details">
           <summary>BadMotivator (Smoke)</summary>
-          <div class="desc">Controls smoke output through the BadMotivator module.</div>
-          <div class="desc">Key: <code>badmot</code> | Commands: <code>#BMSMOKE</code>, <code>#BMSTOP</code>, <code>#BMPULSE&lt;sec&gt;</code></div>
-          <div class="toggle-row mt-8">
+          <div class="desc mt-4">Smoke output via BadMotivator module. Key: <code>badmot</code> | Commands: <code>#BMSMOKE</code>, <code>#BMSTOP</code>, <code>#BMPULSE&lt;sec&gt;</code></div>
+          <div class="toggle-row mt-6">
             <label for="gadget-badmot">Enable Feature</label>
             <input type="checkbox" id="gadget-badmot" onchange="saveGadgetPref('badmot')">
           </div>
@@ -73,9 +199,8 @@
       <div class="gadget-item">
         <details class="gadget-details">
           <summary>FireStrip (Fire LEDs)</summary>
-          <div class="desc">Controls the optional auxiliary fire/spark LED strip.</div>
-          <div class="desc">Key: <code>firest</code> | Commands: <code>#FIRESPARK&lt;ms&gt;</code>, <code>#FIREBURN&lt;ms&gt;</code>, <code>#FIRESTOP</code></div>
-          <div class="toggle-row mt-8">
+          <div class="desc mt-4">Auxiliary fire/spark LED strip. Key: <code>firest</code> | Commands: <code>#FIRESPARK&lt;ms&gt;</code>, <code>#FIREBURN&lt;ms&gt;</code>, <code>#FIRESTOP</code></div>
+          <div class="toggle-row mt-6">
             <label for="gadget-firest">Enable Feature</label>
             <input type="checkbox" id="gadget-firest" onchange="saveGadgetPref('firest')">
           </div>
@@ -85,9 +210,8 @@
       <div class="gadget-item">
         <details class="gadget-details">
           <summary>Charge Bay Indicator (CBI)</summary>
-          <div class="desc">Enables MAX7219 charge-bay panel animation output.</div>
-          <div class="desc">Key: <code>cbienb</code> | Typical commands: <code>#CBION</code>, <code>#CBIOFF</code>, <code>#CBISET&lt;n&gt;</code></div>
-          <div class="toggle-row mt-8">
+          <div class="desc mt-4">MAX7219 charge-bay panel animation. Key: <code>cbienb</code> | Commands: <code>#CBION</code>, <code>#CBIOFF</code>, <code>#CBISET&lt;n&gt;</code></div>
+          <div class="toggle-row mt-6">
             <label for="gadget-cbienb">Enable Feature</label>
             <input type="checkbox" id="gadget-cbienb" onchange="saveGadgetPref('cbienb')">
           </div>
@@ -97,90 +221,33 @@
       <div class="gadget-item">
         <details class="gadget-details">
           <summary>DataPanel</summary>
-          <div class="desc">Enables MAX7219 body datapanel animation output.</div>
-          <div class="desc">Key: <code>dpenab</code> | Typical commands: <code>#DPON</code>, <code>#DPOFF</code>, <code>#DPSET&lt;n&gt;</code></div>
-          <div class="toggle-row mt-8">
+          <div class="desc mt-4">MAX7219 body datapanel animation. Key: <code>dpenab</code> | Commands: <code>#DPON</code>, <code>#DPOFF</code>, <code>#DPSET&lt;n&gt;</code></div>
+          <div class="toggle-row mt-6">
             <label for="gadget-dpenab">Enable Feature</label>
             <input type="checkbox" id="gadget-dpenab" onchange="saveGadgetPref('dpenab')">
           </div>
         </details>
       </div>
     </div>
+  </details>
 
-    <div class="desc mt-8">Hardware must be physically connected and compiled in with the corresponding build flags.</div>
-  </div>
-
-  <div class="card">
-    <h3>Dome Behaviour</h3>
-    <div class="desc">Startup and autonomous behaviour settings. Changes take effect after reboot.</div>
-    <div class="gadget-list mt-10">
-      <div class="gadget-item">
-        <div class="toggle-row">
-          <label for="gadget-holo_boot_loop">Start holo random mode loop on boot</label>
-          <input type="checkbox" id="gadget-holo_boot_loop" onchange="saveGadgetPref('holo_boot_loop')">
-        </div>
-        <div class="desc mt-4">Fires HPS9 at the end of setup() to put all three holos into the autonomous random LED mode loop immediately on power-up. NVS key: <code>holo_boot_loop</code></div>
-      </div>
-    </div>
-  </div>
-
-  <div class="card">
-    <h3>Write API Token</h3>
-    <div class="desc">Optional. Stored only in this browser and sent with write requests when API protection is enabled.</div>
-    <details class="gadget-details mt-10">
-      <summary>Edit API Token</summary>
-      <div class="row mt-8">
-        <input type="password" id="api-token" placeholder="Enter token..." class="flex-1">
-        <button class="btn accent" onclick="saveApiToken()">Save</button>
-        <button class="btn danger" onclick="clearApiToken()">Clear</button>
-      </div>
-    </details>
-    <div class="desc mt-8" id="api-token-status">Not set</div>
-  </div>
-
-  <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>
+  <div id="shell-status"></div>
+  <script src="/shell.js"></script>
   <script src="/app.js"></script>
   <script>
     function isTrue(v) {
       return v === true || v === 'true' || v === '1' || v === 1;
     }
 
-    fetch('/api/state').then(function(r){return r.json();}).then(function(s){
-      var link = document.getElementById('remote-link');
-      var desc = document.getElementById('remote-desc');
-      if (!link) return;
-      if (s && s.droidName) {
-        var nameInput = document.getElementById('droid-name');
-        if (nameInput) nameInput.value = s.droidName;
-      }
-      if (typeof s.remoteSupported !== 'undefined' && !s.remoteSupported) {
-        link.textContent = 'Droid Remote (Disabled in this build)';
-        link.title = 'Droid Remote ESPNOW support is compiled out in this firmware build.';
-        if (desc) desc.textContent = 'Droid Remote support is disabled at build time in this firmware image.';
-      } else {
-        link.textContent = 'Droid Remote (ESPNOW only)';
-        link.title = 'Configure ESPNOW Droid Remote pairing.';
-        if (desc) desc.textContent = 'Pairing and host/secret settings for ESPNOW Droid Remote mode.';
-      }
-    }).catch(function(){});
-
-    function refreshTokenStatus() {
-      var token = getApiToken();
-      var el = document.getElementById('api-token-status');
-      if (token) {
-        el.textContent = 'Token stored in this browser';
-      } else {
-        el.textContent = 'Not set';
-      }
+    function showFeedback(id, type, message) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.className = 'feedback ' + type + ' show';
+      el.textContent = message;
+      setTimeout(function() { el.classList.remove('show'); }, 3000);
     }
 
-    function saveApiToken() {
-      var token = document.getElementById('api-token').value.trim();
-      setApiToken(token);
-      refreshTokenStatus();
-      alert(token ? 'Token saved in browser.' : 'Token cleared.');
-    }
-
+    /* ── Identity ── */
     function saveDroidName() {
       var name = document.getElementById('droid-name').value.trim();
       if (!name) name = 'AstroPixels';
@@ -191,14 +258,227 @@
         })
         .then(function(r) { return r.json(); })
         .then(function(s) {
-          if (s && s.droidName) {
-            document.getElementById('droid-name').value = s.droidName;
-          }
-          alert('Droid name saved.');
+          if (s && s.droidName) document.getElementById('droid-name').value = s.droidName;
+          showFeedback('identity-feedback', 'success', 'Droid name saved.');
         })
-        .catch(function() {
-          alert('Failed to save droid name.');
+        .catch(function() { showFeedback('identity-feedback', 'error', 'Failed to save droid name.'); });
+    }
+
+    /* ── WiFi ── */
+    fetch('/api/pref?keys=wifi,ap,ssid,pass').then(function(r) { return r.json(); }).then(function(d) {
+      if (typeof d.wifi !== 'undefined') document.getElementById('wifi-enabled').checked = isTrue(d.wifi);
+      if (typeof d.ap !== 'undefined') document.getElementById('wifi-ap').checked = isTrue(d.ap);
+      if (d.ssid) document.getElementById('wifi-ssid').value = d.ssid;
+      if (d.pass) document.getElementById('wifi-pass').value = d.pass;
+    }).catch(function() {});
+
+    function saveWifi() {
+      var prefs = [
+        { key: 'wifi', val: document.getElementById('wifi-enabled').checked ? '1' : '0' },
+        { key: 'ap',   val: document.getElementById('wifi-ap').checked ? '1' : '0' },
+        { key: 'ssid', val: document.getElementById('wifi-ssid').value },
+        { key: 'pass', val: document.getElementById('wifi-pass').value },
+        { key: 'remote', val: document.getElementById('wifi-enabled').checked ? '0' : '1' }
+      ];
+      var chain = Promise.resolve();
+      prefs.forEach(function(p, i) {
+        chain = chain.then(function() {
+          var body = 'key=' + encodeURIComponent(p.key) + '&val=' + encodeURIComponent(p.val);
+          if (i === prefs.length - 1) body += '&reboot=1';
+          return apiPostForm('/api/pref', body);
         });
+      });
+      chain.then(function() {
+        showFeedback('wifi-feedback', 'warning', 'Rebooting...');
+      }).catch(function() {
+        showFeedback('wifi-feedback', 'error', 'Failed to save WiFi settings.');
+      });
+    }
+
+    /* ── Serial / protoR2link ── */
+    // Defaults match the protoArtoo body/dome link profile — 9600 baud, protoR2link on,
+    // Serial2 ingest on. Applied immediately so checkboxes are never visually blank
+    // before the pref fetch completes.
+    var serialDefaults = {
+      mserial2: '9600', mserialpass: false, mserial: true,
+      mwifi: true, mwifipass: false, mbodylink: true, mbodywifi: true, bodypeerip: ''
+    };
+
+    function applySerialDefaults() {
+      document.getElementById('serial2-baud').value = serialDefaults.mserial2;
+      document.getElementById('serial-pass').checked = serialDefaults.mserialpass;
+      document.getElementById('jawalite-serial').checked = serialDefaults.mserial;
+      document.getElementById('jawalite-wifi').checked = serialDefaults.mwifi;
+      document.getElementById('wifi-serial-pass').checked = serialDefaults.mwifipass;
+      document.getElementById('bodylink-enabled').checked = serialDefaults.mbodylink;
+      document.getElementById('bodylink-wifi-enabled').checked = serialDefaults.mbodywifi;
+      document.getElementById('bodylink-peer-ip').value = serialDefaults.bodypeerip;
+      syncSerialModeConstraints();
+    }
+
+    applySerialDefaults();
+
+    fetch('/api/pref?keys=mserial2,mserialpass,mserial,mwifi,mwifipass,mbodylink,mbodywifi,bodypeerip')
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.mserial2) document.getElementById('serial2-baud').value = d.mserial2;
+        if (typeof d.mserialpass !== 'undefined') document.getElementById('serial-pass').checked = isTrue(d.mserialpass);
+        if (typeof d.mserial !== 'undefined') document.getElementById('jawalite-serial').checked = isTrue(d.mserial);
+        if (typeof d.mwifi !== 'undefined') document.getElementById('jawalite-wifi').checked = isTrue(d.mwifi);
+        if (typeof d.mwifipass !== 'undefined') document.getElementById('wifi-serial-pass').checked = isTrue(d.mwifipass);
+        if (typeof d.mbodylink !== 'undefined') document.getElementById('bodylink-enabled').checked = isTrue(d.mbodylink);
+        if (typeof d.mbodywifi !== 'undefined') document.getElementById('bodylink-wifi-enabled').checked = isTrue(d.mbodywifi);
+        if (typeof d.bodypeerip !== 'undefined') document.getElementById('bodylink-peer-ip').value = d.bodypeerip;
+        syncSerialModeConstraints();
+      }).catch(function() { applySerialDefaults(); });
+
+    document.getElementById('bodylink-enabled').addEventListener('change', syncSerialModeConstraints);
+
+    function syncSerialModeConstraints() {
+      var bodyLink = document.getElementById('bodylink-enabled').checked;
+      var serialToggle = document.getElementById('jawalite-serial');
+      var hint = document.getElementById('serial-mode-hint');
+      if (bodyLink) {
+        serialToggle.checked = true;
+        serialToggle.disabled = true;
+        hint.textContent = 'protoR2link active: Serial2 command ingest is forced on to keep heartbeat and command routing stable.';
+      } else {
+        serialToggle.disabled = false;
+        hint.textContent = '';
+      }
+    }
+
+    var statePromise = fetch('/api/state').then(function(r) { return r.json(); });
+
+    statePromise.then(function(s) {
+      var ip = s.wifiIP || 'unknown';
+      var mode = s.wifiAP ? 'AP' : 'STA';
+      document.getElementById('r2touch-status').innerHTML =
+        '<div>Controller IP: <strong>' + ip + '</strong> (' + mode + ' mode) — Port: <strong>2000</strong></div>';
+      if (s && s.droidName) {
+        var nameInput = document.getElementById('droid-name');
+        if (nameInput) nameInput.value = s.droidName;
+      }
+    }).catch(function() {
+      document.getElementById('r2touch-status').textContent = 'Unable to read controller IP right now.';
+    });
+
+    statePromise.then(function(s) {
+      var bl = s && s.body_link ? s.body_link : null;
+      var badge = document.getElementById('bodylink-status');
+      if (!bl || !bl.enabled) {
+        badge.textContent = 'Disabled';
+        badge.className = 'badge badge-off';
+      } else if (bl.connected) {
+        var txLabel = (bl.transport || 'uart').toLowerCase() === 'wifi' ? 'WiFi' : 'UART';
+        badge.textContent = 'Connected (' + txLabel + ')';
+        badge.className = 'badge badge-ok';
+      } else {
+        badge.textContent = 'Waiting';
+        badge.className = 'badge badge-warn';
+      }
+    }).catch(function() {
+      var badge = document.getElementById('bodylink-status');
+      badge.textContent = 'Unknown';
+      badge.className = 'badge badge-warn';
+    });
+
+    function saveSerial() {
+      syncSerialModeConstraints();
+      var prefs = [
+        { key: 'mserial2',    val: document.getElementById('serial2-baud').value },
+        { key: 'mserialpass', val: document.getElementById('serial-pass').checked ? '1' : '0' },
+        { key: 'mserial',     val: document.getElementById('jawalite-serial').checked ? '1' : '0' },
+        { key: 'mwifi',       val: document.getElementById('jawalite-wifi').checked ? '1' : '0' },
+        { key: 'mwifipass',   val: document.getElementById('wifi-serial-pass').checked ? '1' : '0' },
+        { key: 'mbodylink',   val: document.getElementById('bodylink-enabled').checked ? '1' : '0' },
+        { key: 'mbodywifi',   val: document.getElementById('bodylink-wifi-enabled').checked ? '1' : '0' },
+        { key: 'bodypeerip',  val: document.getElementById('bodylink-peer-ip').value.trim() }
+      ];
+      var chain = Promise.resolve();
+      prefs.forEach(function(p) {
+        chain = chain.then(function() {
+          return apiPostForm('/api/pref', 'key=' + encodeURIComponent(p.key) + '&val=' + encodeURIComponent(p.val));
+        });
+      });
+      chain.then(function() {
+        showFeedback('serial-feedback', 'success', 'Serial settings saved. Some changes require reboot.');
+      }).catch(function() {
+        showFeedback('serial-feedback', 'error', 'Failed to save serial settings.');
+      });
+    }
+
+    /* ── Droid Remote ── */
+    function setRemoteUiEnabled(enabled) {
+      ['remote-enabled', 'remote-host', 'remote-secret'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.disabled = !enabled;
+      });
+      var btn = document.getElementById('remote-save-btn');
+      if (btn) btn.disabled = !enabled;
+    }
+
+    fetch('/api/state').then(function(r) { return r.json(); }).then(function(s) {
+      if (typeof s.remoteSupported !== 'undefined' && !s.remoteSupported) {
+        setRemoteUiEnabled(false);
+        var info = document.getElementById('remote-info');
+        if (info) info.textContent = 'Droid Remote ESPNOW support is compiled out in this firmware build.';
+      }
+    }).catch(function() {});
+
+    fetch('/api/pref?keys=remote,rhost,rsecret').then(function(r) { return r.json(); }).then(function(d) {
+      if (typeof d.remote !== 'undefined') document.getElementById('remote-enabled').checked = isTrue(d.remote);
+      if (d.rhost) document.getElementById('remote-host').value = d.rhost;
+      if (d.rsecret) document.getElementById('remote-secret').value = d.rsecret;
+    }).catch(function() {});
+
+    function saveRemote() {
+      var prefs = [
+        { key: 'remote',  val: document.getElementById('remote-enabled').checked ? '1' : '0' },
+        { key: 'rhost',   val: document.getElementById('remote-host').value },
+        { key: 'rsecret', val: document.getElementById('remote-secret').value }
+      ];
+      var chain = Promise.resolve();
+      prefs.forEach(function(p, i) {
+        chain = chain.then(function() {
+          var body = 'key=' + encodeURIComponent(p.key) + '&val=' + encodeURIComponent(p.val);
+          if (i === prefs.length - 1) body += '&reboot=1';
+          return apiPostForm('/api/pref', body);
+        });
+      });
+      chain.then(function() {
+        showFeedback('remote-feedback', 'warning', 'Rebooting...');
+      }).catch(function() {
+        showFeedback('remote-feedback', 'error', 'Failed to save remote settings.');
+      });
+    }
+
+    /* ── Firmware / system ── */
+    function confirmReboot() {
+      if (confirm('Reboot the controller?')) {
+        apiPost('/api/reboot');
+        var el = document.getElementById('conn-status');
+        if (el) el.innerHTML = '<span class="dot yellow"></span>Rebooting...';
+      }
+    }
+    function confirmFactoryReset() {
+      if (confirm('Clear ALL preferences and reboot? This resets WiFi, sound, and remote settings to defaults.')) {
+        apiPostForm('/api/pref', 'key=_clear&val=1&reboot=1');
+      }
+    }
+
+    /* ── API Token ── */
+    function refreshTokenStatus() {
+      var token = getApiToken();
+      var el = document.getElementById('api-token-status');
+      if (el) el.textContent = token ? 'Token stored in this browser' : 'Not set';
+    }
+
+    function saveApiToken() {
+      var token = document.getElementById('api-token').value.trim();
+      setApiToken(token);
+      refreshTokenStatus();
+      if (typeof uiToast === 'function') uiToast(token ? 'Token saved.' : 'Token cleared.');
     }
 
     function clearApiToken() {
@@ -209,18 +489,15 @@
 
     refreshTokenStatus();
 
-    // Load gadget preferences on page load
-    fetch('/api/pref?keys=badmot,firest,cbienb,dpenab,holo_boot_loop')
-      .then(function(r){return r.json();})
+    /* ── Gadget prefs — load all optional hardware toggles on page load ── */
+    fetch('/api/pref?keys=badmot,firest,cbienb,dpenab')
+      .then(function(r) { return r.json(); })
       .then(function(prefs) {
         document.getElementById('gadget-badmot').checked = isTrue(prefs.badmot);
         document.getElementById('gadget-firest').checked = isTrue(prefs.firest);
         document.getElementById('gadget-cbienb').checked = isTrue(prefs.cbienb);
         document.getElementById('gadget-dpenab').checked = isTrue(prefs.dpenab);
-        var hbl = document.getElementById('gadget-holo_boot_loop');
-        if (hbl) hbl.checked = isTrue(prefs.holo_boot_loop !== undefined ? prefs.holo_boot_loop : true);
-      })
-      .catch(function(err) {
+      }).catch(function(err) {
         console.warn('Failed to load gadget preferences:', err);
       });
 
@@ -230,13 +507,11 @@
       apiPostForm('/api/pref', 'key=' + key + '&val=' + value)
         .then(function(resp) {
           if (!resp.ok) throw new Error('save failed');
-          // Show subtle feedback
           checkbox.style.opacity = '0.5';
           setTimeout(function() { checkbox.style.opacity = '1'; }, 300);
         })
         .catch(function() {
-          alert('Failed to save ' + key + ' preference. Changes will take effect after reboot.');
-          // Revert checkbox on error
+          if (typeof uiToast === 'function') uiToast('Failed to save ' + key, 'error');
           checkbox.checked = !checkbox.checked;
         });
     }

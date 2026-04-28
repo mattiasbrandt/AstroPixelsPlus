@@ -9,22 +9,12 @@
   <link rel="apple-touch-icon" href="/r2d2dome-favicon.png">
   <link rel="stylesheet" href="/style.css">
 </head>
-<body>
-  <div class="topbar">
-    <div>
-      <h1><img src="/r2d2dome.svg" alt="R2-D2" class="topbar-logo"> <span data-droid-name-target>AstroPixels</span></h1>
-      <div class="subtitle">R2-D2 Dome Controller</div>
-    </div>
-    <button id="sleep-toggle" class="btn power-toggle" onclick="toggleSleepWake()" title="Toggle soft sleep mode">⏻ Sleep</button>
-  </div>
-  <nav>
-    <a href="/" class="active" title="Main dashboard: health, logs, and quick actions">Home</a>
-    <a href="/panels.html" title="Open, close, and animate dome panels">Panels</a>
-    <a href="/holos.html" title="Control holo projector lights and servo movement">Holos</a>
-    <a href="/logics.html" title="Control front/rear logic displays and PSI effects">Logics</a>
-    <a href="/sequences.html" title="Run combined panel, holo, and logic choreography">Sequences</a>
-    <a href="/setup.html" title="WiFi, serial, sound, remote, and firmware settings">Setup</a>
-  </nav>
+<body data-page="home">
+  <div id="shell-top"></div>
+
+  <template id="topbar-actions-template">
+    <button id="sleep-toggle" class="btn accent power-toggle" onclick="toggleSleepWake()" title="Park subsystems in soft sleep mode">⏻ Sleep</button>
+  </template>
 
   <!-- Quick Actions -->
   <div class="card">
@@ -42,14 +32,27 @@
     </div>
   </div>
 
+  <!-- Mood Presets -->
   <div class="card">
     <h3>Mood Presets</h3>
     <div class="desc">Set the idle behavior profile for chatter, holo activity, and visual intensity.</div>
-    <div class="btn-grid mt-8">
-      <button class="btn" onclick="sendCmd(':SE10')" title="Quiet profile: stop sounds, holos idle, panels closed, logic normal">Quiet</button>
-      <button class="btn" onclick="sendCmd(':SE13')" title="Mid-awake profile: balanced idle activity with restrained motion">Mid-Awake</button>
-      <button class="btn accent" onclick="sendCmd(':SE11')" title="Full-awake profile: active idle chatter with holo movement baseline">Full-Awake</button>
-      <button class="btn" onclick="sendCmd(':SE14')" title="Awake+ profile: full-awake plus active holo LED behavior">Awake+</button>
+    <div class="mood-grid mt-8">
+      <button class="mood-btn" onclick="sendCmd(':SE10')" title="Quiet profile: stop sounds, holos idle, panels closed, logic normal">
+        <span class="mood-icon">😴</span>
+        <span class="mood-label">Quiet</span>
+      </button>
+      <button class="mood-btn" onclick="sendCmd(':SE13')" title="Mid-awake profile: balanced idle activity with restrained motion">
+        <span class="mood-icon">😐</span>
+        <span class="mood-label">Mid-Awake</span>
+      </button>
+      <button class="mood-btn accent" onclick="sendCmd(':SE11')" title="Full-awake profile: active idle chatter with holo movement baseline">
+        <span class="mood-icon">😄</span>
+        <span class="mood-label">Full-Awake</span>
+      </button>
+      <button class="mood-btn" onclick="sendCmd(':SE14')" title="Awake+ profile: full-awake plus active holo LED behavior">
+        <span class="mood-icon">🤩</span>
+        <span class="mood-label">Awake+</span>
+      </button>
     </div>
   </div>
 
@@ -57,13 +60,34 @@
   <div class="card">
     <h3>Subsystem Health</h3>
     <div class="health-grid" id="health-grid">
-      <div class="health-item" title="Panel servo controller at I2C address 0x40 (dome panel movement)"><div class="indicator" id="h-panels"></div><span>Servo Panels</span></div>
-      <div class="health-item" title="Holo servo controller at I2C address 0x41 (holo pitch/yaw movement)"><div class="indicator" id="h-holos"></div><span>Servo Holos</span></div>
-      <div class="health-item" title="Sound output availability based on sound module preference state"><div class="indicator" id="h-sound"></div><span>Sound Module</span></div>
-      <div class="health-item" title="Current WiFi service state on this controller"><div class="indicator" id="h-wifi"></div><span>WiFi</span></div>
-      <div class="health-item" title="Droid remote link state (warn means remote feature disabled)"><div class="indicator" id="h-remote"></div><span>Droid Remote</span></div>
-      <div class="health-item" title="SPI flash file system mount state used by web UI files"><div class="indicator" id="h-spiffs"></div><span>SPIFFS</span></div>
-      <div class="health-item" title="protoR2link health and active transport (UART or WiFi fallback)"><div class="indicator" id="h-bodylink"></div><span>protoR2link</span></div>
+      <div class="health-item" title="Panel servo controller at I2C 0x40">
+        <div class="indicator" id="h-panels"></div>
+        <div class="health-label"><span>Servo Panels</span><span class="indicator-text">I2C 0x40</span></div>
+      </div>
+      <div class="health-item" title="Holo servo controller at I2C 0x41">
+        <div class="indicator" id="h-holos"></div>
+        <div class="health-label"><span>Servo Holos</span><span class="indicator-text">I2C 0x41</span></div>
+      </div>
+      <div class="health-item" title="Sound output availability based on module preference state">
+        <div class="indicator" id="h-sound"></div>
+        <div class="health-label"><span>Sound Module</span><span class="indicator-text" id="h-sound-type"></span></div>
+      </div>
+      <div class="health-item" title="Current WiFi service state on this controller">
+        <div class="indicator" id="h-wifi"></div>
+        <div class="health-label"><span>WiFi</span><span class="indicator-text" id="h-wifi-mode"></span></div>
+      </div>
+      <div class="health-item" title="Droid remote link state (warn = feature disabled)">
+        <div class="indicator" id="h-remote"></div>
+        <div class="health-label"><span>Droid Remote</span><span class="indicator-text">ESPNOW</span></div>
+      </div>
+      <div class="health-item" title="SPI flash file system mount state">
+        <div class="indicator" id="h-spiffs"></div>
+        <div class="health-label"><span>SPIFFS</span><span class="indicator-text">Web UI files</span></div>
+      </div>
+      <div class="health-item" title="protoR2link health and active transport">
+        <div class="indicator" id="h-bodylink"></div>
+        <div class="health-label"><span>protoR2link</span><span class="indicator-text">UART / WiFi</span></div>
+      </div>
     </div>
     <div class="i2c-list" id="i2c-list" title="Detected I2C addresses responding on the bus"></div>
   </div>
@@ -73,13 +97,14 @@
     <h3 title="Live firmware log stream. Scroll up to pause auto-follow.">Live Log Console</h3>
     <div id="log-wrap" class="log-wrap">
       <pre id="log-console" class="log-console" title="Recent runtime logs from the controller"></pre>
-      <div id="log-paused" class="log-paused" title="Auto-scroll paused while viewing older lines">PAUSED</div>
+      <div id="log-paused" class="log-paused" title="Auto-scroll paused">PAUSED</div>
     </div>
   </div>
 
+  <!-- Manual Command -->
   <div class="card">
     <h3>Manual Command</h3>
-    <div class="desc">Send any Marcduino command directly (example: :OP01, *ON00, @0T5)</div>
+    <div class="desc">Send any Marcduino command directly (e.g. :OP01, *ON00, @0T5)</div>
     <div class="row mt-8">
       <input
         type="text"
@@ -119,12 +144,18 @@
     </div>
   </div>
 
-  <div class="status-bar" id="conn-status" title="Browser WebSocket link to controller"><span class="dot yellow"></span>Connecting...</div>
-
+  <div id="shell-status"></div>
+  <script src="/shell.js"></script>
   <script src="/app.js"></script>
   <script>
     var remoteSupported = true;
     var sleepModeActive = false;
+    // Sound player label — populated from msound pref on load (0=Off, 1=MP3 Trigger, 2=DFMini, 3=HCR)
+    var SOUND_PLAYER_LABELS = { '0': 'Disabled', '1': 'MP3 Trigger', '2': 'DFMini Player', '3': 'HCR' };
+    var soundPlayerLabel = '';
+    fetch('/api/pref?keys=msound').then(function(r) { return r.json(); }).then(function(d) {
+      soundPlayerLabel = SOUND_PLAYER_LABELS[String(d.msound)] || '';
+    }).catch(function() {});
 
     function setSleepUi(isSleeping) {
       sleepModeActive = !!isSleeping;
@@ -142,7 +173,6 @@
           btn.title = 'Park subsystems in soft sleep mode';
         }
       }
-
       var overlay = document.getElementById('sleep-overlay');
       if (overlay) {
         if (sleepModeActive) overlay.classList.add('active');
@@ -154,15 +184,11 @@
       return apiPost(path)
         .then(function(resp) {
           if (!resp.ok) {
-            return resp.text().then(function(t) {
-              throw new Error(t || ('HTTP ' + resp.status));
-            });
+            return resp.text().then(function(t) { throw new Error(t || ('HTTP ' + resp.status)); });
           }
           return resp.json().catch(function() { return { ok: true }; });
         })
-        .then(function() {
-          return fetchState(updateStatus);
-        })
+        .then(function() { return fetchState(updateStatus); })
         .catch(function(err) {
           if (typeof uiToast === 'function') uiToast('Power mode request failed', 'error');
           console.error(err);
@@ -172,7 +198,6 @@
     window.toggleSleepWake = function() {
       return requestPowerMode(sleepModeActive ? '/api/wake' : '/api/sleep');
     };
-
     window.wakeFromOverlay = function() {
       return requestPowerMode('/api/wake');
     };
@@ -194,83 +219,58 @@
         el.parentElement.style.display = visible ? '' : 'none';
       }
     }
+
     function renderHeapStatus(freeHeapBytes) {
       var kb = freeHeapBytes / 1024;
-      var label = 'Healthy';
-      var color = 'var(--success)';
-      if (kb < 80) {
-        label = 'Critical';
-        color = 'var(--danger)';
-      } else if (kb < 120) {
-        label = 'Low';
-        color = 'var(--warning)';
-      }
-      return 'Free Heap: <span style="color:' + color + ';font-weight:700" title="Thresholds: Healthy >= 120 KB, Low 80-119 KB, Critical < 80 KB">' + kb.toFixed(1) + ' KB (' + label + ')</span>';
+      var label = 'Healthy', color = 'var(--success)';
+      if (kb < 80) { label = 'Critical'; color = 'var(--danger)'; }
+      else if (kb < 120) { label = 'Low'; color = 'var(--warning)'; }
+      return 'Free Heap: <span style="color:' + color + ';font-weight:700" title="Healthy ≥120 KB, Low 80-119 KB, Critical <80 KB">' + kb.toFixed(1) + ' KB (' + label + ')</span>';
     }
     function renderMinHeapStatus(minHeapBytes) {
       var kb = minHeapBytes / 1024;
-      var label = 'Good';
-      var color = 'var(--success)';
-      if (kb < 64) {
-        label = 'Critical';
-        color = 'var(--danger)';
-      } else if (kb < 96) {
-        label = 'Watch';
-        color = 'var(--warning)';
-      }
-      return 'Min Free Heap: <span style="color:' + color + ';font-weight:700" title="Thresholds: Good >= 96 KB, Watch 64-95 KB, Critical < 64 KB">' + kb.toFixed(1) + ' KB (' + label + ')</span>';
+      var label = 'Good', color = 'var(--success)';
+      if (kb < 64) { label = 'Critical'; color = 'var(--danger)'; }
+      else if (kb < 96) { label = 'Watch'; color = 'var(--warning)'; }
+      return 'Min Free Heap: <span style="color:' + color + ';font-weight:700" title="Good ≥96 KB, Watch 64-95 KB, Critical <64 KB">' + kb.toFixed(1) + ' KB (' + label + ')</span>';
     }
     function renderSerial2Health(lastSeenMs, uptimeSec) {
       var nowMs = uptimeSec * 1000;
       var ageMs = (lastSeenMs > 0 && nowMs >= lastSeenMs) ? (nowMs - lastSeenMs) : 0xFFFFFFFF;
-      var text = 'No traffic';
-      var color = 'var(--danger)';
-      if (ageMs <= 5000) {
-        text = 'Active';
-        color = 'var(--success)';
-      } else if (ageMs <= 30000) {
-        text = 'Idle';
-        color = 'var(--warning)';
-      }
-      return 'Serial2 Activity: <span style="color:' + color + ';font-weight:700" title="Thresholds: Active <= 5s, Idle 5-30s, No traffic > 30s">' + text + '</span>';
+      var text = 'No traffic', color = 'var(--danger)';
+      if (ageMs <= 5000) { text = 'Active'; color = 'var(--success)'; }
+      else if (ageMs <= 30000) { text = 'Idle'; color = 'var(--warning)'; }
+      return 'Serial2 Activity: <span style="color:' + color + ';font-weight:700">' + text + '</span>';
     }
     function renderWifiQuality(rssi, apMode) {
-      if (apMode) {
-        return 'WiFi Quality: <span style="color:var(--warning);font-weight:700">AP mode</span>';
-      }
-      if (!rssi) {
-        return 'WiFi Quality: <span style="color:var(--danger);font-weight:700">Unknown</span>';
-      }
-      var quality = 'Poor';
-      var color = 'var(--danger)';
-      if (rssi >= -67) {
-        quality = 'Excellent';
-        color = 'var(--success)';
-      } else if (rssi >= -75) {
-        quality = 'Good';
-        color = 'var(--success)';
-      } else if (rssi >= -85) {
-        quality = 'Fair';
-        color = 'var(--warning)';
-      }
-      return 'WiFi Quality: <span style="color:' + color + ';font-weight:700" title="Thresholds: Excellent >= -67 dBm, Good -68..-75 dBm, Fair -76..-85 dBm, Poor < -85 dBm">' + quality + ' (' + rssi + ' dBm)</span>';
+      if (apMode) return 'WiFi Quality: <span style="color:var(--warning);font-weight:700">AP mode</span>';
+      if (!rssi) return 'WiFi Quality: <span style="color:var(--danger);font-weight:700">Unknown</span>';
+      var quality = 'Poor', color = 'var(--danger)';
+      if (rssi >= -67) { quality = 'Excellent'; color = 'var(--success)'; }
+      else if (rssi >= -75) { quality = 'Good'; color = 'var(--success)'; }
+      else if (rssi >= -85) { quality = 'Fair'; color = 'var(--warning)'; }
+      return 'WiFi Quality: <span style="color:' + color + ';font-weight:700">' + quality + ' (' + rssi + ' dBm)</span>';
     }
     function renderI2CProbeHealth(failures) {
-      var label = 'Clean';
-      var color = 'var(--success)';
-      if (failures > 10) {
-        label = 'Unstable';
-        color = 'var(--danger)';
-      } else if (failures > 0) {
-        label = 'Warning';
-        color = 'var(--warning)';
-      }
-      return 'I2C Probe Errors: <span style="color:' + color + ';font-weight:700" title="Thresholds: Clean 0, Warning 1-10, Unstable > 10 since boot">' + failures + ' (' + label + ')</span>';
+      var label = 'Clean', color = 'var(--success)';
+      if (failures > 10) { label = 'Unstable'; color = 'var(--danger)'; }
+      else if (failures > 0) { label = 'Warning'; color = 'var(--warning)'; }
+      return 'I2C Probe Errors: <span style="color:' + color + ';font-weight:700">' + failures + ' (' + label + ')</span>';
     }
+
     function updateHealth(h) {
       setIndicator('h-panels', h.i2c_panels);
       setIndicator('h-holos', h.i2c_holos);
-      setIndicatorWarn('h-sound', h.sound_module, h.sound_local_enabled);
+      // Grey out sound indicator and clear sub-label when local sound is disabled
+      var sEl = document.getElementById('h-sound');
+      var sTextEl = sEl && sEl.parentElement ? sEl.parentElement.querySelector('.indicator-text') : null;
+      if (!h.sound_local_enabled) {
+        if (sEl) sEl.className = 'indicator';
+        if (sTextEl) sTextEl.textContent = 'Disabled';
+      } else {
+        setIndicator('h-sound', h.sound_module);
+        if (sTextEl) sTextEl.textContent = soundPlayerLabel;
+      }
       setIndicator('h-wifi', h.wifi);
       if (remoteSupported) {
         setIndicatorWarn('h-remote', h.remote, h.remote_enabled);
@@ -285,6 +285,8 @@
           var transport = (h.body_link.transport || 'disconnected').toUpperCase();
           var statusText = !h.body_link.enabled ? 'disabled' : (h.body_link.connected ? 'connected' : 'waiting');
           bodyNode.parentElement.title = 'protoR2link: ' + statusText + ', transport=' + transport;
+          var textEl = bodyNode.parentElement.querySelector('.indicator-text');
+          if (textEl) textEl.textContent = statusText + ' · ' + transport;
           if (!h.body_link.enabled) bodyNode.className = 'indicator';
           else if (h.body_link.connected) bodyNode.className = 'indicator ok';
           else bodyNode.className = 'indicator warn';
@@ -293,7 +295,6 @@
       } else {
         setHealthItemVisible('h-bodylink', false);
       }
-
       if (h.i2c_devices && h.i2c_devices.length > 0) {
         document.getElementById('i2c-list').textContent = 'I2C devices: ' + h.i2c_devices.join(', ');
       }
@@ -304,22 +305,21 @@
         remoteSupported = !!s.remoteSupported;
         setHealthItemVisible('h-remote', remoteSupported);
       }
+      // Update WiFi mode sub-label from live state
+      var wifiModeEl = document.getElementById('h-wifi-mode');
+      if (wifiModeEl && typeof s.wifiAP !== 'undefined') {
+        wifiModeEl.textContent = s.wifiAP ? 'AP Mode' : (s.wifiIP || 'Station');
+      }
       if (typeof s.sleepMode !== 'undefined') {
         setSleepUi(!!s.sleepMode);
       }
 
       var html = '';
-      html += '<div>Uptime: ' + Math.floor(s.uptime/60) + 'm ' + (s.uptime%60) + 's</div>';
+      html += '<div>Uptime: ' + Math.floor(s.uptime / 60) + 'm ' + (s.uptime % 60) + 's</div>';
       html += '<div>' + renderHeapStatus(s.freeHeap) + '</div>';
-      if (typeof s.minFreeHeap !== 'undefined') {
-        html += '<div>' + renderMinHeapStatus(s.minFreeHeap) + '</div>';
-      }
-      if (typeof s.serial2LastSeenMs !== 'undefined') {
-        html += '<div>' + renderSerial2Health(s.serial2LastSeenMs, s.uptime) + '</div>';
-      }
-      if (typeof s.i2c_probe_failures !== 'undefined') {
-        html += '<div>' + renderI2CProbeHealth(s.i2c_probe_failures) + '</div>';
-      }
+      if (typeof s.minFreeHeap !== 'undefined') html += '<div>' + renderMinHeapStatus(s.minFreeHeap) + '</div>';
+      if (typeof s.serial2LastSeenMs !== 'undefined') html += '<div>' + renderSerial2Health(s.serial2LastSeenMs, s.uptime) + '</div>';
+      if (typeof s.i2c_probe_failures !== 'undefined') html += '<div>' + renderI2CProbeHealth(s.i2c_probe_failures) + '</div>';
       html += '<div>WiFi: ' + (s.wifiEnabled ? '<span class="dot green"></span>Enabled' : '<span class="dot red"></span>Disabled');
       if (s.wifiIP) html += ' (' + s.wifiIP + ')';
       if (s.wifiRSSI && !s.wifiAP) html += ' ' + s.wifiRSSI + ' dBm';
@@ -332,14 +332,7 @@
       }
       if (typeof s.soundLocalEnabled !== 'undefined' || typeof s.soundModuleEnabled !== 'undefined') {
         var soundEnabled = !!s.soundModuleEnabled;
-        var soundReason = '';
-        if (!soundEnabled) {
-          if (s.soundLocalEnabled === false) {
-            soundReason = ' (local preference)';
-          } else {
-            soundReason = ' (module setting)';
-          }
-        }
+        var soundReason = !soundEnabled ? (s.soundLocalEnabled === false ? ' (local preference)' : ' (module setting)') : '';
         html += '<div>Sound Playback Module: ' + (soundEnabled ? '<span class="dot green"></span>Enabled' : '<span class="dot yellow"></span>Disabled' + soundReason) + '</div>';
       }
       if (s.otaInProgress) {
@@ -351,13 +344,12 @@
       document.getElementById('sys-status').innerHTML = html;
     }
 
-    // --- Log Console ---
     var logEl = document.getElementById('log-console');
     var logPaused = document.getElementById('log-paused');
     var logAutoScroll = true;
     var LOG_MAX_LINES = 200;
 
-    // Detect user scroll — pause auto-scroll when scrolled up
+    // Detect user scroll — pause auto-follow when the user scrolls up to read older lines
     logEl.addEventListener('scroll', function() {
       var atBottom = (logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight) < 20;
       logAutoScroll = atBottom;
@@ -366,31 +358,27 @@
 
     function appendLogLine(text) {
       logEl.textContent += text + '\n';
-      // Trim old lines if too many
+      // Trim oldest lines when buffer exceeds limit to keep memory bounded
       var lines = logEl.textContent.split('\n');
       if (lines.length > LOG_MAX_LINES + 50) {
         logEl.textContent = lines.slice(lines.length - LOG_MAX_LINES).join('\n');
       }
-      if (logAutoScroll) {
-        logEl.scrollTop = logEl.scrollHeight;
-      }
+      if (logAutoScroll) logEl.scrollTop = logEl.scrollHeight;
     }
 
-    // WebSocket log handler
+    // WebSocket log handler — wired up by app.js
     window.onLogLine = appendLogLine;
 
-    // Fetch initial log buffer
-    fetch('/api/logs').then(function(r){return r.json();}).then(function(data){
-      if (data.lines) {
-        data.lines.forEach(function(line) { appendLogLine(line); });
-      }
-    }).catch(function(){});
+    // Fetch initial log buffer from firmware ring buffer on page load
+    fetch('/api/logs').then(function(r) { return r.json(); }).then(function(data) {
+      if (data.lines) data.lines.forEach(function(line) { appendLogLine(line); });
+    }).catch(function() {});
 
-    // Initial fetch
+    // Initial state + health fetch before WebSocket is established
     fetchState(updateStatus);
-    fetch('/api/health').then(function(r){return r.json();}).then(updateHealth).catch(function(){});
+    fetch('/api/health').then(function(r) { return r.json(); }).then(updateHealth).catch(function() {});
 
-    // OTA progress handler
+    // OTA progress handler — shows overlay bar as firmware upload progresses
     window.onOtaProgress = function(progress) {
       var overlay = document.getElementById('ota-overlay');
       var fill = document.getElementById('ota-bar-fill');
@@ -398,13 +386,10 @@
       overlay.classList.add('active');
       var p = Math.round(progress * 100);
       fill.style.width = p + '%';
-      pct.textContent = p + '%';
-      if (p >= 100) {
-        pct.textContent = 'Rebooting...';
-      }
+      pct.textContent = p >= 100 ? 'Rebooting...' : p + '%';
     };
 
-    // WebSocket live updates
+    // WebSocket live update callbacks — called by app.js on incoming state/health messages
     window.onStateUpdate = updateStatus;
     window.onHealthUpdate = updateHealth;
   </script>

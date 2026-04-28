@@ -9,17 +9,8 @@
   <link rel="apple-touch-icon" href="/r2d2dome-favicon.png">
   <link rel="stylesheet" href="/style.css">
 </head>
-<body>
-  <h1>Dome Panels 🧩</h1>
-  <div class="subtitle">Servo-actuated dome panel control</div>
-  <nav>
-    <a href="/">Home</a>
-    <a href="/setup.html">Setup</a>
-    <a href="/panels.html" class="active">Panels</a>
-    <a href="/holos.html">Holos</a>
-    <a href="/logics.html">Logics</a>
-    <a href="/sequences.html">Sequences</a>
-  </nav>
+<body data-page="panels">
+  <div id="shell-top"></div>
 
   <div class="card" id="panel-health-card" style="display:none;">
     <h3>Panel Servo Controller Status</h3>
@@ -222,7 +213,8 @@
     <div class="desc mt-4"><strong>Tips:</strong> If a servo buzzes at a position, move the slider slightly away from the extreme. Most panels work well with values around <strong>900 μs (closed)</strong> and <strong>2100 μs (open)</strong>.</div>
     <div class="desc mt-4">Quick swap shortcut: <code>#SWxx</code> swaps open/closed values instantly. Use only during calibration, never at boot.</div>
 
-  <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>
+  <div id="shell-status"></div>
+  <script src="/shell.js"></script>
   <script src="/app.js"></script>
   <script>
     (function() {

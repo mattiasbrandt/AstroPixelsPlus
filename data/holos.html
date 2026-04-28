@@ -9,17 +9,8 @@
   <link rel="apple-touch-icon" href="/r2d2dome-favicon.png">
   <link rel="stylesheet" href="/style.css">
 </head>
-<body>
-  <h1>Holo Projectors 💡</h1>
-  <div class="subtitle">HP1 (FHP), HP2 (RHP), HP3 (THP) LED + servo holoprojectors</div>
-  <nav>
-    <a href="/">Home</a>
-    <a href="/setup.html">Setup</a>
-    <a href="/panels.html">Panels</a>
-    <a href="/holos.html" class="active">Holos</a>
-    <a href="/logics.html">Logics</a>
-    <a href="/sequences.html">Sequences</a>
-  </nav>
+<body data-page="holos">
+  <div id="shell-top"></div>
 
   <div class="card" id="holo-health-card" style="display:none;">
     <h3>Holo Servo Controller Status</h3>
@@ -246,7 +237,18 @@
     </div>
   </div>
 
-  <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>
+  <!-- Holo Settings — persistent NVS-backed behaviour toggles -->
+  <div class="card">
+    <h3>Holo Settings</h3>
+    <div class="toggle-row">
+      <label for="holo-boot-loop">Auto-start holo random mode on boot</label>
+      <input type="checkbox" id="holo-boot-loop" onchange="saveHoloPref('holo_boot_loop', this.checked)">
+    </div>
+    <div class="desc mt-4">Fires HPS9 at end of setup() — puts all three holos into autonomous random LED mode on every power-up. NVS key: <code>holo_boot_loop</code></div>
+  </div>
+
+  <div id="shell-status"></div>
+  <script src="/shell.js"></script>
   <script src="/app.js"></script>
   <script>
     (function() {
@@ -397,6 +399,21 @@
       setInterval(function() { refreshHoloDiag(false); }, 30000);
 
       window.onHealthUpdate = updateHoloHealth;
+
+      /* ── Holo Settings — load and save NVS-backed holo behaviour prefs ── */
+      // holo_boot_loop defaults to true if the NVS key hasn't been written yet
+      fetch('/api/pref?keys=holo_boot_loop').then(function(r) { return r.json(); }).then(function(d) {
+        var el = document.getElementById('holo-boot-loop');
+        if (el) el.checked = (d.holo_boot_loop !== undefined)
+          ? (d.holo_boot_loop === true || d.holo_boot_loop === 'true' || d.holo_boot_loop === '1')
+          : true;
+      }).catch(function() {});
+
+      window.saveHoloPref = function(key, val) {
+        if (typeof window.apiPostForm !== 'function') return;
+        window.apiPostForm('/api/pref', 'key=' + encodeURIComponent(key) + '&val=' + (val ? 'true' : 'false'))
+          .catch(function() { console.warn('Failed to save holo pref: ' + key); });
+      };
     })();
   </script>
 </body>

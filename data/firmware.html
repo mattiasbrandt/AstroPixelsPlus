@@ -9,13 +9,8 @@
   <link rel="apple-touch-icon" href="/r2d2dome-favicon.png">
   <link rel="stylesheet" href="/style.css">
 </head>
-<body>
-  <h1>Firmware Update 🚀</h1>
-  <div class="subtitle">OTA firmware upload and system maintenance</div>
-  <nav>
-    <a href="/">Home</a>
-    <a href="/setup.html">Setup</a>
-  </nav>
+<body data-page="firmware">
+  <div id="shell-top"></div>
 
   <div class="card">
     <h3>Upload Firmware</h3>
@@ -55,7 +50,8 @@
     </details>
   </div>
 
-  <div class="status-bar" id="conn-status"><span class="dot yellow"></span>Connecting...</div>
+  <div id="shell-status"></div>
+  <script src="/shell.js"></script>
   <script src="/app.js"></script>
   <script>
     var fwLogEl = null;
