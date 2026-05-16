@@ -361,31 +361,53 @@ DataPanel dataPanel(ledChain1);
 #define PANEL_GROUP_10 (1L << 23)
 
 ////////////////////////////////
-// These values will be configurable through the WiFi interface and stored in the preferences.
+// Servo panel mapping for Mr. Baddeley MK4 complex dome (printed-droid labels).
+// Ring panels with servos: P1, P2, P3, P4, P7, P11, P13
+// Pie panels with servos:  PP1, PP2, PP4, PP6
+// Fixed (no servo): P5 (Magic Panel/frame), P6, P8 (Rear PSI), P9 (Rear Logic),
+//                   P12 (Front Logic), P14 (Front PSI), center top.
+//
+// PCA9685 @ 0x40 channel → printed-droid panel → Marcduino command:
+//   ch 1-4  = P1-P4    :OP01-:OP04   (4 small ring panels)
+//   ch 5    = P7       :OP05          (small upper ring panel)
+//   ch 6    = P11      :OP06          (lower-left ring panel)
+//   ch 7    = P13      :OP07          (lower-front ring panel, near FLD)
+//   ch 8    = unused
+//   ch 9-11 = PP1/PP2/PP4  :OP08-:OP10  (3 individually-addressed pie panels)
+//   ch 12   = PP6      :OP11 group only  (4th pie panel, opened with all-top cmd)
+//   ch 13   = unused (no center-top servo on MK4)
+//
+// Group commands (no dedicated channel):
+//   :OP11 = all pie panels (PP1+PP2+PP4+PP6)
+//   :OP12 = all ring panels (P1-P4, P7, P11, P13)
+//   :OP00 = all panels
+//
+// See docs/HARDWARE_WIRING.md for the full PCA9685 wiring table.
+// Pulse widths (800-2200 µs) are defaults; per-panel calibration stored in NVS via web UI.
 const ServoSettings servoSettings[] PROGMEM = {
 #ifndef USE_I2C_ADDRESS
-    // First PCA9685 controller - CORRECTED to match wiring diagram
-    {1, 800, 2200, PANEL_GROUP_1 | SMALL_PANEL},  /* 0: Small Panel 1 */
-    {2, 800, 2200, PANEL_GROUP_2 | SMALL_PANEL},  /* 1: Small Panel 2 */
-    {3, 800, 2200, PANEL_GROUP_3 | SMALL_PANEL},  /* 2: Small Panel 3 */
-    {4, 800, 2200, PANEL_GROUP_4 | SMALL_PANEL},  /* 3: Small Panel 4 */
-    {5, 800, 2200, PANEL_GROUP_5 | MEDIUM_PANEL}, /* 4: Medium Panel 5 */
-    {6, 800, 2200, PANEL_GROUP_6 | BIG_PANEL},    /* 5: Large Panel 6 */
-    {7, 800, 2200, MINI_PANEL},                   /* 6: Mini Panel A */
-    {8, 800, 2200, MINI_PANEL},                   /* 7: Mini Panel B */
-    {9, 800, 2200, PANEL_GROUP_7 | PIE_PANEL},    /* 8: Pie Panel 7 */
-    {10, 800, 2200, PANEL_GROUP_8 | PIE_PANEL},   /* 9: Pie Panel 8 */
-    {11, 800, 2200, PANEL_GROUP_9 | PIE_PANEL},   /* 10: Pie Panel 9 */
-    {12, 800, 2200, PANEL_GROUP_10 | PIE_PANEL},  /* 11: Pie Panel 10 */
-    {13, 800, 2200, TOP_PIE_PANEL},               /* 12: Top Center Panel */
+    // Panel Controller (PCA9685 @ 0x40)
+    {1,  800, 2200, PANEL_GROUP_1  | SMALL_PANEL}, /* slot 0:  P1  (ring)       ch1   :OP01 */
+    {2,  800, 2200, PANEL_GROUP_2  | SMALL_PANEL}, /* slot 1:  P2  (ring)       ch2   :OP02 */
+    {3,  800, 2200, PANEL_GROUP_3  | SMALL_PANEL}, /* slot 2:  P3  (ring)       ch3   :OP03 */
+    {4,  800, 2200, PANEL_GROUP_4  | SMALL_PANEL}, /* slot 3:  P4  (ring)       ch4   :OP04 */
+    {5,  800, 2200, PANEL_GROUP_5  | SMALL_PANEL}, /* slot 4:  P7  (ring upper) ch5   :OP05 */
+    {6,  800, 2200, PANEL_GROUP_6  | SMALL_PANEL}, /* slot 5:  P11 (ring lower) ch6   :OP06 */
+    {7,  800, 2200, PANEL_GROUP_7  | SMALL_PANEL}, /* slot 6:  P13 (ring front) ch7   :OP07 */
+    {8,  800, 2200, MINI_PANEL},                   /* slot 7:  unused           ch8   —     */
+    {9,  800, 2200, PANEL_GROUP_8  | PIE_PANEL},   /* slot 8:  PP1 (pie)        ch9   :OP08 */
+    {10, 800, 2200, PANEL_GROUP_9  | PIE_PANEL},   /* slot 9:  PP2 (pie)        ch10  :OP09 */
+    {11, 800, 2200, PANEL_GROUP_10 | PIE_PANEL},   /* slot 10: PP4 (pie)        ch11  :OP10 */
+    {12, 800, 2200, PIE_PANEL},                    /* slot 11: PP6 (pie)        ch12  :OP11 group only */
+    {13, 800, 2200, TOP_PIE_PANEL},                /* slot 12: unused           ch13  —     */
 
-    // Second PCA9685 controller - Verify holo assignments match diagram
-    {16, 800, 2200, HOLO_HSERVO}, /* 13: Front Holo Horizontal */
-    {17, 800, 2200, HOLO_VSERVO}, /* 14: Front Holo Vertical */
-    {18, 800, 2200, HOLO_HSERVO}, /* 15: Top Holo Horizontal */
-    {19, 800, 2200, HOLO_VSERVO}, /* 16: Top Holo Vertical */
-    {20, 800, 2200, HOLO_VSERVO}, /* 17: Rear Holo Vertical */
-    {21, 800, 2200, HOLO_HSERVO}, /* 18: Rear Holo Horizontal */
+    // Holo Controller (PCA9685 @ 0x41, solder bridge A0) — channels offset by 16
+    {16, 800, 2200, HOLO_HSERVO}, /* slot 13: FHP1 — front holo horizontal */
+    {17, 800, 2200, HOLO_VSERVO}, /* slot 14: FHP2 — front holo vertical   */
+    {18, 800, 2200, HOLO_HSERVO}, /* slot 15: THP1 — top holo horizontal   */
+    {19, 800, 2200, HOLO_VSERVO}, /* slot 16: THP2 — top holo vertical     */
+    {20, 800, 2200, HOLO_VSERVO}, /* slot 17: RHP2 — rear holo vertical    */
+    {21, 800, 2200, HOLO_HSERVO}, /* slot 18: RHP1 — rear holo horizontal  */
 #endif
 };
 

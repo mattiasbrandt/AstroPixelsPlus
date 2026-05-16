@@ -484,6 +484,62 @@ Fixed a silent failure in `:MV`, `#SO`, `#SC`, `#SW` where the servo never moved
 
 **Limitation:** Commands sent over physical Serial2 (Marcduino serial path) still go through `Marcduino::processCommand()` directly and will hit the empty stubs — calibration is a web UI workflow and is not expected to be driven over serial.
 
+### Panel Naming Clarity & Dome Diagram (MK4 Remap)
+
+Resolved systematic mislabeling and incorrect servo-to-panel mapping for the **Mr. Baddeley MK4 Complex Dome** — the dominant dome design in 2026 builds.
+
+**Root problem:** The firmware's `servoSettings[]` and web UI were based on an older ReelTwo numbering scheme that did not match actual MK4 hardware. Three naming systems existed with no documented cross-reference, causing wiring confusion.
+
+**Three naming systems now documented and anchored to printed-droid labels:**
+
+| System | Scope |
+|--------|-------|
+| Printed-Droid / Mr. Baddeley | P1–P14 (all panels incl. fixed), PP1–PP6 (pie) |
+| PCA9685 channel | ch1–ch13 physical wiring positions |
+| Marcduino firmware | `:OP01`–`:OP13`, maps 1:1 to `servoSettings[]` slots |
+
+**MK4 servo panels (printed-droid labels):**
+- Ring (lower): P1, P2, P3, P4, P7, P11, P13
+- Pie (upper/inner): PP1, PP2, PP4, PP6
+- Fixed (no servo): P5 (Magic Panel frame), P6, P8 (Rear PSI), P9 (Rear Logic), P10, P12 (FLDs), P14 (Front PSI), center top
+
+**`servoSettings[]` remapped (`AstroPixelsPlus.ino`):**
+
+| PCA9685 ch | Panel (printed-droid) | Marcduino | PANEL_GROUP |
+|---|---|---|---|
+| 1 | P1 | `:OP01` | PANEL_GROUP_1 |
+| 2 | P2 | `:OP02` | PANEL_GROUP_2 |
+| 3 | P3 | `:OP03` | PANEL_GROUP_3 |
+| 4 | P4 | `:OP04` | PANEL_GROUP_4 |
+| 5 | P7 | `:OP05` | PANEL_GROUP_5 |
+| 6 | P11 | `:OP06` | PANEL_GROUP_6 |
+| 7 | P13 | `:OP07` | PANEL_GROUP_7 |
+| 8 | — | unused | MINI_PANEL |
+| 9 | PP1 | `:OP08` | PANEL_GROUP_8 \| PIE_PANEL |
+| 10 | PP2 | `:OP09` | PANEL_GROUP_9 \| PIE_PANEL |
+| 11 | PP4 | `:OP10` | PANEL_GROUP_10 \| PIE_PANEL |
+| 12 | PP6 | group-only | PIE_PANEL |
+| 13 | — | unused | TOP_PIE_PANEL |
+
+Note: `:OP11` = OpenTopPanels (PIE_PANEL group), `:OP12` = OpenBottomPanels (DOME_PANELS_MASK group) — these are **group commands**, not individual panels.
+
+**Changes applied:**
+
+- `AstroPixelsPlus.ino` — `servoSettings[]` fully remapped to MK4 wiring with per-slot comments (printed-droid label, PCA9685 channel, Marcduino command, panel type).
+- `DomeSequences.h` — `#define DP5`–`DPP4` updated to match new slot positions.
+- `docs/HARDWARE_WIRING.md` — Panel naming section replaced with clean MK4 cross-reference table. Fixed/servo classification matches user's physical build.
+- `data/panels.html` — Tables (ring panels, pie panels), calibration dropdown, and SVG element IDs/onclick handlers all updated to match corrected MK4 mapping. SVG colors: blue ring panels, blue-tinted pie panels, orange open-state, silver fixed panels and dome gaps.
+- `data/panels.html` — Interactive **Dome Panel Map** SVG added: top-down dome schematic. Click any servo panel → sends `:OP`; click again → sends `:CL`. Fixed panels shown in grey with no click action. Centre top marked as fixed (not clickable).
+- `data/holos.html` — Added **Holo Position Map** SVG: top-down dome view with HP1/HP2/HP3. Click → on (`*ON0x`); click again → off (`*OF0x`). SVG description trimmed to one line.
+
+**SVG geometry (as implemented):**
+
+- CX=CY=240, R_out=172, R_ring_in=146, R_pie_out=118, R_pie_in=54
+- Ring band: r=146–172. Pie band: r=54–118. Silver gap zone r=118–146 represents the visible dome skin between pie and ring sections.
+- Ring panel angular positions follow the MK4 reference: RPSI 3°–25°, P7 32°–52°, P6 55°–68°, MP 72°–92°, P4 96°–114°, silver gap 114°–122°, P3 122°–136°, P2 140°–153°, P1 157°–171°, HP1 gap 171°–185°, P13 185°–198°, FPSI 202°–215°, FLD 219°–248°, P11 252°–272°, silver gap 272°–280°, P10 280°–298°, RLD 302°–323°, HP2 gap 323°–3°.
+- Pie panels (55° wide, 5° gaps): PP3 fixed 332°–27° (straddles top), PP4 servo 32°–87°, PP2 servo 92°–147° (covers right ring gap 114°–122°), PP1 servo 152°–207°, PP6 servo 212°–267°, PP5 fixed 272°–327° (covers left ring gap 272°–280°).
+- Silver gaps appear only in the outer ring band — not in the pie area — because the pie panels are strategically positioned to cover the ring gap angles.
+
 ### Logic Effects UI Coverage
 Added a new **Custom effect** builder card on Logics page to construct full `@APLE` commands from UI controls instead of relying on shortcut-only coverage. Builder supports explicit target selection (both/front/rear), complete effect list, color chips, speed/sensitivity, and duration controls with live command preview.
 

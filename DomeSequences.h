@@ -15,14 +15,14 @@
 #define DP2    1   /* Small Panel 2  — PANEL_GROUP_2 */
 #define DP3    2   /* Small Panel 3  — PANEL_GROUP_3 */
 #define DP4    3   /* Small Panel 4  — PANEL_GROUP_4 */
-#define DP5    4   /* Medium Panel 5 — PANEL_GROUP_5 */
-#define DP6    5   /* Large Panel 6  — PANEL_GROUP_6 */
-#define DPA    6   /* Mini Panel A   — MINI_PANEL     */
-#define DPB    7   /* Mini Panel B   — MINI_PANEL     */
-#define DPP1   8   /* Pie Panel 7    — PANEL_GROUP_7  */
-#define DPP2   9   /* Pie Panel 8    — PANEL_GROUP_8  */
-#define DPP3  10   /* Pie Panel 9    — PANEL_GROUP_9  */
-#define DPP4  11   /* Pie Panel 10   — PANEL_GROUP_10 */
+#define DP5    4   /* P7  (small upper ring panel)        — PANEL_GROUP_5  :OP05 */
+#define DP6    5   /* P11 (lower-left ring panel)         — PANEL_GROUP_6  :OP06 */
+#define DPA    6   /* P13 (lower-front ring panel, FLD)   — PANEL_GROUP_7  :OP07 */
+#define DPB    7   /* unused (ch 8 unconnected)           — MINI_PANEL           */
+#define DPP1   8   /* PP1 (pie panel 1)                   — PANEL_GROUP_8  :OP08 */
+#define DPP2   9   /* PP2 (pie panel 2)                   — PANEL_GROUP_9  :OP09 */
+#define DPP3  10   /* PP4 (pie panel 4)                   — PANEL_GROUP_10 :OP10 */
+#define DPP4  11   /* PP6 (pie panel 6, group-only)       — PIE_PANEL      :OP11 */
 
 // =============================================================================
 // Panel position values (pulse width in microseconds).

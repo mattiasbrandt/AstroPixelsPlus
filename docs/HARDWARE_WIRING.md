@@ -27,7 +27,7 @@ The AstroPixels firmware uses **two** Adafruit PCA9685 16-channel PWM servo driv
 
 | Board | I2C Address | Controls | Servos |
 |-------|-------------|----------|--------|
-| **Panel Controller** | 0x40 | Dome panels P1-P13 | 7 moving panels + 1 fixed (Magic Panel) |
+| **Panel Controller** | 0x40 | Ring panels P1–P4, P7, P11, P13 + pie panels PP1, PP2, PP4, PP6 | 11 servo channels (MK4 dome) |
 | **Holo Controller** | 0x41 | Holoprojectors (FHP, RHP, THP) | 6 servos (2 per holo: H/V) |
 
 ### Why PCA9685?
@@ -225,36 +225,63 @@ Servo connector (female, looking at connector):
 
 ---
 
+### Panel Naming — Mr. Baddeley MK4 Complex Dome
+
+This firmware targets the **Mr. Baddeley MK4 complex dome**, the standard build in the R2 community as of 2026.
+
+**Servo panels (moving):**
+- Ring: P1, P2, P3, P4, P7, P11, P13
+- Pie: PP1, PP2, PP4, PP6
+
+**Fixed panels (no servo):** P5 (Magic Panel/frame), P6, P8 (Rear PSI), P9 (Rear Logic Display), P10, P12 (Front Logic Display), P14 (Front PSI), center top.
+
+All labels use printed-droid / Mr. Baddeley panel numbers throughout — firmware, web UI, and this document.
+
+---
+
 ### Servo Channel Mapping
 
-**Panel Controller (0x40) — Channels 0-12:**
+**Panel Controller (PCA9685 @ 0x40):**
 
-| Channel | Panel | Type | Notes |
-|---------|-------|------|-------|
-| 0 | P1 | Small | Front lower left |
-| 1 | P2 | Small | Front lower right |
-| 2 | P3 | Small | Left side lower |
-| 3 | P4 | Small | Right side lower |
-| 4 | P5 | — | **Magic Panel (fixed, no servo)** |
-| 5 | P6 | Large | Front upper |
-| 6 | — | — | Unused |
-| 7 | P7 | Medium | Left upper side |
-| 8 | — | — | Unused |
-| 9 | — | — | Unused |
-| 10 | P10 | Medium | Rear upper |
-| 11 | P11 | Large | Top pie panel |
-| 12 | P13 | Medium | Center top |
+| PCA9685 Channel | Panel (printed-droid) | Marcduino | Notes |
+|-----------------|-----------------------|-----------|-------|
+| 0 | — | — | Unused — leave unconnected |
+| 1 | **P1** | `:OP01` | Ring panel |
+| 2 | **P2** | `:OP02` | Ring panel |
+| 3 | **P3** | `:OP03` | Ring panel |
+| 4 | **P4** | `:OP04` | Ring panel |
+| 5 | **P7** | `:OP05` | Ring panel (small upper) |
+| 6 | **P11** | `:OP06` | Ring panel (lower-left) |
+| 7 | **P13** | `:OP07` | Ring panel (lower-front, near FLD) |
+| 8 | — | — | Unused — leave unconnected |
+| 9 | **PP1** | `:OP08` | Pie panel 1 |
+| 10 | **PP2** | `:OP09` | Pie panel 2 |
+| 11 | **PP4** | `:OP10` | Pie panel 4 |
+| 12 | **PP6** | `:OP11` group | Pie panel 6 — no individual command, opens with all-top |
+| 13 | — | — | Unused (no center-top servo on MK4) |
+| 14–15 | — | — | Unused |
 
-**Holo Controller (0x41) — Channels 0-5:**
+**Group commands:**
 
-| Channel | Holo | Axis | Notes |
-|---------|------|------|-------|
-| 0 | Front (FHP) | Horizontal | Left/right movement |
-| 1 | Front (FHP) | Vertical | Up/down movement |
-| 2 | Rear (RHP) | Horizontal | Left/right movement |
-| 3 | Rear (RHP) | Vertical | Up/down movement |
-| 4 | Top (THP) | Horizontal | Left/right movement |
-| 5 | Top (THP) | Vertical | Up/down movement |
+| Marcduino | Action |
+|-----------|--------|
+| `:OP11` | Open all pie panels (PP1 + PP2 + PP4 + PP6) |
+| `:OP12` | Open all ring panels (P1–P4, P7, P11, P13) |
+| `:OP00` | Open all panels |
+| `:CL00` | Close all panels |
+
+**Holo Controller (PCA9685 @ 0x41, solder bridge A0) — channels 0–5:**
+
+| PCA9685 Channel | ReelTwo Channel | Holo | Axis | Notes |
+|-----------------|-----------------|------|------|-------|
+| 0 | 16 | Front (FHP) | Horizontal | FHP1 — left/right |
+| 1 | 17 | Front (FHP) | Vertical | FHP2 — up/down |
+| 2 | 18 | Top (THP) | Horizontal | THP1 — left/right |
+| 3 | 19 | Top (THP) | Vertical | THP2 — up/down |
+| 4 | 20 | Rear (RHP) | Vertical | RHP2 — up/down |
+| 5 | 21 | Rear (RHP) | Horizontal | RHP1 — left/right |
+
+> ReelTwo channel numbers for holos start at 16 (second PCA9685 offset). FHP=16/17, THP=18/19, RHP=20/21.
 
 ---
 
