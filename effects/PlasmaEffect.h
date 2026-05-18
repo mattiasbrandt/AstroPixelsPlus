@@ -57,6 +57,7 @@ static bool LogicEffectPlasma(LogicEngineRenderer& r)
         r.clear();
     }
     PlasmaObject* obj = (PlasmaObject*)r.getEffectObject();
+    if (obj == nullptr) return true;
     unsigned h = r.height();
     unsigned w = r.width();
 
@@ -75,6 +76,8 @@ static bool LogicEffectPlasma(LogicEngineRenderer& r)
             double s2 = 768.0 + 768.0 * sin(yc) * calc2;
             double s3 = 768.0 + 768.0 * sin((xc + yc + (obj->plasma_counter / 10.0)) / 2.0);
             int pixel = (int)((s1 + s2 + s3) / 3.0);
+            if (pixel < 0) pixel = 0;
+            if (pixel > 1536) pixel = 1536;
             r.setPixelRGB(
                 x, y,
                 obj->plasma_lut[pixel][0],

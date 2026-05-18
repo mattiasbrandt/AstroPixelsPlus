@@ -323,14 +323,6 @@ DataPanel dataPanel(ledChain1);
 
 
 
-
-
-
-
-// TeecesPSI teecesPSI(ledChain1);
-// TeecesRearLogics teecesRLD(ledChain1);
-// TeecesFrontLogics teecesTFLD(ledChain1);
-
 ////////////////////////////////
 
 #define SMALL_PANEL 0x0001

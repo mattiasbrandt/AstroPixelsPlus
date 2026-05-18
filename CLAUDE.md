@@ -170,14 +170,6 @@ Rules for `WebPages.h`:
 - Use `const char*` arrays, not `String` arrays, for option lists.
 - Do not increase WButton count without testing boot stability.
 
-### Known Bugs (CRITICAL_FINDINGS.md)
-
-- **MetaBalls effect**: incorrect stride math (`i * w + x` should be `i * mb_number + x`) causes buffer overwrite.
-- **MetaBalls init**: 5 `Serial.println()` calls create timing jitter on startup.
-- **FadeAndScrollEffect**: `random(1)` always returns 0 — RGB and Half palettes are never selected.
-- **Remote prefs key mismatch**: `#APRNAME` and `#APRSECRET` use wrong NVS preference key strings.
-- **Blocking delays**: `delay()` calls in hot paths (`AstroPixelsPlus.ino`) stall the event loop.
-
 ## Hardware
 
 - **MCU**: ESP32 (esp32dev), 4MB flash, SPIFFS partition
