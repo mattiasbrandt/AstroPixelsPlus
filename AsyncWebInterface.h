@@ -282,12 +282,44 @@ static bool defaultBoolForPrefKey(const String &key)
     if (key == "mwifipass") return MARC_WIFI_SERIAL_PASS;
     if (key == "mbodylink") return BODY_LINK_ENABLED;
     if (key == "mbodywifi") return BODY_WIFI_ENABLED;
+    if (key == PREFERENCE_BADMOTIVATOR_ENABLED) return AP_ENABLE_BADMOTIVATOR;
     if (key == PREFERENCE_FIRESTRIP_ENABLED) return AP_ENABLE_FIRESTRIP;
     if (key == PREFERENCE_CBI_ENABLED) return AP_ENABLE_CBI;
     if (key == PREFERENCE_DATAPANEL_ENABLED) return AP_ENABLE_DATAPANEL;
     if (key == "holo_boot_loop") return true;
     if (key == "dm_happy_sound") return true;
     return false;
+}
+
+static bool isIntegerPrefKey(const String &key)
+{
+    return key == "mserial2" || key == "msound" || key == "msoundser" ||
+           key == "mvolume" || key == "msoundstart" || key == "mrandom" ||
+           key == "mrandommin" || key == "mrandommax";
+}
+
+static int defaultIntForPrefKey(const String &key)
+{
+    if (key == "mserial2") return MARC_SERIAL2_BAUD_RATE;
+    if (key == "msound") return MARC_SOUND_PLAYER;
+    if (key == "msoundser") return MARC_SOUND_SERIAL;
+    if (key == "mvolume") return MARC_SOUND_VOLUME;
+    if (key == "msoundstart") return MARC_SOUND_STARTUP;
+    if (key == "mrandom") return MARC_SOUND_RANDOM;
+    if (key == "mrandommin") return MARC_SOUND_RANDOM_MIN;
+    if (key == "mrandommax") return MARC_SOUND_RANDOM_MAX;
+    return 0;
+}
+
+static bool parseIntegerPrefValue(const String &val, int &out)
+{
+    if (val.length() == 0) return false;
+    for (size_t i = 0; i < val.length(); i++)
+    {
+        if (!isdigit((unsigned char)val[i])) return false;
+    }
+    out = val.toInt();
+    return true;
 }
 
 static String jsonEscape(const String &in)
@@ -385,8 +417,8 @@ static String buildStateJson()
     json += ",\"soundLocalEnabled\":" + String(soundLocalEnabled ? "true" : "false");
     json += ",\"sleepMode\":" + String(sSleepModeActive ? "true" : "false");
     json += ",\"sleepSinceMs\":" + String(sSleepModeSinceMs);
-    String soundPref = preferences.getString("msound", "0");
-    bool soundModuleEnabled = (soundLocalEnabled && soundPref != "0");
+    int soundPref = preferences.getInt("msound", MARC_SOUND_PLAYER);
+    bool soundModuleEnabled = (soundLocalEnabled && soundPref != 0);
     json += ",\"soundModuleEnabled\":" + String(soundModuleEnabled ? "true" : "false");
 #ifdef USE_DROID_REMOTE
     json += ",\"remoteConnected\":" + String(sRemoteConnected ? "true" : "false");
@@ -666,8 +698,8 @@ static String buildHealthJson()
     // sMarcSound is the global MarcSound instance in .ino
     // We can't easily check module state from here without another extern,
     // so we report it based on preference config
-    String soundPref = preferences.getString("msound", "0");
-    bool soundEnabled = (soundLocalEnabled && soundPref != "0");
+    int soundPref = preferences.getInt("msound", MARC_SOUND_PLAYER);
+    bool soundEnabled = (soundLocalEnabled && soundPref != 0);
     json += ",\"sound_module\":" + String(soundEnabled ? "true" : "false");
     json += ",\"sound_local_enabled\":" + String(soundLocalEnabled ? "true" : "false");
     json += ",\"sleep_mode\":" + String(sSleepModeActive ? "true" : "false");
@@ -862,6 +894,11 @@ static void initAsyncWeb()
                     bool val = preferences.getBool(key.c_str(), defaultBoolForPrefKey(key));
                     json += "\"" + jsonEscape(key) + "\":" + (val ? "true" : "false");
                 }
+                else if (isIntegerPrefKey(key))
+                {
+                    int val = preferences.getInt(key.c_str(), defaultIntForPrefKey(key));
+                    json += "\"" + jsonEscape(key) + "\":" + String(val);
+                }
                 else
                 {
                     String val = preferences.getString(key.c_str(), "");
@@ -931,6 +968,17 @@ static void initAsyncWeb()
                     logCapture.printf("[API] pref (gadget): %s = %s\n", key.c_str(), bval ? "true" : "false");
                 }
                 logCapture.printf("[API] pref (bool): %s = %s\n", key.c_str(), bval ? "true" : "false");
+            }
+            else if (isIntegerPrefKey(key))
+            {
+                int ival = 0;
+                if (!parseIntegerPrefValue(val, ival))
+                {
+                    request->send(400, "application/json", "{\"error\":\"invalid integer value\"}");
+                    return;
+                }
+                preferences.putInt(key.c_str(), ival);
+                logCapture.printf("[API] pref (int): %s = %d\n", key.c_str(), ival);
             }
             else
             {

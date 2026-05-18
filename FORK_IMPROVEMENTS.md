@@ -141,6 +141,8 @@ Implemented a targeted reliability patchset after a full fork review:
 - Fixed random-sound upper-bound exclusion so the last candidate sound can be selected.
 - Hardened panel calibration value parsing (`#SO/#SC/:MV`) to require exactly four digits.
 - Re-enabled gadget preference keys (`badmot`, `firest`, `cbienb`, `dpenab`) in pref-key allowlist.
+- Preserved build-flag defaults for gadget preference reads, including `badmot` when `AP_ENABLE_BADMOTIVATOR=1`.
+- Stored Serial/Sound numeric preferences as NVS integers (`mserial2`, `msound`, `msoundser`, `mvolume`, `msoundstart`, `mrandom`, `mrandommin`, `mrandommax`) so reboot-time firmware reads use saved UI values.
 - Added strict duration input validation (`1-99` seconds, digits-only) for `/api/cbi` and `/api/datapanel`.
 - Fixed FadeAndScroll random enum selection to include terminal enum values.
 
