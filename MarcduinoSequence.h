@@ -6,6 +6,7 @@ MARCDUINO_ACTION(StopSequence, :SE00, ({
 ////////////////
 
 MARCDUINO_ACTION(ScreamSequence, :SE01, ({
+    cancelPanelRelease();
     // Send command to rear logics
     CommandEvent::process("LE3010003");
     // Send command to front logics
@@ -13,30 +14,37 @@ MARCDUINO_ACTION(ScreamSequence, :SE01, ({
     sMarcSound.handleCommand("$S");
     sendBodyCommand("$S");
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpenClose, ALL_DOME_PANELS_MASK);
+    schedulePanelRelease(ALL_DOME_PANELS_MASK, 8000);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(WaveSequence, :SE02, ({
+    cancelPanelRelease();
     sMarcSound.handleCommand("$213");
     sendBodyCommand("$213");
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelWave, ALL_DOME_PANELS_MASK);
+    schedulePanelRelease(ALL_DOME_PANELS_MASK, 8000);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(SmirkWaveSequence, :SE03, ({
+    cancelPanelRelease();
     sMarcSound.handleCommand("$34");
     sendBodyCommand("$34");
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelWaveFast, ALL_DOME_PANELS_MASK);
+    schedulePanelRelease(ALL_DOME_PANELS_MASK, 6000);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(OpenCloseWaveSequence, :SE04, ({
+    cancelPanelRelease();
     sMarcSound.handleCommand("$36");
     sendBodyCommand("$36");
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelOpenCloseWave, ALL_DOME_PANELS_MASK);
+    schedulePanelRelease(ALL_DOME_PANELS_MASK, 8000);
 }))
 
 ////////////////
@@ -44,6 +52,7 @@ MARCDUINO_ACTION(OpenCloseWaveSequence, :SE04, ({
 MARCDUINO_ANIMATION(BeepCantinaSequence, :SE05)
 {
     DO_START()
+    DO_ONCE({ cancelPanelRelease(); })
     DO_ONCE({ sMarcSound.handleCommand("$c"); })
     DO_ONCE({ sendBodyCommand("$c"); })
     // Wait 1 second
@@ -67,6 +76,7 @@ MARCDUINO_ANIMATION(BeepCantinaSequence, :SE05)
 MARCDUINO_ANIMATION(ShortSequence, :SE06)
 {
     DO_START()
+    DO_ONCE({ cancelPanelRelease(); })
     // Logic engine alarm
     DO_COMMAND(F("LE105000"))
     // Play scream-3 and wait 500ms
@@ -102,6 +112,7 @@ MARCDUINO_ANIMATION(ShortSequence, :SE06)
         // Holo off
         "HPA000|0\n"))
     DO_SEQUENCE_VARSPEED(SeqPanelAllOpenCloseLong, ALL_DOME_PANELS_MASK, 700, 900);
+    DO_ONCE({ schedulePanelRelease(ALL_DOME_PANELS_MASK, 15000); })
     // Fake being dead for 8 seconds
     DO_WAIT_SEC(8)
     // Ok We are back!
@@ -116,6 +127,7 @@ MARCDUINO_ANIMATION(ShortSequence, :SE06)
 MARCDUINO_ANIMATION(CantinaSequence, :SE07)
 {
     DO_START()
+    DO_ONCE({ cancelPanelRelease(); })
     // Play Orchestral Cantina
     DO_ONCE({ sMarcSound.handleCommand("$C"); })
     DO_ONCE({ sendBodyCommand("$C"); })
@@ -160,6 +172,7 @@ MARCDUINO_ANIMATION(LeiaMessage, :SE08)
 MARCDUINO_ANIMATION(DiscoSequence, :SE09)
 {
     DO_START()
+    DO_ONCE({ cancelPanelRelease(); })
     DO_ONCE({ sMarcSound.handleCommand("$D"); })
     DO_ONCE({ sendBodyCommand("$D"); })
     DO_SEQUENCE(SeqPanelLongDisco, DOME_DANCE_PANELS_MASK)
@@ -185,6 +198,7 @@ MARCDUINO_ACTION(QuietModeReset, :SE10, ({
     sendBodyCommand("$s");
     CommandEvent::process(F("HPA096"));
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, ALL_DOME_PANELS_MASK);
+    schedulePanelRelease(ALL_DOME_PANELS_MASK);
     FLD.selectSequence(LogicEngineRenderer::NORMAL);
     RLD.selectSequence(LogicEngineRenderer::NORMAL);
 }))
@@ -198,6 +212,7 @@ MARCDUINO_ACTION(FullAwakeModeReset, :SE11, ({
     CommandEvent::process(F("HPF104\nHPR104\nHPT104\n"));
     CommandEvent::process(F("HPA096"));
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, ALL_DOME_PANELS_MASK);
+    schedulePanelRelease(ALL_DOME_PANELS_MASK);
     FLD.selectSequence(LogicEngineRenderer::NORMAL);
     RLD.selectSequence(LogicEngineRenderer::NORMAL);
 }))
@@ -205,9 +220,11 @@ MARCDUINO_ACTION(FullAwakeModeReset, :SE11, ({
 ////////////////
 
 MARCDUINO_ACTION(TopPanelsShowcase, :SE12, ({
+    cancelPanelRelease(PIE_PANEL);
     // Demo top-panel choreography with a coordinated holo LED cycle
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpenClose, PIE_PANEL);
     CommandEvent::process(F("HPA0040"));
+    schedulePanelRelease(PIE_PANEL, 8000);
 }))
 
 ////////////////
@@ -218,6 +235,7 @@ MARCDUINO_ACTION(MidAwakeModeReset, :SE13, ({
     sendBodyCommand("$R");
     CommandEvent::process(F("HPA0000"));
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, ALL_DOME_PANELS_MASK);
+    schedulePanelRelease(ALL_DOME_PANELS_MASK);
     FLD.selectSequence(LogicEngineRenderer::NORMAL);
     RLD.selectSequence(LogicEngineRenderer::NORMAL);
 }))
@@ -231,6 +249,7 @@ MARCDUINO_ACTION(AwakePlusModeReset, :SE14, ({
     CommandEvent::process(F("HPF104\nHPR104\nHPT104\n"));
     CommandEvent::process(F("HPA0040"));
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, ALL_DOME_PANELS_MASK);
+    schedulePanelRelease(ALL_DOME_PANELS_MASK);
     FLD.selectSequence(LogicEngineRenderer::NORMAL);
     RLD.selectSequence(LogicEngineRenderer::NORMAL);
 }))
@@ -248,6 +267,7 @@ MARCDUINO_ACTION(ScreamNoPanelsAlias, :SE15, ({
 ////////////////
 
 MARCDUINO_ACTION(PanelWiggleSequence, :SE16, ({
+    cancelPanelRelease();
     // Quick panel wiggle showcase using alternating panel sequence
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAlternate, ALL_DOME_PANELS_MASK);
 }))
@@ -263,52 +283,67 @@ MARCDUINO_ACTION(ScreamNoPanelSequence, :SE50, ({
 ////////////////
 
 MARCDUINO_ACTION(ScreamPanelSequence, :SE51, ({
+    cancelPanelRelease();
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpenClose, ALL_DOME_PANELS_MASK);
+    schedulePanelRelease(ALL_DOME_PANELS_MASK, 8000);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(WavePanelSequence, :SE52, ({
+    cancelPanelRelease();
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelWave, ALL_DOME_PANELS_MASK);
+    schedulePanelRelease(ALL_DOME_PANELS_MASK, 8000);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(SmirkWavePanelSequence, :SE53, ({
+    cancelPanelRelease();
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelWaveFast, ALL_DOME_PANELS_MASK);
+    schedulePanelRelease(ALL_DOME_PANELS_MASK, 6000);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(OpenWaveSequence, :SE54, ({
+    cancelPanelRelease();
     sMarcSound.handleCommand("$36");
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelOpenCloseWave, ALL_DOME_PANELS_MASK);
+    schedulePanelRelease(ALL_DOME_PANELS_MASK, 8000);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(MarchingAntsPanelSequence, :SE55, ({
+    cancelPanelRelease();
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelMarchingAnts, ALL_DOME_PANELS_MASK);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(FaintPanelSequence, :SE56, ({
+    cancelPanelRelease();
     DO_SEQUENCE_VARSPEED(SeqPanelAllOpenCloseLong, ALL_DOME_PANELS_MASK, 700, 900);
+    schedulePanelRelease(ALL_DOME_PANELS_MASK, 15000);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(RythmicPanelSequence, :SE57, ({
+    cancelPanelRelease();
     SEQUENCE_PLAY_ONCE_SPEED(servoSequencer, SeqPanelAllOpenCloseLong, ALL_DOME_PANELS_MASK, 900);
+    schedulePanelRelease(ALL_DOME_PANELS_MASK, 15000);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(PanelWaveByeByeSequence, :SE58, ({
+    cancelPanelRelease();
     // Farewell-style panel wave with a brief holo pulse accent
     SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelWave, ALL_DOME_PANELS_MASK, 8, 18);
     CommandEvent::process(F("HPA0030"));
+    schedulePanelRelease(ALL_DOME_PANELS_MASK, 6000);
 }))
 
 ////////////////
@@ -316,6 +351,7 @@ MARCDUINO_ACTION(PanelWaveByeByeSequence, :SE58, ({
 MARCDUINO_ANIMATION(HarlemShakeSequence, $815)
 {
     DO_START()
+    DO_ONCE({ cancelPanelRelease(); })
     // Wait 2 seconds
     DO_WAIT_SEC(2)
     DO_COMMAND(F(
@@ -346,6 +382,7 @@ MARCDUINO_ANIMATION(HarlemShakeSequence, $815)
     DO_DURATION(26500, { animation.gotoStep(shake); })
     // Start panel sequence
     DO_SEQUENCE(SeqPanelAllOpenCloseLong, ALL_DOME_PANELS_MASK)
+    DO_ONCE({ schedulePanelRelease(ALL_DOME_PANELS_MASK, 15000); })
     // Wait 2 seconds
     DO_WAIT_SEC(2)
 
@@ -360,6 +397,7 @@ MARCDUINO_ANIMATION(HarlemShakeSequence, $815)
 MARCDUINO_ANIMATION(GirlOnFireSequence, $821)
 {
     DO_START()
+    DO_ONCE({ cancelPanelRelease(); })
     // Wait 3.5 seconds
     DO_WAIT_MILLIS(3500)
     DO_SEQUENCE(SeqPanelDance, DOME_DANCE_PANELS_MASK)
@@ -398,6 +436,7 @@ MARCDUINO_ANIMATION(GirlOnFireSequence, $821)
 MARCDUINO_ANIMATION(YodaClearMind, $720)
 {
     DO_START()
+    DO_ONCE({ cancelPanelRelease(PANEL_GROUP_6); })
     DO_SEQUENCE(SeqPanelAllOpen, PANEL_GROUP_6)
     DO_COMMAND(F(
         // Yoda LED sequence
@@ -405,6 +444,7 @@ MARCDUINO_ANIMATION(YodaClearMind, $720)
     // Wait 15 seconds
     DO_WAIT_SEC(15)
     DO_SEQUENCE(SeqPanelAllClose, PANEL_GROUP_6)
+    DO_ONCE({ schedulePanelRelease(PANEL_GROUP_6); })
     DO_RESET({
         resetSequence();
     })

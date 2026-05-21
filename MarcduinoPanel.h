@@ -186,17 +186,20 @@ MARCDUINO_ACTION(SwapPanelOpenClosedCalibration, #SW, ({
 MARCDUINO_ACTION(CloseAllPanels, :CL00, ({
     Marcduino::processCommand(player, "@4S3");
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, ALL_DOME_PANELS_MASK);
+    schedulePanelRelease(ALL_DOME_PANELS_MASK);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(OpenAllPanels, :OP00, ({
+    cancelPanelRelease();
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, ALL_DOME_PANELS_MASK);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(FlutterAllPanels, :OF00, ({
+    cancelPanelRelease();
     SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, ALL_DOME_PANELS_MASK, 10, 50);
 }))
 
@@ -296,9 +299,11 @@ MARCDUINO_ACTION(OpenCloseRepeatPanelGroupDynamic, :OCR$, ({
     uint32_t group = strtol(cmd, 0, 16);
     if (group != 0)
     {
+        cancelPanelRelease(group);
         Easing::Method onEasing = Easing::getEasingMethod(args[2]);
         Easing::Method offEasing = Easing::getEasingMethod(args[3]);
         SEQUENCE_PLAY_ONCE_VARSPEED_EASING(servoSequencer, SeqPanelAllFOpenCloseRepeat, group, args[0], args[1], onEasing, offEasing);
+        schedulePanelRelease(group, min(max((uint32_t)args[1] * 30u, (uint32_t)5000u), (uint32_t)30000u));
     }
 }))
 
@@ -318,6 +323,7 @@ MARCDUINO_ACTION(FlutterPanelGroupDynamic, :OF$, ({
     uint32_t group = strtol(cmd, 0, 16);
     if (group != 0)
     {
+        cancelPanelRelease(group);
         Easing::Method onEasing = Easing::getEasingMethod(args[2]);
         Easing::Method offEasing = Easing::getEasingMethod(args[3]);
         SEQUENCE_PLAY_ONCE_VARSPEED_EASING(servoSequencer, SeqPanelAllFlutter, group, args[0], args[1], onEasing, offEasing);
@@ -340,9 +346,11 @@ MARCDUINO_ACTION(OpenClosePanelGroupDynamic, :OC$, ({
     uint32_t group = strtol(cmd, 0, 16);
     if (group != 0)
     {
+        cancelPanelRelease(group);
         Easing::Method onEasing = Easing::getEasingMethod(args[2]);
         Easing::Method offEasing = Easing::getEasingMethod(args[3]);
         SEQUENCE_PLAY_ONCE_VARSPEED_EASING(servoSequencer, SeqPanelAllOpenClose, group, args[0], args[1], onEasing, offEasing);
+        schedulePanelRelease(group, min(max((uint32_t)(args[0]+args[1])*15u, (uint32_t)3000u), (uint32_t)30000u));
     }
 }))
 
@@ -362,9 +370,11 @@ MARCDUINO_ACTION(OpenClosePanelLongGroupDynamic, :OCL$, ({
     uint32_t group = strtol(cmd, 0, 16);
     if (group != 0)
     {
+        cancelPanelRelease(group);
         Easing::Method onEasing = Easing::getEasingMethod(args[2]);
         Easing::Method offEasing = Easing::getEasingMethod(args[3]);
         SEQUENCE_PLAY_ONCE_VARSPEED_EASING(servoSequencer, SeqPanelAllOpenCloseLong, group, args[0], args[1], onEasing, offEasing);
+        schedulePanelRelease(group, min(max((uint32_t)(args[0]+args[1])*15u, (uint32_t)5000u), (uint32_t)30000u));
     }
 }))
 
@@ -384,9 +394,11 @@ MARCDUINO_ACTION(WavePanelGroupDynamic, :OW$, ({
     uint32_t group = strtol(cmd, 0, 16);
     if (group != 0)
     {
+        cancelPanelRelease(group);
         Easing::Method onEasing = Easing::getEasingMethod(args[2]);
         Easing::Method offEasing = Easing::getEasingMethod(args[3]);
         SEQUENCE_PLAY_ONCE_VARSPEED_EASING(servoSequencer, SeqPanelWave, group, args[0], args[1], onEasing, offEasing);
+        schedulePanelRelease(group, min(max((uint32_t)(args[0]+args[1])*15u, (uint32_t)3000u), (uint32_t)30000u));
     }
 }))
 
@@ -406,9 +418,11 @@ MARCDUINO_ACTION(FastWavePanelGroupDynamic, :OWF$, ({
     uint32_t group = strtol(cmd, 0, 16);
     if (group != 0)
     {
+        cancelPanelRelease(group);
         Easing::Method onEasing = Easing::getEasingMethod(args[2]);
         Easing::Method offEasing = Easing::getEasingMethod(args[3]);
         SEQUENCE_PLAY_ONCE_VARSPEED_EASING(servoSequencer, SeqPanelWaveFast, group, args[0], args[1], onEasing, offEasing);
+        schedulePanelRelease(group, min(max((uint32_t)(args[0]+args[1])*15u, (uint32_t)3000u), (uint32_t)30000u));
     }
 }))
 
@@ -428,9 +442,11 @@ MARCDUINO_ACTION(OpenCloseWavePanelGroupDynamic, :OWC$, ({
     uint32_t group = strtol(cmd, 0, 16);
     if (group != 0)
     {
+        cancelPanelRelease(group);
         Easing::Method onEasing = Easing::getEasingMethod(args[2]);
         Easing::Method offEasing = Easing::getEasingMethod(args[3]);
         SEQUENCE_PLAY_ONCE_VARSPEED_EASING(servoSequencer, SeqPanelOpenCloseWave, group, args[0], args[1], onEasing, offEasing);
+        schedulePanelRelease(group, min(max((uint32_t)(args[0]+args[1])*15u, (uint32_t)3000u), (uint32_t)30000u));
     }
 }))
 
@@ -450,6 +466,7 @@ MARCDUINO_ACTION(MarchingAntPanelGroupDynamic, :OMA$, ({
     uint32_t group = strtol(cmd, 0, 16);
     if (group != 0)
     {
+        cancelPanelRelease(group);
         Easing::Method onEasing = Easing::getEasingMethod(args[2]);
         Easing::Method offEasing = Easing::getEasingMethod(args[3]);
         SEQUENCE_PLAY_ONCE_VARSPEED_EASING(servoSequencer, SeqPanelMarchingAnts, group, args[0], args[1], onEasing, offEasing);
@@ -472,6 +489,7 @@ MARCDUINO_ACTION(AlternatePanelGroupDynamic, :OAP$, ({
     uint32_t group = strtol(cmd, 0, 16);
     if (group != 0)
     {
+        cancelPanelRelease(group);
         Easing::Method onEasing = Easing::getEasingMethod(args[2]);
         Easing::Method offEasing = Easing::getEasingMethod(args[3]);
         SEQUENCE_PLAY_ONCE_VARSPEED_EASING(servoSequencer, SeqPanelAlternate, group, args[0], args[1], onEasing, offEasing);
@@ -494,6 +512,7 @@ MARCDUINO_ACTION(DancePanelGroupDynamic, :OD$, ({
     uint32_t group = strtol(cmd, 0, 16);
     if (group != 0)
     {
+        cancelPanelRelease(group);
         Easing::Method onEasing = Easing::getEasingMethod(args[2]);
         Easing::Method offEasing = Easing::getEasingMethod(args[3]);
         SEQUENCE_PLAY_ONCE_VARSPEED_EASING(servoSequencer, SeqPanelDance, group, args[0], args[1], onEasing, offEasing);
@@ -516,6 +535,7 @@ MARCDUINO_ACTION(ShakePanelGroupDynamic, :OS$, ({
     uint32_t group = strtol(cmd, 0, 16);
     if (group != 0)
     {
+        cancelPanelRelease(group);
         Easing::Method onEasing = Easing::getEasingMethod(args[2]);
         Easing::Method offEasing = Easing::getEasingMethod(args[3]);
         SEQUENCE_PLAY_ONCE_VARSPEED_EASING(servoSequencer, SeqPanelLongHarlemShake, group, args[0], args[1], onEasing, offEasing);
@@ -538,6 +558,7 @@ MARCDUINO_ACTION(OpenPanelGroupDynamic, :OP$, ({
     uint32_t group = strtol(cmd, 0, 16);
     if (group != 0)
     {
+        cancelPanelRelease(group);
         Easing::Method onEasing = Easing::getEasingMethod(args[2]);
         Easing::Method offEasing = Easing::getEasingMethod(args[3]);
         SEQUENCE_PLAY_ONCE_VARSPEED_EASING(servoSequencer, SeqPanelAllOpen, group, args[0], args[1], onEasing, offEasing);
@@ -566,220 +587,259 @@ MARCDUINO_ACTION(ClosePanelGroupDynamic, :CL$, ({
         // servoDispatch.moveServosToPulse(TOP_PIE_PANEL, 0, 1000, 1850);
         // servoDispatch.moveServosToPulse(group, args[0], args[1], args[2], args[3]);
         SEQUENCE_PLAY_ONCE_VARSPEED_EASING(servoSequencer, SeqPanelAllClose, group, args[0], args[1], onEasing, offEasing);
+        // Scale release delay by the off-speed so a slow close doesn't get cut short.
+        // Default args[1]=50 → 1500ms; args[1]=200 → 2000ms; capped floor at 1500ms.
+        schedulePanelRelease(group, min(max((uint32_t)args[1] * 10u, (uint32_t)1500u), (uint32_t)30000u));
     }
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(OpenPanelGroup1, :OP01, ({
+    cancelPanelRelease(PANEL_GROUP_1);
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_GROUP_1);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(OpenPanelGroup2, :OP02, ({
+    cancelPanelRelease(PANEL_GROUP_2);
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_GROUP_2);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(OpenPanelGroup3, :OP03, ({
+    cancelPanelRelease(PANEL_GROUP_3);
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_GROUP_3);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(OpenPanelGroup4, :OP04, ({
+    cancelPanelRelease(PANEL_GROUP_4);
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_GROUP_4);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(OpenPanelGroup5, :OP05, ({
+    cancelPanelRelease(PANEL_GROUP_5);
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_GROUP_5);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(OpenPanelGroup6, :OP06, ({
+    cancelPanelRelease(PANEL_GROUP_6);
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_GROUP_6);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(OpenPanelGroup7, :OP07, ({
+    cancelPanelRelease(PANEL_GROUP_7);
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_GROUP_7);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(OpenPanelGroup8, :OP08, ({
+    cancelPanelRelease(PANEL_GROUP_8);
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_GROUP_8);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(OpenPanelGroup9, :OP09, ({
+    cancelPanelRelease(PANEL_GROUP_9);
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_GROUP_9);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(OpenPanelGroup10, :OP10, ({
+    cancelPanelRelease(PANEL_GROUP_10);
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_GROUP_10);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(OpenTopPanels, :OP11, ({
+    cancelPanelRelease(PIE_PANEL);
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PIE_PANEL);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(OpenBottomPanels, :OP12, ({
+    cancelPanelRelease(DOME_PANELS_MASK);
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, DOME_PANELS_MASK);
 }))
 
 
 MARCDUINO_ACTION(ClosePanelGroup1, :CL01, ({
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_GROUP_1);
+    schedulePanelRelease(PANEL_GROUP_1);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(ClosePanelGroup2, :CL02, ({
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_GROUP_2);
+    schedulePanelRelease(PANEL_GROUP_2);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(ClosePanelGroup3, :CL03, ({
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_GROUP_3);
+    schedulePanelRelease(PANEL_GROUP_3);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(ClosePanelGroup4, :CL04, ({
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_GROUP_4);
+    schedulePanelRelease(PANEL_GROUP_4);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(ClosePanelGroup5, :CL05, ({
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_GROUP_5);
+    schedulePanelRelease(PANEL_GROUP_5);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(ClosePanelGroup6, :CL06, ({
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_GROUP_6);
+    schedulePanelRelease(PANEL_GROUP_6);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(ClosePanelGroup7, :CL07, ({
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_GROUP_7);
+    schedulePanelRelease(PANEL_GROUP_7);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(ClosePanelGroup8, :CL08, ({
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_GROUP_8);
+    schedulePanelRelease(PANEL_GROUP_8);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(ClosePanelGroup9, :CL09, ({
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_GROUP_9);
+    schedulePanelRelease(PANEL_GROUP_9);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(ClosePanelGroup10, :CL10, ({
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_GROUP_10);
+    schedulePanelRelease(PANEL_GROUP_10);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(CloseTopPanels, :CL11, ({
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PIE_PANEL);
+    schedulePanelRelease(PIE_PANEL);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(CloseBottomPanels, :CL12, ({
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, DOME_PANELS_MASK);
+    schedulePanelRelease(DOME_PANELS_MASK);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(FlutterPanelGroup1, :OF01, ({
+    cancelPanelRelease(PANEL_GROUP_1);
     SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_GROUP_1, 10, 50);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(FlutterPanelGroup2, :OF02, ({
+    cancelPanelRelease(PANEL_GROUP_2);
     SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_GROUP_2, 10, 50);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(FlutterPanelGroup3, :OF03, ({
+    cancelPanelRelease(PANEL_GROUP_3);
     SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_GROUP_3, 10, 50);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(FlutterPanelGroup4, :OF04, ({
+    cancelPanelRelease(PANEL_GROUP_4);
     SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_GROUP_4, 10, 50);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(FlutterPanelGroup5, :OF05, ({
+    cancelPanelRelease(PANEL_GROUP_5);
     SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_GROUP_5, 10, 50);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(FlutterPanelGroup6, :OF06, ({
+    cancelPanelRelease(PANEL_GROUP_6);
     SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_GROUP_6, 10, 50);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(FlutterPanelGroup7, :OF07, ({
+    cancelPanelRelease(PANEL_GROUP_7);
     SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_GROUP_7, 10, 50);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(FlutterPanelGroup8, :OF08, ({
+    cancelPanelRelease(PANEL_GROUP_8);
     SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_GROUP_8, 10, 50);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(FlutterPanelGroup9, :OF09, ({
+    cancelPanelRelease(PANEL_GROUP_9);
     SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_GROUP_9, 10, 50);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(FlutterPanelGroup10, :OF10, ({
+    cancelPanelRelease(PANEL_GROUP_10);
     SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_GROUP_10, 10, 50);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(FlutterTopPanels, :OF11, ({
+    cancelPanelRelease(PIE_PANEL);
     SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PIE_PANEL, 10, 50);
 }))
 
 ////////////////
 
 MARCDUINO_ACTION(FlutterBottomPanels, :OF12, ({
+    cancelPanelRelease(DOME_PANELS_MASK);
     SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, DOME_PANELS_MASK, 10, 50);
 }))

@@ -410,6 +410,15 @@ ServoDispatchPCA9685<SizeOfArray(servoSettings)> servoDispatch(servoSettings);
 #endif
 ServoSequencer servoSequencer(servoDispatch);
 AnimationPlayer player(servoSequencer);
+
+// Panel servo auto-release — cut PWM after a close sequence so a stalled/
+// misconnected servo cannot grind indefinitely against its mechanical stop.
+// sPanelReleaseMask tracks which groups are pending; only those servos are cut,
+// so an open panel in a different group is never disturbed by another group's close.
+static uint32_t sPanelReleaseAtMs   = 0;
+static uint32_t sPanelReleaseMask   = 0;
+static void schedulePanelRelease(uint32_t mask, uint32_t delayMs = 1500);
+static void cancelPanelRelease(uint32_t mask = ALL_DOME_PANELS_MASK);
 MarcduinoSerial<> marcduinoSerial(player);
 
 /////////////////////////////////////////////////////////////////////////
@@ -1463,7 +1472,12 @@ static bool isWakeProfileCommand(const char *cmd)
 bool shouldBlockCommandDuringSleep(const char *cmd)
 {
     if (!sSleepModeActive || cmd == nullptr || cmd[0] == '\0') return false;
-    return !isWakeProfileCommand(cmd);
+    if (isWakeProfileCommand(cmd)) return false;
+    // Emergency all-stop (:SE00) and all-close (:CL00) always pass through —
+    // they must halt a grinding or runaway sequence even during sleep.
+    // Individual group closes (:CL01-:CL12) remain blocked intentionally.
+    if (strcmp(cmd, ":SE00") == 0 || strcmp(cmd, ":CL00") == 0) return false;
+    return true;
 }
 
 static void applySoftSleepOutputs()
@@ -1554,6 +1568,45 @@ I2CReceiverBase<CONSOLE_BUFFER_SIZE> i2cReceiver(USE_I2C_ADDRESS, [](char *cmd)
 
 ////////////////
 
+static void releasePanelServos()
+{
+    for (uint16_t i = 0; i < servoDispatch.getNumServos(); i++)
+    {
+        if (servoDispatch.getGroup(i) & sPanelReleaseMask)
+        {
+            uint8_t pin = servoDispatch.getPin(i);
+#ifndef USE_I2C_ADDRESS
+            // Write full-off to the PCA9685 channel so the motor is actually
+            // de-energised. disable() alone only clears firmware state; the
+            // chip keeps driving the last PWM value until told otherwise.
+            if (pin != 0)
+                servoDispatch.setOutput(pin, false);
+#endif
+            servoDispatch.disable(i);
+        }
+    }
+    sPanelReleaseMask = 0;
+    DEBUG_PRINTLN(F("[Panel] Auto-release: servo PWM cut after close"));
+}
+
+static void schedulePanelRelease(uint32_t mask, uint32_t delayMs)
+{
+    sPanelReleaseMask |= mask;
+    uint32_t newDeadline = millis() + delayMs;
+    // Never shorten an existing deadline — a slow-close in progress needs its full time.
+    if (sPanelReleaseAtMs == 0 || (int32_t)(newDeadline - sPanelReleaseAtMs) > 0)
+        sPanelReleaseAtMs = newDeadline;
+}
+
+static void cancelPanelRelease(uint32_t mask)
+{
+    sPanelReleaseMask &= ~mask;
+    if (sPanelReleaseMask == 0)
+        sPanelReleaseAtMs = 0;
+}
+
+////////////////
+
 void mainLoop()
 {
     AnimatedEvent::process();
@@ -1566,6 +1619,12 @@ void mainLoop()
     {
         applySoftSleepOutputs();
         sSleepEnforceAtMs = 0;
+    }
+
+    if (sPanelReleaseAtMs != 0 && (int32_t)(millis() - sPanelReleaseAtMs) >= 0)
+    {
+        releasePanelServos();
+        sPanelReleaseAtMs = 0;
     }
 
     if (sWakeTransitionPending && sWakeTransitionAtMs != 0 && (int32_t)(millis() - sWakeTransitionAtMs) >= 0)
