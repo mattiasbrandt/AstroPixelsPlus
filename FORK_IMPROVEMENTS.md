@@ -112,6 +112,85 @@ Body→dome commands (WiFi path) use HTTP POST to the dome's `/api/cmd` endpoint
 - 65-byte UART buffer with overflow logging and null-termination safety
 - `#PAWU` whitelisted in sleep gate so a body-initiated wake is never blocked by dome sleep mode
 
+### Servo Grind Protection — Per-Mask Post-Close PWM Release
+
+**Problem discovered:** During the 2026-05-21 protoR2 integration test, `#PASL` (body sleep sync) fired mid-panel-wave, the sleep guard blocked `:SE00`/`:OF00`, and `SeqPanelAllClose` fought the running sequence — grinding noise, no recovery without a full power cycle.
+
+Two underlying issues:
+
+1. PCA9685 is a dumb PWM emitter. After a close sequence, the servo holds position indefinitely under active PWM. Any mechanical conflict (misrouted wire, wiring offset, fighting sequence) grinds the motor until power is cut.
+2. `shouldBlockCommandDuringSleep()` blocked ALL commands during sleep mode, including emergency stop signals.
+
+#### Part 1 — Stop command sleep bypass
+
+`:SE00` (stop sequence) and `:CL00` (all-close) are now whitelisted in `shouldBlockCommandDuringSleep()`. These are safety signals, not control signals — they must always pass through regardless of sleep state.
+
+#### Part 2 — Post-close timed servo PWM release
+
+After a close sequence completes, the PCA9685 continues driving PWM to hold the servo in position. If the servo is already at its mechanical stop (or fighting a misconnected wire), this holds it under constant load.
+
+Fix: a timer in `mainLoop()` fires after a configurable delay and calls `servoDispatch.setOutput(pin, false)` (writes `LED_FULL_OFF_H` to the PCA9685 register — actually cuts hardware PWM) followed by `servoDispatch.disable(i)`. This bounds the worst-case grind duration to the delay window, after which the servo is de-energized regardless of firmware state.
+
+#### Iteration 1 — Known limitations addressed
+
+Initial implementation used a single global timer with a fixed 1500 ms delay. Two limitations were then identified and fixed:
+
+- **Timer not cancelled on open commands.** If `:OP01` fired after a close, the pending release timer would still cut that servo's PWM mid-hold. Fixed by calling `cancelPanelRelease()` inside every open command handler (`:OP00`–`:OP12`, `:OF00`–`:OF12`).
+- **Fixed delay wrong for varspeed sequences.** Dynamic close commands (`:CL$`) accept a speed parameter — a slow close at speed 200 takes far longer than the default 1500 ms. Fixed by scaling the delay: `min(max(args[1] * 10u, 1500u), 30000u)`.
+
+#### Iteration 2 — Upper cap added
+
+Varspeed delay scaling had no upper bound, which could produce arbitrarily long hold times. Added a 30,000 ms cap to prevent a pathological high-speed argument from locking servos energized for minutes.
+
+#### Iteration 3 — Gap fix: open→close sequences never rearmed the timer
+
+ACTION-style sequences that open then close panels (e.g. SE01 ScreamSequence, SE02 WaveSequence) called `cancelPanelRelease()` at start to prevent the previous release from cutting mid-open — but never rearmed a release after the close phase finished. Result: after the sequence completed with panels closed, servos stayed energized indefinitely.
+
+Fixed by adding `schedulePanelRelease(ALL_DOME_PANELS_MASK, N)` after every `SEQUENCE_PLAY_ONCE` call whose sequence ends in a closed position. Delay values chosen from observed sequence durations:
+
+| Sequence type | Delay |
+|---|---|
+| Standard open-close (SeqPanelAllOpenClose, SeqPanelWave, SeqPanelOpenCloseWave) | 8000 ms |
+| Fast wave (SeqPanelWaveFast) | 6000 ms |
+| Long open-close (SeqPanelAllOpenCloseLong) | 15000 ms |
+
+Sequences with unknown end state (SeqPanelMarchingAnts, SeqPanelAlternate, SeqPanelDance, SeqPanelLongDisco, SeqPanelLongHarlemShake) receive `cancelPanelRelease()` only — no schedule.
+
+For ANIMATION-style sequences (SE06 ShortSequence, $815 HarlemShake, $720 YodaClearMind), the schedule is issued as `DO_ONCE({ schedulePanelRelease(...); })` immediately after the relevant `DO_SEQUENCE` step.
+
+#### Iteration 4 (final) — Per-mask redesign: correct group isolation
+
+**Problem with the global timer:** `:CL01` (close group 1) with a global timer would eventually cut PWM for ALL groups — including a panel in group 2 that the operator had just opened with `:OP02`. The requirement is that an open panel must stay energized regardless of what close commands fire on other groups.
+
+**Architecture:** Single global timer replaced with per-group mask tracking.
+
+```cpp
+static uint32_t sPanelReleaseAtMs   = 0;   // when the timer fires
+static uint32_t sPanelReleaseMask   = 0;   // which groups are pending release
+
+static void schedulePanelRelease(uint32_t mask, uint32_t delayMs = 1500);
+static void cancelPanelRelease(uint32_t mask = ALL_DOME_PANELS_MASK);
+```
+
+Semantics:
+- `schedulePanelRelease(mask, delay)` — ORs the mask bits into `sPanelReleaseMask`, then extends the deadline only if the new deadline is later than the current one ("never shorten"). This ensures a slow-close sequence already in progress gets its full time even when another group also closes.
+- `cancelPanelRelease(mask)` — clears those bits from `sPanelReleaseMask`. If the mask reaches 0, the timer is cancelled.
+- `releasePanelServos()` — iterates all servo channels, cuts PWM only for channels whose group bit is set in `sPanelReleaseMask`. Then clears the mask.
+
+**Result:** `:CL01` schedules a release for `PANEL_GROUP_1` only. `:OP02` cancels `PANEL_GROUP_2`'s pending release only. A panel open in group 2 is never disturbed by group 1's close.
+
+**PWM cutoff implementation:** `servoDispatch.setOutput(pin, false)` writes `LED_FULL_OFF_H` to the PCA9685 output register — this is the correct path for actually cutting hardware PWM, as opposed to `disable(i)` which only updates firmware state. Guarded by `#ifndef USE_I2C_ADDRESS` since `ServoDispatchDirect` does not expose `setOutput()`.
+
+#### Files changed
+
+| File | Changes |
+|---|---|
+| `AstroPixelsPlus.ino` | `sPanelReleaseAtMs`, `sPanelReleaseMask` globals; `releasePanelServos()`, `schedulePanelRelease()`, `cancelPanelRelease()` implementations; mainLoop timer check; sleep bypass for `:SE00`/`:CL00` |
+| `MarcduinoPanel.h` | All `:CL00`–`:CL12`, `:OP00`–`:OP12`, `:OF00`–`:OF12` static handlers updated with per-mask calls; all dynamic `$`-suffix handlers (`:CL$`, `:OP$`, `:OF$`, `:OC$`, `:OCL$`, `:OCR$`, `:OW$`, `:OWF$`, `:OWC$`, `:OMA$`, `:OAP$`, `:OD$`, `:OS$`, `:OF$`) updated |
+| `MarcduinoSequence.h` | SE01–SE04, SE10–SE14, SE16, SE51–SE58 updated; SE06, $815, $720 animation gap fixes; SE12 narrowed to PIE_PANEL |
+
+**Build verification:** SUCCESS — RAM 18.6%, Flash 82.9%. Hardware test pending (physical panel rewire required first).
+
 ### Local Sound Execution Feature Toggle
 Added `msoundlocal` preference. When disabled, sound commands may still be accepted but local playback/startup/random local sound behavior is not actuated.
 

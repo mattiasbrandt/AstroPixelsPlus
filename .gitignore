@@ -16,8 +16,9 @@
 .vs/
 /build
 
-# Local bench testing notes (user-specific)
+# Local testing notes (user-specific, setup-specific)
 tasks/bench-testing.md
+tasks/protoR2-testing.md
 
 # Local agent scratch/state
 .cache/*
