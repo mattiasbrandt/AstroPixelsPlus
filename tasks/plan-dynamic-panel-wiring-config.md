@@ -34,7 +34,9 @@ Landed across the following commits on `main` (in order):
 | `e81cc41` | Operator-facing warning when an active slot has no command-routing group bits (plan-mandated, missed in original feature commit). |
 | `e9b5135` | Logging overhaul — moved `LogCapture` instance earlier so boot-time wiring logs reach the web log viewer; added structured info/warn/error logs to all new endpoints and to both load functions. |
 | `2121040`, `85ab880` | `FORK_IMPROVEMENTS.md` entry rewritten in builder/operator language. |
-| `66d0d63` | Three Codex-review fixes (see *Post-implementation review fixes* below). |
+| `66d0d63` | Codex review round 1 — three fixes (see *Post-implementation review fixes* below). |
+| `afe6eaf` | Codex review round 2 — too-many-slots accepted; numeric-prefix `5bad` and `truejunk` accepted. |
+| `803f8a8` | Codex review round 3 — whitespace treated as value terminator (`5 garbage` accepted); Reload didn't stop active test. |
 
 ### Deviations from the original spec
 
@@ -50,13 +52,27 @@ Landed across the following commits on `main` (in order):
 
 ### Post-implementation review fixes
 
-GPT Codex review on 2026-05-24 found three real defects in the shipped feature. All three landed in `66d0d63`:
+GPT Codex performed three review rounds on 2026-05-24. Each round caught defects in the previous round's surface — a pattern worth noting on its own (see the meta note at the end of this section).
+
+**Round 1 — `66d0d63`:**
 
 1. **UI stuck-on test on row deactivation.** Unchecking the Active checkbox for the currently-testing row only reset the button label and cleared `activeTestIdx` — it never called `/api/servo/stop`. Result: panels stayed held open under PWM after the row went inactive; holo sweeps kept running in `mainLoop()`. Both UI handlers now POST `/api/servo/stop` first and reset state inside `.finally()`.
 2. **Lax `strtol()` parsing.** Both `wiringConfigParseBody()` and `servoTestParseBody()` used `strtol(s, nullptr, 10)`, which returns 0 for non-numeric input (`"channel":"bad"`, `"channel":true`) — and that 0 was silently accepted as channel 0. A direct POST could pulse CH0 or save channel-0 assignments. Switched to the end-pointer form; rejects with `"channel must be a number"` if no digit was consumed, before the existing 0–15 range check.
 3. **Silent partial NVS save.** `wiringConfigSave()` ignored the return values of `Preferences.putUChar()`/`putBool()` (0 = flash write failed). Endpoint could return `{ok:true}` after a partial save. Now checks each write, short-circuits the loop on failure, and the POST handler returns the existing 500 with the `[API] Error: ... NVS save failed` log line.
 
-These defects would not have been caught by F9/F10 hardware verification — they require either a direct API client sending malformed bodies (#2), an NVS-full / corrupt scenario (#3), or the specific operator UI flow of deactivating a row mid-test (#1). Worth noting for future similar features: external API review catches a class of issues that hands-on hardware testing does not.
+**Round 2 — `afe6eaf`:**
+
+4. **Too many slots silently accepted.** `wiringConfigParseBody()` stopped iterating once `parsed == expectedSlots` and returned success without checking whether more `{...}` rows remained before the array terminator. A POST with 14 panel slots would save the first 13 silently. Added a trailing-objects scan; rejects with `"too many slots (expected exactly N)"`.
+5. **Numeric-prefix and keyword-prefix garbage accepted.** Round 1's end-pointer `strtol()` only rejected wholly non-numeric input — `5bad` still parsed as 5 because the cursor *did* advance. Same for `truejunk` / `falsejunk` via `String::startsWith()`. Introduced an `isJsonValueTerminator()` helper and required the token to end at a structural terminator.
+
+**Round 3 — `803f8a8`:**
+
+6. **Whitespace treated as a value terminator.** Round 2's helper accepted whitespace as a valid terminator, so `"channel": 5 garbage` and `"active": true garbage` parsed cleanly — the parser stopped at the space and the space itself passed the check. Whitespace is a *separator*, not a *terminator*. Renamed the helper to `jsonValueEndsCleanly(const char *)` with a stricter algorithm (skip whitespace, *then* require `,`, `}`, `]`, or NUL). All four call sites updated.
+7. **Reload didn't stop active test.** `loadPanelWiring()` / `loadHoloWiring()` re-rendered the table from `/api/{panels,holos}/config` without stopping any active test. Clicking Reload while a panel was held open reset every row's button visually, but the server-side test kept the panel under PWM (or the holo sweep state machine kept flipping phases). Both loaders now POST `/api/servo/stop` first if `activeTestIdx >= 0`, then clear state, then fetch.
+
+**Meta note — why each round caught more.** Each round's previous fix patched the *exact* case the previous report named without surveying the surrounding validation surface. The pattern broke after Round 3 because the helper rename (`isJsonValueTerminator` → `jsonValueEndsCleanly`) pushed the right algorithm by name. Lesson for future similar work: when adding input validation, name the helper after the *intent* (does this token end cleanly?), not the surface check (is this char a terminator?), and audit the full validation surface rather than each named case in isolation.
+
+None of these defects would have surfaced through F9/F10 hardware verification — they require direct API clients sending malformed bodies, NVS-failure scenarios, or specific UI sequencing flows that hands-on operator testing rarely exercises. External API review is genuinely catching issues that hardware testing cannot.
 
 ### Verification status
 
