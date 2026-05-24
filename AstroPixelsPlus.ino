@@ -545,9 +545,12 @@ static const char *kHoloSlotLabels[NUM_HOLO_SLOTS] = {
 static void panelConfigLoad()
 {
     Preferences prefs;
-    // Read-only open: avoids creating an empty namespace on first boot and avoids
-    // an unnecessary flash erase cycle when the user has never saved a config.
-    prefs.begin(PREFERENCE_PANELS_NS, true);
+    // Read-write open creates the namespace silently if it doesn't exist —
+    // avoids the noisy "[E][Preferences.cpp:50] nvs_open failed: NOT_FOUND"
+    // log that read-only mode produces on first ever boot. We never call
+    // put*() in this function, so no flash writes happen after the one-time
+    // namespace-entry creation on first boot. Subsequent boots: pure read.
+    prefs.begin(PREFERENCE_PANELS_NS, false);
     int activeCount = 0;
     int inactiveCount = 0;
     int chOverrides = 0;
@@ -629,7 +632,10 @@ static void panelConfigLoad()
 static void holoConfigLoad()
 {
     Preferences prefs;
-    prefs.begin(PREFERENCE_HOLOS_NS, true);
+    // Read-write to suppress first-boot NOT_FOUND log — same reasoning as
+    // panelConfigLoad above. No put*() calls = no flash writes after the
+    // one-time namespace creation.
+    prefs.begin(PREFERENCE_HOLOS_NS, false);
     int activeCount = 0;
     int inactiveCount = 0;
     int chOverrides = 0;

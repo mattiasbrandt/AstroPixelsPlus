@@ -514,7 +514,10 @@ static void wiringConfigRead(const char *ns, const char *chFmt, const char *actF
                               uint8_t *outCh, bool *outActive)
 {
     Preferences prefs;
-    prefs.begin(ns, true);
+    // Read-write to suppress the first-time NOT_FOUND error log if the
+    // namespace doesn't exist yet (e.g. GET fires before any save has run
+    // on a fresh dome). No put*() calls below — no flash writes occur.
+    prefs.begin(ns, false);
     for (int i = 0; i < slotCount; i++)
     {
         char keyC[12];
