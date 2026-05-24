@@ -578,6 +578,17 @@ static String wiringConfigBuildJson(const char *board, int slotCount,
 // expectedSlots entries; each entry must carry index, channel (0–15), and
 // active (true|false). Indexes must match array position (slot 0 → index 0).
 // Duplicate active channels are detected by the caller, not here.
+
+// Returns true if c is a legal token terminator inside a JSON value position:
+// whitespace, end-of-array, end-of-object, comma, or NUL. Used to reject
+// inputs like "5bad" / "truejunk" where strtol() or startsWith() would
+// otherwise silently accept the leading prefix.
+static inline bool isJsonValueTerminator(char c)
+{
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r' ||
+           c == ',' || c == '}'  || c == ']'  || c == '\0';
+}
+
 static bool wiringConfigParseBody(const String &body, int expectedSlots,
                                    uint8_t *outCh, bool *outActive, String &errMsg)
 {
@@ -611,24 +622,31 @@ static bool wiringConfigParseBody(const String &body, int expectedSlots,
         int chColon  = slot.indexOf(':', chKey);
         int actColon = slot.indexOf(':', actKey);
         // Use end-pointer form of strtol so we can detect "not a number" inputs
-        // — strtol returns 0 for both "0" and "bad"/"true"/"\"5\"", and without
-        // checking that the cursor advanced we'd silently accept channel 0 for
-        // any garbage value. Reject if no digit was consumed.
+        // — strtol returns 0 for both "0" and "bad"/"true"/"\"5\"". Also require
+        // that the token ENDS at a JSON terminator (whitespace, ',', '}', ']'),
+        // otherwise "5bad" would silently parse as 5.
         const char *idxStart = slot.c_str() + idxColon + 1;
         const char *chStart  = slot.c_str() + chColon  + 1;
         char *idxEnd = nullptr;
         char *chEnd  = nullptr;
         long idxVal  = strtol(idxStart, &idxEnd, 10);
         long chVal   = strtol(chStart,  &chEnd,  10);
-        if (idxEnd == idxStart) { errMsg = "index must be a number at slot " + String(parsed); return false; }
-        if (chEnd  == chStart)  { errMsg = "channel must be a number at slot " + String(parsed); return false; }
+        if (idxEnd == idxStart || !isJsonValueTerminator(*idxEnd))
+        { errMsg = "index must be a number at slot " + String(parsed); return false; }
+        if (chEnd  == chStart  || !isJsonValueTerminator(*chEnd))
+        { errMsg = "channel must be a number at slot " + String(parsed); return false; }
 
+        // For active, startsWith("true"/"false") matches "truejunk" / "falsejunk"
+        // too. Verify the next char after the keyword is a JSON terminator so
+        // we reject malformed boolean tokens with trailing garbage.
         String actStr = slot.substring(actColon + 1);
         actStr.trim();
         bool actVal;
-        if (actStr.startsWith("true"))       actVal = true;
-        else if (actStr.startsWith("false")) actVal = false;
-        else { errMsg = "active must be true or false"; return false; }
+        if (actStr.startsWith("true") && isJsonValueTerminator(actStr.length() > 4 ? actStr.charAt(4) : '\0'))
+            actVal = true;
+        else if (actStr.startsWith("false") && isJsonValueTerminator(actStr.length() > 5 ? actStr.charAt(5) : '\0'))
+            actVal = false;
+        else { errMsg = "active must be true or false at slot " + String(parsed); return false; }
 
         if (idxVal != parsed)
         {
@@ -650,6 +668,16 @@ static bool wiringConfigParseBody(const String &body, int expectedSlots,
     if (parsed != expectedSlots)
     {
         errMsg = "expected " + String(expectedSlots) + " slots, got " + String(parsed);
+        return false;
+    }
+    // Reject extra slot objects beyond the expected count — the parse loop
+    // stops once parsed == expectedSlots, but a malicious or buggy client
+    // could send N+1 valid-looking rows and we'd silently keep only the
+    // first N. Scan from the cursor to the array terminator for any more '{'.
+    int trailing = body.indexOf('{', pos);
+    if (trailing >= 0 && trailing < arrEnd)
+    {
+        errMsg = "too many slots (expected exactly " + String(expectedSlots) + ")";
         return false;
     }
     return true;
@@ -827,11 +855,14 @@ static bool servoTestParseBody(const String &body, bool &outIsPanels, int &outCh
         if (chKey < 0) { errMsg = "missing channel"; return false; }
         int chColon = body.indexOf(':', chKey);
         // End-pointer form so a non-numeric value ("bad", true, "5" as string)
-        // is rejected instead of silently parsed as 0 and pulsing CH0.
+        // is rejected instead of silently parsed as 0 and pulsing CH0. Also
+        // require the token to end at a JSON terminator so "5bad" is rejected
+        // instead of silently parsed as 5.
         const char *chStart = body.c_str() + chColon + 1;
         char *chEnd = nullptr;
         long chVal = strtol(chStart, &chEnd, 10);
-        if (chEnd == chStart) { errMsg = "channel must be a number"; return false; }
+        if (chEnd == chStart || !isJsonValueTerminator(*chEnd))
+        { errMsg = "channel must be a number"; return false; }
         if (chVal < 0 || chVal > 15) { errMsg = "channel out of range (0-15)"; return false; }
         outChannel = (int)chVal;
     }
