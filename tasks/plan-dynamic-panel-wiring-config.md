@@ -38,6 +38,7 @@ Landed across the following commits on `main` (in order):
 | `afe6eaf` | Codex review round 2 — too-many-slots accepted; numeric-prefix `5bad` and `truejunk` accepted. |
 | `803f8a8` | Codex review round 3 — whitespace treated as value terminator (`5 garbage` accepted); Reload didn't stop active test. |
 | `6a6e16d` | Codex review round 4 — six UI `.finally()` sites silently desynced from server on stop-call failure. |
+| `f9fd999` | Bench-flash polish — suppressed false `[E][Preferences.cpp:50] nvs_open failed: NOT_FOUND` boot noise by opening NVS namespaces read-write (silently creates on first boot, no flash writes after). |
 
 ### Deviations from the original spec
 
@@ -83,7 +84,8 @@ None of these defects would have surfaced through F9/F10 hardware verification �
 
 - **Local build** — clean across all commits (RAM 18.6%, Flash 84.0%).
 - **Local browser smoke** — structural only (pages serve 200, markup well-formed, div balance correct). Interactive UI flow (table render, conflict highlighting, save banner) not driven manually.
-- **Hardware flash + Marcduino compat matrix** — **pending** (F9).
+- **Bench boot smoke (USB-only, no PCA9685 attached)** — **passed 2026-05-24** after flashing through `f9fd999`. Single clean POWERON_RESET, both `[Wiring] … config loaded` summary lines fire before `Ready`, no crash loop, no Guru Meditation, WiFi joins and web server comes up on the expected IP. Expected absences: I2C scan finds nothing (no boards), ServoDispatch logs four `Wire.cpp Error 263` probes for the missing PCA9685s and stops. The `[E][Preferences.cpp:50] NOT_FOUND` boot noise was eliminated in `f9fd999`.
+- **Hardware flash + Marcduino compat matrix on full dome** — **pending** (F9 full).
 - **Empirical channel walk-through using the new test UI** — **pending** (F10). MK4 channel defaults in code are best-available information; F10 is the ground-truth confirmation step. Any discrepancy at F10 requires a small correction commit to `defaultPanelCh[]` / `defaultHoloCh[]`.
 
 ### Operator-visible logging summary
