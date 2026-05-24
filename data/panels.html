@@ -70,15 +70,18 @@
 .lt{font:bold 7.5px monospace;fill:#fff;text-anchor:middle;dominant-baseline:middle;pointer-events:none}
 .lp{font:bold 8.5px monospace;fill:#bfdbfe;text-anchor:middle;dominant-baseline:middle;pointer-events:none}
 .lf{font:6.5px sans-serif;fill:#374151;text-anchor:middle;dominant-baseline:middle;pointer-events:none}
+.hp{fill:#16a34a;stroke:#fff;stroke-width:.6;pointer-events:none}
+.lh{font:bold 5.5px monospace;fill:#fff;text-anchor:middle;dominant-baseline:middle;pointer-events:none}
 </style>
 <circle class="dbg" cx="240" cy="240" r="172"/>
 <circle class="pbg" cx="240" cy="240" r="119"/>
-<path class="pe" id="pp3" d="M 184.6,135.8 A 118,118 0 0 1 293.6,134.9 L 264.5,191.9 A 54,54 0 0 0 214.6,192.3 Z"><title>PP3</title></path>
-<path class="pp" id="dp10" onclick="domePanelClick('10')" d="M 302.5,139.9 A 118,118 0 0 1 357.8,233.8 L 293.9,237.2 A 54,54 0 0 0 268.6,194.2 Z"><title>PP4</title></path>
-<path class="pp" id="dp09" onclick="domePanelClick('09')" d="M 357.9,244.1 A 118,118 0 0 1 304.3,339.0 L 269.4,285.3 A 54,54 0 0 0 294.0,241.9 Z"><title>PP2</title></path>
-<path class="pp" id="dp08" onclick="domePanelClick('08')" d="M 295.4,344.2 A 118,118 0 0 1 186.4,345.1 L 215.5,288.1 A 54,54 0 0 0 265.4,287.7 Z"><title>PP1</title></path>
-<path class="pp" id="dp11" onclick="domePanelClick('11')" d="M 177.5,340.1 A 118,118 0 0 1 122.2,246.2 L 186.1,242.8 A 54,54 0 0 0 211.4,285.8 Z"><title>PP6</title></path>
-<path class="pe" id="pp5" d="M 122.1,235.9 A 118,118 0 0 1 175.7,141.0 L 210.6,194.7 A 54,54 0 0 0 186.0,238.1 Z"><title>PP5</title></path>
+<!-- Pie wedges, CW from top: PP3 (top, fixed, contains THP/HP3), PP2, PP1, PP6, PP5 (fixed), PP4. Wedge angle ranges unchanged; panel identities re-assigned to match dome reference. -->
+<path class="pe" id="pp3" d="M 184.6,135.8 A 118,118 0 0 1 293.6,134.9 L 264.5,191.9 A 54,54 0 0 0 214.6,192.3 Z"><title>PP3 (fixed, hosts THP)</title></path>
+<path class="pp" id="dp09" onclick="domePanelClick('09')" d="M 302.5,139.9 A 118,118 0 0 1 357.8,233.8 L 293.9,237.2 A 54,54 0 0 0 268.6,194.2 Z"><title>PP2</title></path>
+<path class="pp" id="dp08" onclick="domePanelClick('08')" d="M 357.9,244.1 A 118,118 0 0 1 304.3,339.0 L 269.4,285.3 A 54,54 0 0 0 294.0,241.9 Z"><title>PP1</title></path>
+<path class="pp" id="dp11" onclick="domePanelClick('11')" d="M 295.4,344.2 A 118,118 0 0 1 186.4,345.1 L 215.5,288.1 A 54,54 0 0 0 265.4,287.7 Z"><title>PP6 (group only)</title></path>
+<path class="pe" id="pp5" d="M 177.5,340.1 A 118,118 0 0 1 122.2,246.2 L 186.1,242.8 A 54,54 0 0 0 211.4,285.8 Z"><title>PP5 (fixed)</title></path>
+<path class="pp" id="dp10" onclick="domePanelClick('10')" d="M 122.1,235.9 A 118,118 0 0 1 175.7,141.0 L 210.6,194.7 A 54,54 0 0 0 186.0,238.1 Z"><title>PP4</title></path>
 <path class="pf" id="p8" d="M 249.0,68.2 A 172,172 0 0 1 312.7,84.1 L 301.7,107.7 A 146,146 0 0 0 247.6,94.2 Z"><title>RPSI</title></path>
 <path class="pr" id="dp05" onclick="domePanelClick('05')" d="M 331.1,94.1 A 172,172 0 0 1 375.5,134.1 L 355.0,150.1 A 146,146 0 0 0 317.4,116.2 Z"><title>P7</title></path>
 <path class="pf" id="p6" d="M 380.9,141.3 A 172,172 0 0 1 399.5,175.6 L 375.4,185.3 A 146,146 0 0 0 359.6,156.3 Z"><title>P6</title></path>
@@ -139,12 +142,19 @@
 <line x1="98.5" y1="110.3" x2="110.2" y2="121.1" class="conn-f"/>
 <circle class="cf" cx="87.4" cy="100.2" r="15"/>
 <text class="lf" x="87.4" y="100.2">RLD</text>
-<text class="lp" x="239.2" y="154.0">PP3</text>
-<text class="lp" x="314.1" y="196.4">PP4</text>
-<text class="lp" x="314.9" y="282.3">PP2</text>
-<text class="lp" x="240.8" y="326.0">PP1</text>
-<text class="lp" x="165.9" y="283.6">PP6</text>
-<text class="lp" x="165.1" y="197.7">PP5</text>
+<!-- Pie wedge labels — text x/y are the wedge centers (unchanged); only the label
+     text changes to match the new panel-to-wedge assignment. PP3 label sits left
+     of centre because HP3 (THP) marker occupies the right half of PP3. -->
+<text class="lp" x="228.0" y="154.0">PP3</text>
+<text class="lp" x="314.1" y="196.4">PP2</text>
+<text class="lp" x="314.9" y="282.3">PP1</text>
+<text class="lp" x="240.8" y="326.0">PP6</text>
+<text class="lp" x="165.9" y="283.6">PP5</text>
+<text class="lp" x="165.1" y="197.7">PP4</text>
+<!-- THP (Top Holo Projector) — fixed-mounted inside PP3, slightly right of top.
+     Position: angle ~10° (just right of vertical), radius 85 from CX=CY=240. -->
+<circle class="hp" cx="254.8" cy="156.3" r="6"><title>THP / HP3 — Top Holo Projector (fixed on PP3)</title></circle>
+<text class="lh" x="254.8" y="156.3">HP3</text>
 <g transform="translate(10,462)">
   <rect x="0" y="0" width="10" height="8" fill="#1e3a8a" rx="1"/><text x="13" y="7" style="font:7.5px sans-serif;fill:#9ca3af">Ring servo</text>
   <rect x="82" y="0" width="10" height="8" fill="#1e3a6e" rx="1"/><text x="95" y="7" style="font:7.5px sans-serif;fill:#9ca3af">Pie servo</text>
