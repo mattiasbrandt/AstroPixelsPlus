@@ -84,9 +84,85 @@ None of these defects would have surfaced through F9/F10 hardware verification �
 
 - **Local build** — clean across all commits (RAM 18.6%, Flash 84.0%).
 - **Local browser smoke** — structural only (pages serve 200, markup well-formed, div balance correct). Interactive UI flow (table render, conflict highlighting, save banner) not driven manually.
-- **Bench boot smoke (USB-only, no PCA9685 attached)** — **passed 2026-05-24** after flashing through `f9fd999`. Single clean POWERON_RESET, both `[Wiring] … config loaded` summary lines fire before `Ready`, no crash loop, no Guru Meditation, WiFi joins and web server comes up on the expected IP. Expected absences: I2C scan finds nothing (no boards), ServoDispatch logs four `Wire.cpp Error 263` probes for the missing PCA9685s and stops. The `[E][Preferences.cpp:50] NOT_FOUND` boot noise was eliminated in `f9fd999`.
-- **Hardware flash + Marcduino compat matrix on full dome** — **pending** (F9 full).
+- **Bench boot smoke (USB-only, no PCA9685 attached)** — **passed 2026-05-24**. Details below.
+- **Hardware flash + Marcduino compat matrix on full dome** — **pending** (F9 full — needs PCA9685 boards + servos to validate command routing end-to-end).
 - **Empirical channel walk-through using the new test UI** — **pending** (F10). MK4 channel defaults in code are best-available information; F10 is the ground-truth confirmation step. Any discrepancy at F10 requires a small correction commit to `defaultPanelCh[]` / `defaultHoloCh[]`.
+
+### Bench boot verification — 2026-05-24
+
+**Setup:** AstroPixels board connected to bench machine via USB only. **No PCA9685 boards attached, no servos wired, no slip-ring connection.** Goal: confirm the firmware boots cleanly with all the wiring-config refactor changes (R1 PROGMEM shift, F1 constants/defaults, F2 boot-time NVS load + setServo overrides before `SetupEvent::ready()`, F5 holo sweep state machine in `mainLoop()`, logging-overhaul `LogCapture` relocation) and that no crash loop or panic frame appears.
+
+**Flow:** `pio run -e astropixelsplus -t upload` → `-t uploadfs` → reset via DTR pulse → capture 18 s of serial @ 115200.
+
+**Captured boot log (cleaned of timestamps where irrelevant):**
+
+```
+ets Jul 29 2019 12:21:46
+
+rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
+...
+entry 0x400805f0
+R2D2 - May 24 2026 - ESP: [2.0.5]
+
+=== I2C DIAGNOSTICS ===
+Initializing I2C on SDA=21, SCL=22
+===========================================
+Scanning I2C addresses 0x01-0x7E...
+Expected: 0x40 (Panels), 0x41 (Holos)
+===========================================
+❌ NO I2C DEVICES FOUND!
+=== END I2C DIAGNOSTICS ===
+
+[Wiring] Panel config loaded: 11 active, 2 inactive (NVS overrides: 0 channel, 0 active flag)
+[Wiring] Holo config loaded: 6 active, 0 inactive (NVS overrides: 0 channel, 0 active flag)
+[  1307][E][Wire.cpp:513] requestFrom(): i2cRead returned Error 263
+[  2308][E][Wire.cpp:513] requestFrom(): i2cRead returned Error 263
+[  3308][E][Wire.cpp:513] requestFrom(): i2cRead returned Error 263
+[  4309][E][Wire.cpp:513] requestFrom(): i2cRead returned Error 263
+Local sound execution disabled by preference
+Ready
+COMMAND: HPS9
+COMMAND: HPS9
+COMMAND: HPS9
+Joining: protoWifi4
+WifiMarcduinoReceiverBase.wifiConnected
+Connect to http://10.0.0.21
+[AsyncWeb] Server started on port 80
+[BodyLink] UDP listener started on port 4901
+[BodyLink] mDNS hostname: astropixelsplus
+```
+
+**Pass/fail checklist:**
+
+| Check | Result |
+|---|---|
+| Single clean `POWERON_RESET` — no crash loop | ✅ |
+| No Guru Meditation / no panic frame / no auto-restart | ✅ |
+| New build banner shows today's date | ✅ `R2D2 - May 24 2026` |
+| `panelConfigLoad()` runs and logs summary before `Ready` | ✅ |
+| `holoConfigLoad()` runs and logs summary before `Ready` | ✅ |
+| MK4 defaults applied (0 NVS overrides — namespaces empty on fresh dome) | ✅ |
+| `static_assert` for `servoSettings[]` size would have failed the build if drift | ✅ (built clean) |
+| `[E][Preferences.cpp:50] NOT_FOUND` noise gone after `f9fd999` | ✅ — log goes straight from `END I2C DIAGNOSTICS` to `[Wiring] Panel config loaded` |
+| WiFi joins configured network, web server reaches operational state | ✅ — `Connect to http://10.0.0.21`, `[AsyncWeb] Server started on port 80` |
+| Body link layer initialises | ✅ — UDP listener + mDNS up |
+| `holo_boot_loop` pref still fires `HPS9` autonomous holo mode | ✅ (pre-existing behaviour preserved) |
+
+**Expected absences (not regressions — explained by the USB-only bench setup):**
+
+- I2C scan finds zero devices (no PCA9685 boards connected)
+- Four `[E][Wire.cpp:513] Error 263` lines spaced ~1 s apart — ReelTwo `ServoDispatchPCA9685` probing for the missing boards. Stops after ~4 attempts.
+- No physical servo movement (nothing wired). Cannot validate `:OP01` actually drives panel CH1 here — that's F10's job.
+
+**What this bench verification does NOT cover:**
+
+- Whether `:OPnn` commands route to the *correct physical* panel after the R1 channel-mapping fix (needs PCA9685 + servos)
+- Whether the holo sweep test produces visible motion on the right axis (needs holo board + projector servos)
+- Whether the `command_compat_matrix.py` regression suite passes on a wired dome
+- Whether saving a wiring config and rebooting actually re-routes a panel as expected
+- All the operator-flow assertions from the spec's Verification Steps section
+
+Those remain in F9 (full) / F10 and need the dome reconnected.
 
 ### Operator-visible logging summary
 
