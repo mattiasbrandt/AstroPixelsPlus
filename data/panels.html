@@ -640,10 +640,17 @@
           actCb.addEventListener('change', function() {
             slot.active = actCb.checked;
             updateRowEnabled(tr, slot);
-            // If we just deactivated an active test row, cancel its visual state.
+            // If we just deactivated the currently-testing row, stop the
+            // board FIRST. Resetting only the visual state would leave the
+            // panel held open under PWM after the row goes inactive.
             if (!slot.active && activeTestIdx === idx) {
-              resetTestButton(tr.querySelector('button'));
-              activeTestIdx = -1;
+              window.apiPost('/api/servo/stop', {
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ board: BOARD })
+              }).finally(function() {
+                resetTestButton(tr.querySelector('button'));
+                activeTestIdx = -1;
+              });
             }
             revalidate();
           });

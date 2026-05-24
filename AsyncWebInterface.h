@@ -610,8 +610,19 @@ static bool wiringConfigParseBody(const String &body, int expectedSlots,
         int idxColon = slot.indexOf(':', idxKey);
         int chColon  = slot.indexOf(':', chKey);
         int actColon = slot.indexOf(':', actKey);
-        long idxVal  = strtol(slot.c_str() + idxColon + 1, nullptr, 10);
-        long chVal   = strtol(slot.c_str() + chColon + 1, nullptr, 10);
+        // Use end-pointer form of strtol so we can detect "not a number" inputs
+        // — strtol returns 0 for both "0" and "bad"/"true"/"\"5\"", and without
+        // checking that the cursor advanced we'd silently accept channel 0 for
+        // any garbage value. Reject if no digit was consumed.
+        const char *idxStart = slot.c_str() + idxColon + 1;
+        const char *chStart  = slot.c_str() + chColon  + 1;
+        char *idxEnd = nullptr;
+        char *chEnd  = nullptr;
+        long idxVal  = strtol(idxStart, &idxEnd, 10);
+        long chVal   = strtol(chStart,  &chEnd,  10);
+        if (idxEnd == idxStart) { errMsg = "index must be a number at slot " + String(parsed); return false; }
+        if (chEnd  == chStart)  { errMsg = "channel must be a number at slot " + String(parsed); return false; }
+
         String actStr = slot.substring(actColon + 1);
         actStr.trim();
         bool actVal;
@@ -667,26 +678,30 @@ static bool wiringConfigCheckConflicts(int slotCount, const uint8_t *channels,
     return true;
 }
 
-// Atomic NVS write — opens the namespace read/write, writes all pairs, closes.
-// If the call returns true, every key was written; if false, the namespace may
-// be partially updated (NVS does not transact across keys), but validation runs
-// FIRST so we only reach this path with a fully-valid payload.
+// Atomic-ish NVS write — opens the namespace read/write, writes all pairs,
+// closes. Each Preferences.put*() call returns the number of bytes written;
+// 0 means the flash write failed (out of space, NVS corrupt, etc.). We bail
+// at the first failure so the caller can report a 500 instead of silently
+// claiming success. The namespace MAY be left partially updated on failure
+// (NVS doesn't transact across keys) — the next successful save corrects it,
+// and the GET endpoint always returns the current persisted state.
 static bool wiringConfigSave(const char *ns, const char *chFmt, const char *actFmt,
                               int slotCount, const uint8_t *channels, const bool *actives)
 {
     Preferences prefs;
     if (!prefs.begin(ns, false)) return false;
-    for (int i = 0; i < slotCount; i++)
+    bool allOk = true;
+    for (int i = 0; i < slotCount && allOk; i++)
     {
         char keyC[12];
         char keyA[12];
         snprintf(keyC, sizeof(keyC), chFmt, i);
         snprintf(keyA, sizeof(keyA), actFmt, i);
-        prefs.putUChar(keyC, channels[i]);
-        prefs.putBool(keyA,  actives[i]);
+        if (prefs.putUChar(keyC, channels[i]) == 0) allOk = false;
+        if (allOk && prefs.putBool(keyA, actives[i]) == 0) allOk = false;
     }
     prefs.end();
-    return true;
+    return allOk;
 }
 
 // ---------------------------------------------------------------
@@ -811,7 +826,12 @@ static bool servoTestParseBody(const String &body, bool &outIsPanels, int &outCh
         int chKey = body.indexOf("\"channel\"");
         if (chKey < 0) { errMsg = "missing channel"; return false; }
         int chColon = body.indexOf(':', chKey);
-        long chVal = strtol(body.c_str() + chColon + 1, nullptr, 10);
+        // End-pointer form so a non-numeric value ("bad", true, "5" as string)
+        // is rejected instead of silently parsed as 0 and pulsing CH0.
+        const char *chStart = body.c_str() + chColon + 1;
+        char *chEnd = nullptr;
+        long chVal = strtol(chStart, &chEnd, 10);
+        if (chEnd == chStart) { errMsg = "channel must be a number"; return false; }
         if (chVal < 0 || chVal > 15) { errMsg = "channel out of range (0-15)"; return false; }
         outChannel = (int)chVal;
     }

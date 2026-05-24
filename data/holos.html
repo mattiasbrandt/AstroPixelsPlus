@@ -627,9 +627,18 @@
         actCb.addEventListener('change', function() {
           slot.active = actCb.checked;
           updateRowEnabled(tr, slot);
+          // If we just deactivated the currently-sweeping row, stop the
+          // board FIRST. Otherwise the holo sweep state machine in mainLoop()
+          // keeps flipping phases on this channel even though the row is now
+          // inactive.
           if (!slot.active && activeTestIdx === idx) {
-            resetTestButton(tr.querySelector('button'));
-            activeTestIdx = -1;
+            window.apiPost('/api/servo/stop', {
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ board: BOARD })
+            }).finally(function() {
+              resetTestButton(tr.querySelector('button'));
+              activeTestIdx = -1;
+            });
           }
           revalidate();
         });
