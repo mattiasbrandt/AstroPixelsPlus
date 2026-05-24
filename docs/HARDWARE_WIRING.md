@@ -5,17 +5,25 @@
 
 ## Table of Contents
 
+**Common wiring (every dome needs these):**
+
 1. [PCA9685 Servo Controller Wiring](#1-pca9685-servo-controller-wiring)
-2. [FireStrip — WS2812B LED Strip](#2-firestrip--ws2812b-led-strip)
-3. [BadMotivator — Smoke Generator](#3-badmotivator--smoke-generator)
-4. [CBI — Charge Bay Indicator](#4-cbi--charge-bay-indicator)
-5. [DataPanel — Data Panel](#5-datapanel--data-panel)
-6. [CBI + DataPanel Combined Chain](#6-cbi--datapanel-combined-chain)
-7. [Power Budget](#7-power-budget)
-8. [Pin Conflict Reference](#8-pin-conflict-reference)
-9. [Enabling Gadgets in Firmware](#9-enabling-gadgets-in-firmware)
-10. [Troubleshooting](#10-troubleshooting)
-11. [Body Link — Serial Connection via Slip Ring](#11-body-link--serial-connection-via-slip-ring)
+2. [Body Link — Serial Connection via Slip Ring](#2-body-link--serial-connection-via-slip-ring)
+
+**Optional gadgets:**
+
+3. [FireStrip — WS2812B LED Strip](#3-firestrip--ws2812b-led-strip)
+4. [BadMotivator — Smoke Generator](#4-badmotivator--smoke-generator)
+5. [CBI — Charge Bay Indicator](#5-cbi--charge-bay-indicator)
+6. [DataPanel — Data Panel](#6-datapanel--data-panel)
+7. [CBI + DataPanel Combined Chain](#7-cbi--datapanel-combined-chain)
+
+**Reference / cross-cutting:**
+
+8. [Power Budget](#8-power-budget)
+9. [Pin Conflict Reference](#9-pin-conflict-reference)
+10. [Enabling Gadgets in Firmware](#10-enabling-gadgets-in-firmware)
+11. [Troubleshooting](#11-troubleshooting)
 
 ---
 
@@ -343,7 +351,152 @@ All labels use printed-droid / Mr. Baddeley panel numbers throughout — firmwar
 
 ---
 
-## 2. FireStrip — WS2812B LED Strip
+## 2. Body Link — Serial Connection via Slip Ring
+
+**Purpose:** Bidirectional UART link between the AstroPixelsPlus dome controller and the body controller (protoArtoo), routed through the dome slip ring. Used for heartbeat keepalive, sleep/wake sync, and dome-to-body command forwarding (sounds, mood changes).
+
+This is the most common wiring after the servo boards — almost every R2 with a separate body controller uses it.
+
+### Which serial port — Serial2, not Serial or Serial1
+
+The AstroPixels board has three hardware serial ports. **Use Serial2 exclusively** for the body link:
+
+| Port | GPIO pins | Used for | Notes |
+|---|---|---|---|
+| **Serial (UART0)** | GPIO 1 (TX), GPIO 3 (RX) | USB / debug monitor | Never wire external devices here |
+| **Serial1** | GPIO 18 (RX), GPIO 19 (TX) | DFPlayer sound module (AUX4/AUX5) | Conflicts with FireStrip / BadMotivator |
+| **Serial2** ✅ | **GPIO 16 (RX)**, **GPIO 17 (TX)** | **Body link + Marcduino** | **This is the correct port** |
+
+> **Common doubt:** The AstroPixels board has a header labelled "Serial" (or "UART") and one labelled "Serial2". Wire the slip ring to the **Serial2 header** (GPIO 16/17). Wiring into the wrong header will result in no communication — the dome will not receive body heartbeats and the body link will stay disconnected.
+
+---
+
+### Serial2 header pinout — `G V R T`
+
+The Serial2 header on the AstroPixels board is a **4-pin block** silk-screened
+left-to-right as `G V R T`:
+
+| Pin label | Meaning | Body link use |
+|---|---|---|
+| **G** | GND | ✅ Connect to slip-ring GND wire |
+| **V** | 5 V | ❌ **Leave unconnected** for body link (see note below) |
+| **R** | RX (GPIO 16) | ✅ Connect to the slip-ring wire that routes to the body controller's **TX** |
+| **T** | TX (GPIO 17) | ✅ Connect to the slip-ring wire that routes to the body controller's **RX** |
+
+A standard 3-wire UART slip-ring cable (GND + RX + TX) uses **three of the four header pins** — the `V` pin stays open.
+
+> ⚠️ **Do not connect `V` for the body link.** protoArtoo has its own power supply; no power needs to cross the slip ring. Routing 5 V through a slip-ring channel is also wasteful (slip-ring channels are a finite resource) and risks back-feeding voltage between systems if the body and dome have separate, mismatched supplies. The `V` pin is provided for builders who want to power a small UART peripheral *locally* on the Serial2 header — not for slip-ring use.
+
+---
+
+### How Serial2 is shared between Marcduino and body link
+
+Serial2 serves two purposes that coexist:
+
+1. **Marcduino hardware input** — a hardware Marcduino controller (e.g. Teeces, body main) can send `:OP01`, `$R`, etc. commands to the dome over this line.
+2. **Body link UART** — the protoArtoo body controller sends heartbeat probes (`#PAHB`) and receives dome heartbeats (`#APHB`) over the same wires through the slip ring.
+
+**When body link is enabled**, `marcduinoSerial.setStream()` is explicitly cleared in firmware so that ReelTwo's Marcduino serial driver does not compete with the body link handler for the Serial2 buffer. The body link handler (`handleBodySerial()`) reads Serial2 directly and intercepts heartbeat messages before dispatching anything else to the Marcduino command processor. Hardware Marcduino over Serial2 is therefore **not available simultaneously with body link** — if you need both, use the WiFi command path (`/api/cmd`) for hardware controller commands.
+
+---
+
+### Transport priority: UART primary, WiFi fallback
+
+The body link supports two transports:
+
+| Transport | Trigger | Notes |
+|---|---|---|
+| **UART (primary)** | Body heartbeat received on Serial2 within 5 s | Slip ring wired, body sending `#PAHB` |
+| **WiFi/UDP (fallback)** | UART heartbeat stales (no `#PAHB` for > 5 s) | Dome and body on same WiFi network |
+
+The active transport is reported in `/api/health` → `body_link.transport` and shown in the web UI serial page badge (`Connected (UART)` / `Connected (WiFi)`).
+
+> If the slip ring is disconnected or noisy, the link automatically falls back to WiFi within a few seconds — no reboot needed.
+
+---
+
+### Wiring diagram — Serial2 via slip ring
+
+```
+AstroPixels Board (dome)               Slip Ring              Body Controller (protoArtoo)
+┌──────────────────────┐              ┌─────────┐             ┌──────────────────────┐
+│  Serial2 header      │              │         │             │                      │
+│  ┌───┬───┬───┬───┐   │              │         │             │                      │
+│  │ G │ V │ R │ T │   │              │         │             │                      │
+│  └─┬─┴─×─┴─┬─┴─┬─┘   │              │         │             │                      │
+│    │   │   │   │     │              │         │             │                      │
+│    │   │   │   └─────┤──TX──────────┤ ring ch ├──────RX─────┤ Serial2 RX (body)    │
+│    │   │   │         │              │         │             │                      │
+│    │   │   └─────────┤──RX──────────┤ ring ch ├──────TX─────┤ Serial2 TX (body)    │
+│    │   │             │              │         │             │                      │
+│    │   ┄ (unused)    │              │         │             │                      │
+│    │                 │              │         │             │                      │
+│    └─────────────────┤──GND─────────┤ ring ch ├──────GND────┤ GND                  │
+│                      │              │         │             │                      │
+└──────────────────────┘              └─────────┘             └──────────────────────┘
+```
+
+> **TX/RX cross-connect:** Dome TX → body RX, body TX → dome RX. This is standard UART — TX of one side connects to RX of the other. Wiring TX→TX or RX→RX is a common mistake and produces no communication.
+
+**Connection table:**
+
+| Dome header pin | Slip ring | Body controller pin | Wire gauge |
+|---|---|---|---|
+| `T` — GPIO 17 (Serial2 TX) | Channel A | UART RX | 24–26 AWG |
+| `R` — GPIO 16 (Serial2 RX) | Channel B | UART TX | 24–26 AWG |
+| `G` — GND | Channel C | GND (common) | 22–24 AWG |
+| `V` — 5 V | — | (not connected) | — |
+
+> ⚠️ **Common ground required.** The dome and body must share a GND reference through the slip ring — even if they have separate power supplies. Without a common GND, UART voltage levels are undefined and communication will be unreliable or absent.
+
+---
+
+### Baud rate
+
+Serial2 runs at **2400 baud** — the standard Marcduino baud rate. This is set in firmware at boot:
+
+```cpp
+#define COMMAND_BAUD_RATE 2400
+Serial2.begin(COMMAND_BAUD_RATE, SERIAL_8N1, SERIAL2_RX_PIN, SERIAL2_TX_PIN);
+```
+
+Both dome and body must use 2400 baud on this link. Do not change this value without matching the body firmware.
+
+---
+
+### Wiring checklist
+
+- [ ] **Correct header used:** wired to the `G V R T` header silk-screened *Serial2*, not the USB/debug Serial header
+- [ ] **`V` pin left unconnected** — only `G`, `R`, and `T` carry the slip-ring cable
+- [ ] **Slip ring channels:** TX, RX, and GND each on their own ring channel — never share GND with a signal channel
+- [ ] **Cross-connect verified:** dome `T` (GPIO 17 TX) → body RX; dome `R` (GPIO 16 RX) → body TX
+- [ ] **Common GND:** body GND connected to dome GND through slip ring
+- [ ] **Body link enabled in firmware:** `mbodylink` preference is `true` (default) — check Setup page
+- [ ] **Power up both boards:** dome health page should show `body_link: connected` within a few seconds
+
+---
+
+### Troubleshooting body link serial
+
+**Body link stays "Waiting" / disconnected:**
+1. Confirm slip ring GND is connected and continuity-tested to both boards.
+2. Verify TX/RX cross-connect — swap if unsure (dome `T`/`R` pins to slip ring, body UART TX/RX from slip ring).
+3. Check `mbodylink` preference on Setup page is enabled.
+4. Open serial monitor on dome (115200 baud) — you should see `[BodyLink] UART heartbeat received` within a few seconds of powering the body.
+5. If no heartbeat: verify body firmware is sending `#PAHB` on its Serial2 TX at 2400 baud.
+
+**Body link shows "Connected (UART)" but commands are not received by body:**
+1. A known issue: if the body is also emitting UART probes on a separate GPIO that routes back to the dome Serial2 RX, the dome may register a UART heartbeat and route all `sendBodyCommand()` calls to UART. Verify the body is not sending probes on a GPIO that arrives at the dome before WiFi is established. See `bodyLinkActiveTransport()` in `BodyLinkWiFi.h`.
+2. Confirm the body is listening on its Serial2 RX at 2400 baud for the dome's outgoing commands.
+
+**Link works but drops intermittently:**
+1. Check slip ring contact quality — rotate the dome manually while monitoring the serial log for heartbeat gaps.
+2. Add a 100 nF decoupling capacitor on the UART signal lines close to the slip ring output connector.
+3. Keep UART signal wires in the slip ring away from high-current servo or motor wires (cross-talk).
+
+---
+
+## 3. FireStrip — WS2812B LED Strip
 
 
 ### What it does
@@ -467,7 +620,7 @@ FireStrip<5> fireStrip;
 
 ---
 
-## 3. BadMotivator — Smoke Generator
+## 4. BadMotivator — Smoke Generator
 
 > **⚠️ SAFETY — READ BEFORE WIRING**
 >
@@ -619,7 +772,7 @@ Or pass the pin directly to the constructor and remove the `PIN_AUX5` dependency
 
 ---
 
-## 4. CBI — Charge Bay Indicator
+## 5. CBI — Charge Bay Indicator
 
 ### What it does
 
@@ -743,7 +896,7 @@ against reversal.
 
 ---
 
-## 5. DataPanel — Data Panel
+## 6. DataPanel — Data Panel
 
 ### What it does
 
@@ -812,7 +965,7 @@ Adjust if you add more devices.
 
 ---
 
-## 6. CBI + DataPanel Combined Chain
+## 7. CBI + DataPanel Combined Chain
 
 ### Daisy-Chain Topology
 
@@ -862,7 +1015,7 @@ bulk bypass.
 
 ---
 
-## 7. Power Budget
+## 8. Power Budget
 
 > **⚠️ Do not power LEDs or relay loads from the AstroPixels board's 5 V pin.**
 > The on-board 5 V regulator is sized for logic only. Use a dedicated external 5 V supply.
@@ -927,7 +1080,7 @@ Example (default FireStrip): `8 * 0.060 * (100/255) ~= 0.19 A` estimated.
 
 ---
 
-## 8. Pin Conflict Reference
+## 9. Pin Conflict Reference
 
 ### AUX4 (GPIO 18) and AUX5 (GPIO 19)
 
@@ -987,7 +1140,7 @@ GPIO 33           — PIN_REAR_LOGIC (RLD WS2812B)
 
 ---
 
-## 9. Enabling Gadgets in Firmware
+## 10. Enabling Gadgets in Firmware
 
 ### platformio.ini Build Flags
 
@@ -1058,7 +1211,7 @@ After flashing with gadgets enabled, verify function over serial or web API:
 
 ---
 
-## 10. Troubleshooting
+## 11. Troubleshooting
 
 ### FireStrip shows no output
 
@@ -1124,122 +1277,5 @@ After flashing with gadgets enabled, verify function over serial or web API:
 - **WS2812B datasheet:** https://cdn-shop.adafruit.com/datasheets/WS2812B.pdf
 
 ---
-
----
-
-## 11. Body Link — Serial Connection via Slip Ring
-
-**Purpose:** Bidirectional UART link between the AstroPixelsPlus dome controller and the body controller (protoArtoo), routed through the dome slip ring. Used for heartbeat keepalive, sleep/wake sync, and dome-to-body command forwarding (sounds, mood changes).
-
-### Which serial port — Serial2, not Serial or Serial1
-
-The AstroPixels board has three hardware serial ports. **Use Serial2 exclusively** for the body link:
-
-| Port | GPIO pins | Used for | Notes |
-|---|---|---|---|
-| **Serial (UART0)** | GPIO 1 (TX), GPIO 3 (RX) | USB / debug monitor | Never wire external devices here |
-| **Serial1** | GPIO 18 (RX), GPIO 19 (TX) | DFPlayer sound module (AUX4/AUX5) | Conflicts with FireStrip / BadMotivator |
-| **Serial2** ✅ | **GPIO 16 (RX)**, **GPIO 17 (TX)** | **Body link + Marcduino** | **This is the correct port** |
-
-> **Common doubt:** The AstroPixels board has a header labelled "Serial" (or "UART") and one labelled "Serial2". Wire the slip ring to the **Serial2 header** (GPIO 16/17). Wiring into the wrong header will result in no communication — the dome will not receive body heartbeats and the body link will stay disconnected.
-
----
-
-### How Serial2 is shared between Marcduino and body link
-
-Serial2 serves two purposes that coexist:
-
-1. **Marcduino hardware input** — a hardware Marcduino controller (e.g. Teeces, body main) can send `:OP01`, `$R`, etc. commands to the dome over this line.
-2. **Body link UART** — the protoArtoo body controller sends heartbeat probes (`#PAHB`) and receives dome heartbeats (`#APHB`) over the same wires through the slip ring.
-
-**When body link is enabled**, `marcduinoSerial.setStream()` is explicitly cleared in firmware so that ReelTwo's Marcduino serial driver does not compete with the body link handler for the Serial2 buffer. The body link handler (`handleBodySerial()`) reads Serial2 directly and intercepts heartbeat messages before dispatching anything else to the Marcduino command processor. Hardware Marcduino over Serial2 is therefore **not available simultaneously with body link** — if you need both, use the WiFi command path (`/api/cmd`) for hardware controller commands.
-
----
-
-### Transport priority: UART primary, WiFi fallback
-
-The body link supports two transports:
-
-| Transport | Trigger | Notes |
-|---|---|---|
-| **UART (primary)** | Body heartbeat received on Serial2 within 5 s | Slip ring wired, body sending `#PAHB` |
-| **WiFi/UDP (fallback)** | UART heartbeat stales (no `#PAHB` for > 5 s) | Dome and body on same WiFi network |
-
-The active transport is reported in `/api/health` → `body_link.transport` and shown in the web UI serial page badge (`Connected (UART)` / `Connected (WiFi)`).
-
-> If the slip ring is disconnected or noisy, the link automatically falls back to WiFi within a few seconds — no reboot needed.
-
----
-
-### Wiring diagram — Serial2 via slip ring
-
-```
-AstroPixels Board (dome)               Slip Ring              Body Controller (protoArtoo)
-┌──────────────────────┐              ┌─────────┐             ┌──────────────────────┐
-│                      │              │         │             │                      │
-│  GPIO 17 (Serial2 TX)├──TX──────────┤ ring ch ├──────RX─────┤ Serial2 RX (body)    │
-│                      │              │         │             │                      │
-│  GPIO 16 (Serial2 RX)├──RX──────────┤ ring ch ├──────TX─────┤ Serial2 TX (body)    │
-│                      │              │         │             │                      │
-│  GND                 ├──GND─────────┤ ring ch ├──────GND────┤ GND                  │
-│                      │              │         │             │                      │
-└──────────────────────┘              └─────────┘             └──────────────────────┘
-```
-
-> **TX/RX cross-connect:** Dome TX → body RX, body TX → dome RX. This is standard UART — TX of one side connects to RX of the other. Wiring TX→TX or RX→RX is a common mistake and produces no communication.
-
-**Connection table:**
-
-| Dome pin | Slip ring | Body controller pin | Wire gauge |
-|---|---|---|---|
-| GPIO 17 (Serial2 TX) | Channel A | UART RX | 24–26 AWG |
-| GPIO 16 (Serial2 RX) | Channel B | UART TX | 24–26 AWG |
-| GND | Channel C | GND (common) | 22–24 AWG |
-
-> ⚠️ **Common ground required.** The dome and body must share a GND reference through the slip ring — even if they have separate power supplies. Without a common GND, UART voltage levels are undefined and communication will be unreliable or absent.
-
----
-
-### Baud rate
-
-Serial2 runs at **2400 baud** — the standard Marcduino baud rate. This is set in firmware at boot:
-
-```cpp
-#define COMMAND_BAUD_RATE 2400
-Serial2.begin(COMMAND_BAUD_RATE, SERIAL_8N1, SERIAL2_RX_PIN, SERIAL2_TX_PIN);
-```
-
-Both dome and body must use 2400 baud on this link. Do not change this value without matching the body firmware.
-
----
-
-### Wiring checklist
-
-- [ ] **Slip ring channels:** TX, RX, and GND each on their own ring channel — never share GND with a signal channel
-- [ ] **Cross-connect verified:** dome GPIO 17 TX → body RX; dome GPIO 16 RX → body TX
-- [ ] **Common GND:** body GND connected to dome GND through slip ring
-- [ ] **Serial2 header used:** wired to the GPIO 16/17 header, not the USB/debug Serial header
-- [ ] **Body link enabled in firmware:** `mbodylink` preference is `true` (default) — check Setup page
-- [ ] **Power up both boards:** dome health page should show `body_link: connected` within a few seconds
-
----
-
-### Troubleshooting body link serial
-
-**Body link stays "Waiting" / disconnected:**
-1. Confirm slip ring GND is connected and continuity-tested to both boards.
-2. Verify TX/RX cross-connect — swap if unsure (dome GPIO 16/17 to slip ring, body UART TX/RX from slip ring).
-3. Check `mbodylink` preference on Setup page is enabled.
-4. Open serial monitor on dome (115200 baud) — you should see `[BodyLink] UART heartbeat received` within a few seconds of powering the body.
-5. If no heartbeat: verify body firmware is sending `#PAHB` on its Serial2 TX at 2400 baud.
-
-**Body link shows "Connected (UART)" but commands are not received by body:**
-1. A known issue: if the body is also emitting UART probes on a separate GPIO that routes back to the dome Serial2 RX, the dome may register a UART heartbeat and route all `sendBodyCommand()` calls to UART. Verify the body is not sending probes on a GPIO that arrives at the dome before WiFi is established. See `bodyLinkActiveTransport()` in `BodyLinkWiFi.h`.
-2. Confirm the body is listening on its Serial2 RX at 2400 baud for the dome's outgoing commands.
-
-**Link works but drops intermittently:**
-1. Check slip ring contact quality — rotate the dome manually while monitoring the serial log for heartbeat gaps.
-2. Add a 100 nF decoupling capacitor on the UART signal lines close to the slip ring output connector.
-3. Keep UART signal wires in the slip ring away from high-current servo or motor wires (cross-talk).
 
 *Generated from firmware analysis of AstroPixelsPlus + Reeltwo `23.5.3` source.*
