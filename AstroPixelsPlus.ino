@@ -556,6 +556,25 @@ static void panelConfigLoad()
         uint16_t end     = servoDispatch.getEnd(i);
         uint16_t neutral = servoDispatch.getNeutral(i);
 
+        // Operator-visible safety check: an enabled panel with no command
+        // routing won't move when any Marcduino panel command is sent. This
+        // only fires if a future firmware edit drops the group bits — it
+        // should never trigger on the shipped MK4 defaults.
+        if (active && group == 0)
+        {
+            static const char *kLabels[NUM_PANEL_SLOTS] = {
+                "P1", "P2", "P3", "P4", "P7", "P11", "P13",
+                "PP5", "PP1", "PP2", "PP4", "PP6", "PP3",
+            };
+            Serial.print(F("[Wiring] Warning: panel "));
+            Serial.print(kLabels[i]);
+            Serial.println(F(" is enabled in the wiring config but won't respond "
+                             "to any open/close commands. Either uncheck it in "
+                             "the Servo Wiring Config (if no servo is wired) or "
+                             "ask the firmware maintainer to restore its command "
+                             "group bits."));
+        }
+
         servoDispatch.setServo(i, pin, start, end, neutral, group);
     }
     prefs.end();
@@ -590,6 +609,25 @@ static void holoConfigLoad()
         uint16_t start   = servoDispatch.getStart(i);
         uint16_t end     = servoDispatch.getEnd(i);
         uint16_t neutral = servoDispatch.getNeutral(i);
+
+        // Operator-visible safety check: an enabled holo axis with no command
+        // routing won't move when any holo command (*HP / *RD / *HN) is sent.
+        // Only fires if a future firmware edit drops the group bits.
+        if (active && group == 0)
+        {
+            static const char *kLabels[NUM_HOLO_SLOTS] = {
+                "FHP horizontal", "FHP vertical",
+                "THP horizontal", "THP vertical",
+                "RHP vertical",   "RHP horizontal",
+            };
+            Serial.print(F("[Wiring] Warning: holo "));
+            Serial.print(kLabels[slotIdx]);
+            Serial.println(F(" is enabled in the wiring config but won't "
+                             "respond to any holo commands. Either uncheck "
+                             "it in the Holo Wiring Config (if no servo is "
+                             "wired) or ask the firmware maintainer to "
+                             "restore its command group bits."));
+        }
 
         servoDispatch.setServo(i, pin, start, end, neutral, group);
     }
