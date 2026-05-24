@@ -559,23 +559,40 @@
       }
 
       window.loadHoloWiring = function() {
-        loading.style.display = '';
-        errorEl.style.display = 'none';
-        tableWrap.style.display = 'none';
-        saveResult.textContent = '';
-        fetch('/api/holos/config').then(function(r) {
-          if (!r.ok) throw new Error('HTTP ' + r.status);
-          return r.json();
-        }).then(function(j) {
-          slots = j.slots || [];
-          renderTable();
-          loading.style.display = 'none';
-          tableWrap.style.display = '';
-        }).catch(function(err) {
-          loading.style.display = 'none';
-          errorEl.textContent = 'Failed to load config: ' + err.message;
-          errorEl.style.display = '';
-        });
+        // If a sweep is currently active, stop it BEFORE re-rendering. The
+        // table is about to wipe every row's button state, but the holo
+        // sweep state machine in mainLoop() would otherwise keep flipping
+        // phases on the channel the row used to point at.
+        function doFetch() {
+          loading.style.display = '';
+          errorEl.style.display = 'none';
+          tableWrap.style.display = 'none';
+          saveResult.textContent = '';
+          fetch('/api/holos/config').then(function(r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+          }).then(function(j) {
+            slots = j.slots || [];
+            renderTable();
+            loading.style.display = 'none';
+            tableWrap.style.display = '';
+          }).catch(function(err) {
+            loading.style.display = 'none';
+            errorEl.textContent = 'Failed to load config: ' + err.message;
+            errorEl.style.display = '';
+          });
+        }
+        if (activeTestIdx >= 0) {
+          window.apiPost('/api/servo/stop', {
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ board: BOARD })
+          }).finally(function() {
+            activeTestIdx = -1;
+            doFetch();
+          });
+        } else {
+          doFetch();
+        }
       };
 
       function renderTable() {
