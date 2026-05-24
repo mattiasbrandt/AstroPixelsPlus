@@ -586,9 +586,16 @@
           window.apiPost('/api/servo/stop', {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ board: BOARD })
-          }).finally(function() {
+          }).then(function(r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
             activeTestIdx = -1;
             doFetch();
+          }).catch(function(err) {
+            // Stop failed — do NOT reload. Sweep is still running server-side;
+            // re-rendering the table now would lie about the dome's state.
+            if (window.uiToast) window.uiToast('Reload aborted: stop failed (' + err.message +
+              ') — sweep may still be running. Click Stop on the active row, then Reload.', 'error');
+            else alert('Reload aborted: stop failed (' + err.message + ') — sweep may still be running.');
           });
         } else {
           doFetch();
@@ -642,21 +649,34 @@
         actCb.type = 'checkbox';
         actCb.checked = !!slot.active;
         actCb.addEventListener('change', function() {
-          slot.active = actCb.checked;
-          updateRowEnabled(tr, slot);
           // If we just deactivated the currently-sweeping row, stop the
-          // board FIRST. Otherwise the holo sweep state machine in mainLoop()
-          // keeps flipping phases on this channel even though the row is now
-          // inactive.
-          if (!slot.active && activeTestIdx === idx) {
+          // board FIRST. Only commit the uncheck after the stop succeeds —
+          // otherwise the row would show inactive while the holo sweep
+          // state machine keeps flipping phases on this channel.
+          if (!actCb.checked && activeTestIdx === idx) {
             window.apiPost('/api/servo/stop', {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ board: BOARD })
-            }).finally(function() {
+            }).then(function(r) {
+              if (!r.ok) throw new Error('HTTP ' + r.status);
+              slot.active = false;
+              updateRowEnabled(tr, slot);
               resetTestButton(tr.querySelector('button'));
               activeTestIdx = -1;
+              revalidate();
+            }).catch(function(err) {
+              // Stop failed — revert the uncheck so the row visibly
+              // reflects that the sweep is still active server-side.
+              actCb.checked = true;
+              slot.active = true;
+              if (window.uiToast) window.uiToast('Could not deactivate ' + (slot.label || 'slot') +
+                ': stop failed (' + err.message + '). Sweep is still running — click Stop on the row first.', 'error');
+              else alert('Could not deactivate: ' + err.message);
             });
+            return;
           }
+          slot.active = actCb.checked;
+          updateRowEnabled(tr, slot);
           revalidate();
         });
         actTd.appendChild(actCb);
@@ -756,12 +776,20 @@
 
       function handleTestClick(idx, btn) {
         if (btn.dataset.testing === '1') {
+          // Currently sweeping — stop it. Only reset the button after the
+          // server confirms the stop. On failure, keep the button as
+          // ■ Stop so the operator can retry; the sweep is still running.
           window.apiPost('/api/servo/stop', {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ board: BOARD })
-          }).finally(function() {
+          }).then(function(r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
             resetTestButton(btn);
             if (activeTestIdx === idx) activeTestIdx = -1;
+          }).catch(function(err) {
+            if (window.uiToast) window.uiToast('Stop failed: ' + err.message +
+              ' — sweep may still be running. Retry.', 'error');
+            else alert('Stop failed: ' + err.message + ' — sweep may still be running.');
           });
           return;
         }
