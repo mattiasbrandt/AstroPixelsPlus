@@ -492,11 +492,11 @@ $42\r    → Play track 42
 
 | Command | Name | Description |
 |---------|------|-------------|
-| `:SE10\r` | Quiet Mode | Sleep mode entry |
-| `:SE11\r` | Full Awake | Full awake mode |
+| `:SE10\r` | Quiet Mode | Sound stopped, holos idle, no panel motion |
+| `:SE11\r` | Full Awake | Full awake mode, no panel motion |
 | `:SE12\r` | Top Showcase | Top panels demo |
-| `:SE13\r` | Mid Awake | Mid awake mode |
-| `:SE14\r` | Awake Plus | Awake+ mode |
+| `:SE13\r` | Mid Awake | Mid awake mode, no panel motion |
+| `:SE14\r` | Awake Plus | Awake+ mode, no panel motion |
 | `:SE15\r` | Scream No Panels | Scream without panels |
 | `:SE16\r` | Panel Wiggle | Panel wiggle animation |
 

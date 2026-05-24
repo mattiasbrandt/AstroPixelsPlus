@@ -199,6 +199,10 @@ nav a.active {
   border-color: var(--accent-bright);
   box-shadow: 0 0 0 2px rgba(106,176,255,0.28), 0 4px 10px rgba(0,0,0,0.28);
 }
+.btn.is-current-mood {
+  border-color: var(--accent-bright);
+  box-shadow: 0 0 0 2px rgba(106,176,255,0.28), 0 4px 10px rgba(0,0,0,0.28);
+}
 .btn.is-fired { animation: btnPulse 240ms ease-out; }
 
 @keyframes btnPulse {
@@ -252,11 +256,13 @@ nav a.active {
   transform: translateY(-1px);
 }
 .mood-btn:active { transform: scale(0.96); }
-.mood-btn.accent {
+.mood-btn.accent,
+.mood-btn.is-current-mood {
   background: rgba(74,144,217,0.15);
   border-color: var(--accent);
 }
-.mood-btn.accent .mood-label { color: var(--accent-bright); }
+.mood-btn.accent .mood-label,
+.mood-btn.is-current-mood .mood-label { color: var(--accent-bright); }
 .mood-btn.danger {
   background: rgba(232,84,84,0.1);
   border-color: #5a2a2a;

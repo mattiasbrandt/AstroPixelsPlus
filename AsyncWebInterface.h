@@ -419,6 +419,8 @@ static String buildStateJson()
     json += ",\"soundLocalEnabled\":" + String(soundLocalEnabled ? "true" : "false");
     json += ",\"sleepMode\":" + String(sSleepModeActive ? "true" : "false");
     json += ",\"sleepSinceMs\":" + String(sSleepModeSinceMs);
+    json += ",\"mood\":{\"command\":\"" + String(sCurrentMoodCmd) + "\"";
+    json += ",\"name\":\"" + String(currentMoodName()) + "\"}";
     int soundPref = preferences.getInt("msound", MARC_SOUND_PLAYER);
     bool soundModuleEnabled = (soundLocalEnabled && soundPref != 0);
     json += ",\"soundModuleEnabled\":" + String(soundModuleEnabled ? "true" : "false");
@@ -1232,6 +1234,7 @@ static void initAsyncWeb()
             }
             logCapture.printf("[API] cmd=%s len=%u\n", cmd.c_str(), (unsigned int)cmd.length());
             processMarcduinoCommandWithSource("astropixel-web-api", cmd.c_str());
+            broadcastState();
             request->send(200, "application/json", "{\"ok\":true}");
         }
         else
@@ -2136,6 +2139,92 @@ static void initAsyncWeb()
                 if (Update.end(true))
                 {
                     logCapture.println("Update Success. Rebooting...");
+                }
+                else
+                {
+                    Update.printError(Serial);
+                    otaUploadFailed = true;
+                }
+            }
+        });
+
+    // ---- Filesystem upload (SPIFFS OTA via web) ----
+    asyncServer.on("/upload/filesystem", HTTP_POST,
+        [](AsyncWebServerRequest *request)
+        {
+            if (!checkWriteAuth(request))
+            {
+                request->send(401, "text/plain", "Unauthorized");
+                return;
+            }
+            otaInProgress = false;
+            if (otaUploadFailed || Update.hasError())
+            {
+                request->send(500, "text/plain", "Filesystem update FAILED");
+                FLD.selectSequence(LogicEngineDefaults::FAILURE);
+                FLD.setTextMessage("FS Flash Fail");
+                FLD.selectSequence(LogicEngineDefaults::TEXTSCROLLLEFT,
+                                   LogicEngineRenderer::kRed, 1, 0);
+            }
+            else
+            {
+                request->send(200, "text/plain", "Filesystem update OK - Rebooting...");
+                scheduleReboot(1000);
+            }
+        },
+        [](AsyncWebServerRequest *request, const String &filename,
+           size_t index, uint8_t *data, size_t len, bool final)
+        {
+            if (index == 0)
+            {
+                otaInProgress = true;
+                otaUploadFailed = false;
+                unmountFileSystems();
+                FLD.selectSequence(LogicEngineDefaults::NORMAL);
+                RLD.selectSequence(LogicEngineDefaults::NORMAL);
+                FLD.setEffectWidthRange(0);
+                RLD.setEffectWidthRange(0);
+                logCapture.printf("Filesystem update: %s\n", filename.c_str());
+                if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_SPIFFS))
+                {
+                    Update.printError(Serial);
+                    logCapture.println("Filesystem update begin failed");
+                    otaUploadFailed = true;
+                    return;
+                }
+            }
+            if (otaUploadFailed)
+            {
+                return;
+            }
+            if (len)
+            {
+                if (Update.write(data, len) != len)
+                {
+                    Update.printError(Serial);
+                    logCapture.println("Filesystem update write failed");
+                    otaUploadFailed = true;
+                    return;
+                }
+                if (request->contentLength() > 0)
+                {
+                    float range = (float)(index + len) / (float)request->contentLength();
+                    FLD.setEffectWidthRange(range);
+                    RLD.setEffectWidthRange(range);
+                    broadcastOtaProgress(range);
+                }
+            }
+            if (final)
+            {
+                logCapture.printf("Filesystem update complete: %u bytes\n", index + len);
+                if (otaUploadFailed)
+                {
+                    logCapture.println("Filesystem update aborted after previous write error");
+                    return;
+                }
+                if (Update.end(true))
+                {
+                    logCapture.println("Filesystem update success. Rebooting...");
                 }
                 else
                 {

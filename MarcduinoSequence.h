@@ -193,12 +193,14 @@ MARCDUINO_ANIMATION(DiscoSequence, :SE09)
 ////////////////
 
 MARCDUINO_ACTION(QuietModeReset, :SE10, ({
-    // Stop sound, disable holo LEDs, close panels, and return logic displays to normal
+    // Stop sound, disable holo LEDs, and return logic displays to normal.
+    // Mood changes must not drive all panel servos; on the full droid that
+    // can brown out or grind if a panel is already against a stop.
+    setCurrentMoodCommand(":SE10");
     sMarcSound.handleCommand("$s");
-    sendBodyCommand("$s");
+    sendBodyCommand(":SE10");
     CommandEvent::process(F("HPA096"));
-    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, ALL_DOME_PANELS_MASK);
-    schedulePanelRelease(ALL_DOME_PANELS_MASK);
+    schedulePanelRelease(ALL_DOME_PANELS_MASK, 1);
     FLD.selectSequence(LogicEngineRenderer::NORMAL);
     RLD.selectSequence(LogicEngineRenderer::NORMAL);
 }))
@@ -207,12 +209,12 @@ MARCDUINO_ACTION(QuietModeReset, :SE10, ({
 
 MARCDUINO_ACTION(FullAwakeModeReset, :SE11, ({
     // Resume random chatter baseline with holo movement while keeping holo LEDs off
+    setCurrentMoodCommand(":SE11");
     sMarcSound.handleCommand("$R");
-    sendBodyCommand("$R");
+    sendBodyCommand(":SE11");
     CommandEvent::process(F("HPF104\nHPR104\nHPT104\n"));
     CommandEvent::process(F("HPA096"));
-    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, ALL_DOME_PANELS_MASK);
-    schedulePanelRelease(ALL_DOME_PANELS_MASK);
+    schedulePanelRelease(ALL_DOME_PANELS_MASK, 1);
     FLD.selectSequence(LogicEngineRenderer::NORMAL);
     RLD.selectSequence(LogicEngineRenderer::NORMAL);
 }))
@@ -230,12 +232,12 @@ MARCDUINO_ACTION(TopPanelsShowcase, :SE12, ({
 ////////////////
 
 MARCDUINO_ACTION(MidAwakeModeReset, :SE13, ({
-    // Mid-awake mode: random sound baseline, holos stopped, panels closed
+    // Mid-awake mode: random sound baseline, holos stopped, no panel motion
+    setCurrentMoodCommand(":SE13");
     sMarcSound.handleCommand("$R");
-    sendBodyCommand("$R");
+    sendBodyCommand(":SE13");
     CommandEvent::process(F("HPA0000"));
-    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, ALL_DOME_PANELS_MASK);
-    schedulePanelRelease(ALL_DOME_PANELS_MASK);
+    schedulePanelRelease(ALL_DOME_PANELS_MASK, 1);
     FLD.selectSequence(LogicEngineRenderer::NORMAL);
     RLD.selectSequence(LogicEngineRenderer::NORMAL);
 }))
@@ -244,12 +246,12 @@ MARCDUINO_ACTION(MidAwakeModeReset, :SE13, ({
 
 MARCDUINO_ACTION(AwakePlusModeReset, :SE14, ({
     // Awake+ mode: random sound baseline, holo movement enabled, holo LEDs active
+    setCurrentMoodCommand(":SE14");
     sMarcSound.handleCommand("$R");
-    sendBodyCommand("$R");
+    sendBodyCommand(":SE14");
     CommandEvent::process(F("HPF104\nHPR104\nHPT104\n"));
     CommandEvent::process(F("HPA0040"));
-    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, ALL_DOME_PANELS_MASK);
-    schedulePanelRelease(ALL_DOME_PANELS_MASK);
+    schedulePanelRelease(ALL_DOME_PANELS_MASK, 1);
     FLD.selectSequence(LogicEngineRenderer::NORMAL);
     RLD.selectSequence(LogicEngineRenderer::NORMAL);
 }))

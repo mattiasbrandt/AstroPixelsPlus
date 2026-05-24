@@ -26,8 +26,8 @@
       <button class="btn danger" onclick="sendCmd(':SE06')" title="Electrocute/faint sequence with short-circuit effects across logic, holo, smoke, and panels">Electrocute / Faint</button>
       <button class="btn" onclick="sendCmd('$821')" title="Girl On Fire: high-intensity multi-subsystem sequence">Girl On Fire</button>
       <button class="btn" onclick="sendCmd('$815')" title="Harlem Shake: rhythmic dance-style synchronized sequence">Harlem Shake</button>
-      <button class="btn" onclick="sendCmd(':SE14')" title="Awake+ reset profile with movement and active holo LEDs">Awake+</button>
-      <button class="btn danger" onclick="sendCmd(':SE10')" title="Quiet reset: stop sound, holos idle, panels closed">Quiet Reset</button>
+      <button class="btn" data-mood=":SE14" onclick="sendCmd(':SE14')" title="Awake+ reset profile with movement and active holo LEDs">Awake+</button>
+      <button class="btn danger" data-mood=":SE10" onclick="sendCmd(':SE10')" title="Quiet reset: stop sound, holos idle, logics normal">Quiet Reset</button>
       <button class="btn danger" onclick="sendCmd(':SE00')" title="Stop active panel choreography and return to idle">Stop Sequence</button>
     </div>
   </div>
@@ -37,19 +37,19 @@
     <h3>Mood Presets</h3>
     <div class="desc">Set the idle behavior profile for chatter, holo activity, and visual intensity.</div>
     <div class="mood-grid mt-8">
-      <button class="mood-btn" onclick="sendCmd(':SE10')" title="Quiet profile: stop sounds, holos idle, panels closed, logic normal">
-        <span class="mood-icon">😴</span>
+      <button class="mood-btn" data-mood=":SE10" onclick="sendCmd(':SE10')" title="Quiet profile: stop sounds, holos idle, logic normal">
+        <span class="mood-icon">🤐</span>
         <span class="mood-label">Quiet</span>
       </button>
-      <button class="mood-btn" onclick="sendCmd(':SE13')" title="Mid-awake profile: balanced idle activity with restrained motion">
+      <button class="mood-btn" data-mood=":SE13" onclick="sendCmd(':SE13')" title="Mid-awake profile: balanced idle activity with restrained motion">
         <span class="mood-icon">😐</span>
         <span class="mood-label">Mid-Awake</span>
       </button>
-      <button class="mood-btn accent" onclick="sendCmd(':SE11')" title="Full-awake profile: active idle chatter with holo movement baseline">
+      <button class="mood-btn" data-mood=":SE11" onclick="sendCmd(':SE11')" title="Full-awake profile: active idle chatter with holo movement baseline">
         <span class="mood-icon">😄</span>
         <span class="mood-label">Full-Awake</span>
       </button>
-      <button class="mood-btn" onclick="sendCmd(':SE14')" title="Awake+ profile: full-awake plus active holo LED behavior">
+      <button class="mood-btn" data-mood=":SE14" onclick="sendCmd(':SE14')" title="Awake+ profile: full-awake plus active holo LED behavior">
         <span class="mood-icon">🤩</span>
         <span class="mood-label">Awake+</span>
       </button>
@@ -312,6 +312,9 @@
       }
       if (typeof s.sleepMode !== 'undefined') {
         setSleepUi(!!s.sleepMode);
+      }
+      if (typeof updateMoodButtons === 'function') {
+        updateMoodButtons(s);
       }
 
       var html = '';

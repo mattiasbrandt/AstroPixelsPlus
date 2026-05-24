@@ -905,6 +905,10 @@ static float sSoundInitVolume;
 static uint32_t sBodyLastSeenMs  = 0;   // millis() when last #PAHB received (0=never)
 static uint32_t sBodyHeartbeatRx = 0;   // count of #PAHB frames received from body
 static uint32_t sBodyLastTxMs    = 0;   // millis() of last #APHB sent
+static bool sSuppressBodyLinkEgress = false;
+static uint32_t sLastMoodResetMs = 0;
+static char sLastMoodResetCmd[6] = "";
+static char sCurrentMoodCmd[6] = "";
 #include "BodyLinkWiFi.h"
 #include "DomeSequences.h"
 bool dome_PiesOpen   = false;
@@ -917,9 +921,60 @@ static bool bodyLinkConnected()
     return sBodyLastSeenMs > 0 && (millis() - sBodyLastSeenMs) < 5000;
 }
 
+static bool isBodyLinkSource(const char *source)
+{
+    return source != nullptr && strncmp(source, "body-link-", 10) == 0;
+}
+
+static bool isMoodResetCommand(const char *cmd)
+{
+    return cmd != nullptr &&
+        (strcmp(cmd, ":SE10") == 0 ||
+         strcmp(cmd, ":SE11") == 0 ||
+         strcmp(cmd, ":SE13") == 0 ||
+         strcmp(cmd, ":SE14") == 0);
+}
+
+static bool shouldDropDuplicateMoodReset(const char *cmd)
+{
+    if (!isMoodResetCommand(cmd))
+        return false;
+
+    uint32_t now = millis();
+    if (strcmp(sLastMoodResetCmd, cmd) == 0 && (now - sLastMoodResetMs) < 2500)
+        return true;
+
+    strlcpy(sLastMoodResetCmd, cmd, sizeof(sLastMoodResetCmd));
+    sLastMoodResetMs = now;
+    return false;
+}
+
+static void setCurrentMoodCommand(const char *cmd)
+{
+    if (!isMoodResetCommand(cmd))
+        return;
+    strlcpy(sCurrentMoodCmd, cmd, sizeof(sCurrentMoodCmd));
+}
+
+static const char *currentMoodName()
+{
+    if (strcmp(sCurrentMoodCmd, ":SE10") == 0) return "Quiet";
+    if (strcmp(sCurrentMoodCmd, ":SE11") == 0) return "Full-Awake";
+    if (strcmp(sCurrentMoodCmd, ":SE13") == 0) return "Mid-Awake";
+    if (strcmp(sCurrentMoodCmd, ":SE14") == 0) return "Awake+";
+    return "";
+}
+
 static void sendBodyCommand(const char* cmd)
 {
     if (cmd == nullptr || *cmd == '\0') return;
+
+    if (sSuppressBodyLinkEgress)
+    {
+        DEBUG_PRINT(F("[BodyLink] Suppressed egress while processing inbound command: "));
+        DEBUG_PRINTLN(cmd);
+        return;
+    }
 
     BodyLinkTransport transport = bodyLinkActiveTransport();
     if (transport == BODY_LINK_UART && COMMAND_SERIAL)
@@ -1860,8 +1915,18 @@ static void processMarcduinoCommandWithSourceMain(const char *source, const char
         Serial.printf("[CMD][%s][sleep-blocked] %s\n", source, cmd);
         return;
     }
+    if (shouldDropDuplicateMoodReset(cmd))
+    {
+        Serial.printf("[CMD][%s][mood-duplicate-dropped] %s\n", source, cmd);
+        return;
+    }
     Serial.printf("[CMD][%s] %s\n", source, cmd);
+    bool fromBodyLink = isBodyLinkSource(source);
+    bool previousSuppressBodyLinkEgress = sSuppressBodyLinkEgress;
+    if (fromBodyLink)
+        sSuppressBodyLinkEgress = true;
     Marcduino::processCommand(player, cmd);
+    sSuppressBodyLinkEgress = previousSuppressBodyLinkEgress;
 }
 
 ////////////////

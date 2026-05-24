@@ -15,7 +15,6 @@
   <div class="card">
     <h3>Upload Firmware</h3>
     <div class="desc">Select a .bin firmware file to flash over-the-air</div>
-    <div class="desc mt-8">Note: OTA here updates firmware only. Web UI file changes (HTML/CSS/JS/assets) require SPIFFS upload over USB (`pio run -e astropixelsplus -t uploadfs`).</div>
 
     <div class="mt-12">
       <input type="file" id="fw-file" accept=".bin"
@@ -30,6 +29,18 @@
     </div>
 
     <button class="btn accent w-100" onclick="uploadFirmware()">Upload &amp; Flash</button>
+  </div>
+
+  <div class="card">
+    <h3>Upload Web UI</h3>
+    <div class="desc">Select a SPIFFS .bin image to update HTML/CSS/JS/assets over-the-air</div>
+
+    <div class="mt-12">
+      <input type="file" id="fs-file" accept=".bin"
+             class="file-input">
+    </div>
+
+    <button class="btn w-100" onclick="uploadFilesystem()">Upload Web UI</button>
   </div>
 
   <div class="card">
@@ -100,10 +111,10 @@
       setTimeout(probe, 1500);
     }
 
-    function uploadFirmware() {
-      var file = document.getElementById('fw-file').files[0];
-      if (!file) { alert('Select a firmware file first.'); return; }
-      if (!confirm('Flash firmware: ' + file.name + ' (' + (file.size/1024).toFixed(0) + ' KB)?')) return;
+    function uploadImage(opts) {
+      var file = document.getElementById(opts.inputId).files[0];
+      if (!file) { alert('Select a ' + opts.label.toLowerCase() + ' file first.'); return; }
+      if (!confirm(opts.confirm + ': ' + file.name + ' (' + (file.size/1024).toFixed(0) + ' KB)?')) return;
 
       var prog = document.getElementById('fw-progress');
       var bar = document.getElementById('fw-bar');
@@ -131,7 +142,7 @@
       }
 
       var xhr = new XMLHttpRequest();
-      xhr.open('POST', '/upload/firmware');
+      xhr.open('POST', opts.path);
       var token = getApiToken();
       if (token) xhr.setRequestHeader('X-AP-Token', token);
 
@@ -185,8 +196,28 @@
       };
 
       var formData = new FormData();
-      formData.append('firmware', file, file.name);
+      formData.append(opts.field, file, file.name);
       xhr.send(formData);
+    }
+
+    function uploadFirmware() {
+      uploadImage({
+        inputId: 'fw-file',
+        label: 'Firmware',
+        confirm: 'Flash firmware',
+        path: '/upload/firmware',
+        field: 'firmware'
+      });
+    }
+
+    function uploadFilesystem() {
+      uploadImage({
+        inputId: 'fs-file',
+        label: 'Web UI',
+        confirm: 'Flash web UI filesystem',
+        path: '/upload/filesystem',
+        field: 'filesystem'
+      });
     }
   </script>
 </body>

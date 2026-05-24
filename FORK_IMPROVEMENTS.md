@@ -472,7 +472,7 @@ Added compatibility handlers in `MarcduinoHolo.h` for:
 Added matching operator controls in `data/holos.html` under **Expanded Holo Commands** for center/test/RC operations.
 
 ### Sequence/Mode Coverage for Compatibility and Demos
-Added sequence handlers: `:SE10`, `:SE11`, `:SE12`, `:SE13`, `:SE14`, `:SE15`, `:SE16`, `:SE58`. Expanded web sequence/home quick-action controls and mood preset buttons.
+Added mood presets and demo controls for quiet, mid-awake, full-awake, awake+, top-panel showcase, panel wiggle, and bye-bye wave. Mood changes now adjust the droid's idle personality and body sync without moving the dome panels; panel movement stays under explicit panel and sequence controls. Mood buttons highlight the active mood reported by the dome.
 
 ### Additive Compatibility Overlays (Legacy-Safe)
 Kept existing commands; added aliases/wrappers for broader controller compatibility.

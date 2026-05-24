@@ -26,6 +26,30 @@
     }
   }
 
+  function moodCommandFromState(stateOrCommand) {
+    if (!stateOrCommand) return '';
+    if (typeof stateOrCommand === 'string') return stateOrCommand;
+    if (stateOrCommand.mood && typeof stateOrCommand.mood.command === 'string') {
+      return stateOrCommand.mood.command;
+    }
+    return '';
+  }
+
+  function updateMoodButtons(stateOrCommand) {
+    var current = moodCommandFromState(stateOrCommand);
+    var moodButtons = document.querySelectorAll('[data-mood]');
+    for (var i = 0; i < moodButtons.length; i++) {
+      var btn = moodButtons[i];
+      if (current && btn.getAttribute('data-mood') === current) {
+        btn.classList.add('is-current-mood');
+        btn.setAttribute('aria-pressed', 'true');
+      } else {
+        btn.classList.remove('is-current-mood');
+        btn.setAttribute('aria-pressed', 'false');
+      }
+    }
+  }
+
   function wsConnect() {
     var loc = window.location;
     var uri = (loc.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + loc.host + '/ws';
@@ -47,6 +71,9 @@
         var msg = JSON.parse(evt.data);
         if (msg.type === 'state' && msg.data && msg.data.droidName) {
           applyDroidBrand(msg.data.droidName);
+        }
+        if (msg.type === 'state' && msg.data) {
+          updateMoodButtons(msg.data);
         }
         if (msg.type === 'state' && typeof window.onStateUpdate === 'function') {
           window.onStateUpdate(msg.data);
@@ -445,6 +472,12 @@
       .then(function(resp) {
         if (!resp.ok && ws && ws.readyState === WebSocket.OPEN) {
           ws.send(cmd);
+        } else if (resp.ok) {
+          updateMoodButtons(cmd);
+          fetchState(function(s) {
+            updateMoodButtons(s);
+            if (typeof window.onStateUpdate === 'function') window.onStateUpdate(s);
+          });
         }
       })
       .catch(function() {
@@ -475,15 +508,21 @@
   // --- State poller (fallback if WS not available) ---
   window.fetchState = function(cb) {
     fetch('/api/state').then(function(r) { return r.json(); })
-      .then(cb)
+      .then(function(s) {
+        updateMoodButtons(s);
+        if (cb) cb(s);
+      })
       .catch(function(){});
   };
+
+  window.updateMoodButtons = updateMoodButtons;
 
   // --- Init ---
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function() {
       fetch('/api/state').then(function(r){ return r.json(); }).then(function(s){
         if (s && s.droidName) applyDroidBrand(s.droidName);
+        updateMoodButtons(s);
       }).catch(function(){});
       enhanceTooltips();
       wsConnect();
@@ -491,6 +530,7 @@
   } else {
     fetch('/api/state').then(function(r){ return r.json(); }).then(function(s){
       if (s && s.droidName) applyDroidBrand(s.droidName);
+      updateMoodButtons(s);
     }).catch(function(){});
     enhanceTooltips();
     wsConnect();

@@ -170,7 +170,7 @@ curl -X POST http://192.168.1.100/api/cmd -d "cmd=:SE51"
 | `:SE00` | Stop all sequences |
 | `:SE01` | Scream |
 | `:SE02` | Wave |
-| `:SE10` | Quiet mode (lights out, still) |
+| `:SE10` | Quiet mode (sound stopped, holos idle, no panel motion) |
 | `:SE11` | Full awake |
 | `:SE51` | Panel march |
 
