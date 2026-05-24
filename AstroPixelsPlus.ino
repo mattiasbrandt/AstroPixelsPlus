@@ -117,6 +117,24 @@
 #define BODY_LINK_ENABLED             true   // on by default in this fork
 #define BODY_WIFI_ENABLED             true   // WiFi fallback enabled by default
 
+// Dynamic wiring config — slot counts and offsets for servoSettings[].
+// NUM_PANEL_SLOTS + NUM_HOLO_SLOTS must equal SizeOfArray(servoSettings); a
+// static_assert below the array declaration enforces that. HOLO_SLOT_OFFSET is
+// the servoSettings[] index of the first holo slot, used by holoConfigLoad()
+// to convert between slot index and NVS key index (slotIdx = i - HOLO_SLOT_OFFSET).
+#define NUM_PANEL_SLOTS   13
+#define NUM_HOLO_SLOTS     6
+#define HOLO_SLOT_OFFSET  13
+
+// NVS namespaces and key prefixes for the dynamic wiring config. Keys are
+// kept short (<= 15 chars) to satisfy ESP32 NVS's key-length limit.
+#define PREFERENCE_PANELS_NS       "panels"
+#define PREFERENCE_PANELS_CH_FMT   "pc_ch%d"   // pc_ch0..pc_ch12 — physical silkscreen channel
+#define PREFERENCE_PANELS_ACT_FMT  "pc_act%d"  // pc_act0..pc_act12 — bool active
+#define PREFERENCE_HOLOS_NS        "holos"
+#define PREFERENCE_HOLOS_CH_FMT    "hc_ch%d"   // hc_ch0..hc_ch5
+#define PREFERENCE_HOLOS_ACT_FMT   "hc_act%d"  // hc_act0..hc_act5
+
 
 #define PREFERENCE_MARCSOUND "msound"
 #define PREFERENCE_MARCSOUND_SERIAL "msoundser"
@@ -423,6 +441,68 @@ const ServoSettings servoSettings[] PROGMEM = {
 #endif
 };
 
+#ifndef USE_I2C_ADDRESS
+// Compile-time guard: if anyone adds or removes a slot in servoSettings[] without
+// updating NUM_PANEL_SLOTS / NUM_HOLO_SLOTS / HOLO_SLOT_OFFSET, this fires loudly
+// instead of letting holoConfigLoad() silently walk off the end of the array.
+static_assert(
+    SizeOfArray(servoSettings) == (NUM_PANEL_SLOTS + NUM_HOLO_SLOTS),
+    "servoSettings[] size drift — update NUM_PANEL_SLOTS / NUM_HOLO_SLOTS to match");
+static_assert(
+    HOLO_SLOT_OFFSET == NUM_PANEL_SLOTS,
+    "HOLO_SLOT_OFFSET must equal NUM_PANEL_SLOTS — holos sit immediately after panels");
+#endif
+
+// MK4 default channel assignments used when NVS is absent (fresh boot, factory reset).
+// Channels are physical silkscreen numbers (0–15) on each PCA9685 board; firmware pin
+// is computed at runtime by panelConfigLoad() / holoConfigLoad() with the formula
+// pin = (n × 16) + physCh + 1 (n = 0 for 0x40 panel board, n = 1 for 0x41 holo board).
+// Active=false marks a slot as having no servo wired — its setServo() call then uses
+// pin = 0, group = 0 to keep it out of all I2C writes and command-mask routing.
+static const uint8_t defaultPanelCh[NUM_PANEL_SLOTS] = {
+    1,   // slot 0:  P1   (ring)
+    2,   // slot 1:  P2   (ring)
+    3,   // slot 2:  P3   (ring)
+    4,   // slot 3:  P4   (ring)
+    5,   // slot 4:  P7   (ring upper)
+    6,   // slot 5:  P11  (ring lower)
+    7,   // slot 6:  P13  (ring front)
+    0,   // slot 7:  PP5  — unserviced on MK4; channel value ignored when active=false
+    9,   // slot 8:  PP1  (pie)
+    10,  // slot 9:  PP2  (pie)
+    11,  // slot 10: PP4  (pie)
+    12,  // slot 11: PP6  (pie, :OP11 group only)
+    0,   // slot 12: PP3  — unserviced on MK4; channel value ignored when active=false
+};
+static const bool defaultPanelActive[NUM_PANEL_SLOTS] = {
+    true,  // P1
+    true,  // P2
+    true,  // P3
+    true,  // P4
+    true,  // P7
+    true,  // P11
+    true,  // P13
+    false, // PP5 — unserviced on standard MK4
+    true,  // PP1
+    true,  // PP2
+    true,  // PP4
+    true,  // PP6
+    false, // PP3 — unserviced on standard MK4
+};
+
+// Holo defaults — physical silkscreen channels on the 0x41 board.
+static const uint8_t defaultHoloCh[NUM_HOLO_SLOTS] = {
+    0,  // slot 13 (holo 0): FHP — front holo horizontal
+    1,  // slot 14 (holo 1): FHP — front holo vertical
+    2,  // slot 15 (holo 2): THP — top holo horizontal
+    3,  // slot 16 (holo 3): THP — top holo vertical
+    4,  // slot 17 (holo 4): RHP — rear holo vertical
+    5,  // slot 18 (holo 5): RHP — rear holo horizontal
+};
+static const bool defaultHoloActive[NUM_HOLO_SLOTS] = {
+    true, true, true, true, true, true,
+};
+
 #ifdef USE_I2C_ADDRESS
 ServoDispatchDirect<SizeOfArray(servoSettings)> servoDispatch(servoSettings);
 #else
@@ -430,6 +510,92 @@ ServoDispatchPCA9685<SizeOfArray(servoSettings)> servoDispatch(servoSettings);
 #endif
 ServoSequencer servoSequencer(servoDispatch);
 AnimationPlayer player(servoSequencer);
+
+// Dynamic wiring config — apply per-slot PCA9685 channel assignments and
+// active/inactive state from NVS, overriding the PROGMEM defaults eagerly copied
+// into fServos[] by the ServoDispatchPCA9685 constructor.
+//
+// Both functions MUST be called in setup() after Wire.begin() and BEFORE
+// SetupEvent::ready() — that ordering is load-bearing because SetupEvent::ready()
+// triggers the first PCA9685 I2C write, after which any slot still pointing at
+// the wrong channel would briefly drive that physical output. See ADR 0002 for
+// why setServo() is the right hook (vs construction reordering or PROGMEM editing).
+#ifndef USE_I2C_ADDRESS
+static void panelConfigLoad()
+{
+    Preferences prefs;
+    // Read-only open: avoids creating an empty namespace on first boot and avoids
+    // an unnecessary flash erase cycle when the user has never saved a config.
+    prefs.begin(PREFERENCE_PANELS_NS, true);
+    for (int i = 0; i < NUM_PANEL_SLOTS; i++)
+    {
+        char keyC[12];
+        char keyA[12];
+        snprintf(keyC, sizeof(keyC), PREFERENCE_PANELS_CH_FMT, i);
+        snprintf(keyA, sizeof(keyA), PREFERENCE_PANELS_ACT_FMT, i);
+
+        // active = NVS bool if present, else MK4 default. The active flag is the
+        // sole source of truth for whether a servo is wired — channel value is
+        // ignored when inactive (we don't use a sentinel like channel=255).
+        bool active = prefs.isKey(keyA)
+                          ? prefs.getBool(keyA, defaultPanelActive[i])
+                          : defaultPanelActive[i];
+        uint8_t physCh = prefs.isKey(keyC)
+                             ? prefs.getUChar(keyC, defaultPanelCh[i])
+                             : defaultPanelCh[i];
+
+        // Preserve the PROGMEM group/pulse so command routing, mask membership,
+        // and per-slot calibration are unchanged. We override only the pin and,
+        // for inactive slots, also zero the group bits to remove them from every
+        // mask comparison (ALL_DOME_PANELS_MASK, PIE_PANELS_MASK, the per-slot
+        // PANEL_GROUP_n bit drives :OPnn routing). pin=0 + group=0 is the
+        // ReelTwo convention for "no servo on this slot".
+        uint32_t group   = active ? servoDispatch.getGroup(i) : 0;
+        uint8_t  pin     = active ? (physCh + 1) : 0;          // 0x40: silkscreen → firmware pin
+        uint16_t start   = servoDispatch.getStart(i);
+        uint16_t end     = servoDispatch.getEnd(i);
+        uint16_t neutral = servoDispatch.getNeutral(i);
+
+        servoDispatch.setServo(i, pin, start, end, neutral, group);
+    }
+    prefs.end();
+}
+
+static void holoConfigLoad()
+{
+    Preferences prefs;
+    prefs.begin(PREFERENCE_HOLOS_NS, true);
+    for (int i = HOLO_SLOT_OFFSET; i < HOLO_SLOT_OFFSET + NUM_HOLO_SLOTS; i++)
+    {
+        // slotIdx (0–5) is what we use for NVS keys and the default arrays;
+        // the dispatch itself addresses by absolute servoSettings[] index i.
+        int slotIdx = i - HOLO_SLOT_OFFSET;
+        char keyC[12];
+        char keyA[12];
+        snprintf(keyC, sizeof(keyC), PREFERENCE_HOLOS_CH_FMT, slotIdx);
+        snprintf(keyA, sizeof(keyA), PREFERENCE_HOLOS_ACT_FMT, slotIdx);
+
+        bool active = prefs.isKey(keyA)
+                          ? prefs.getBool(keyA, defaultHoloActive[slotIdx])
+                          : defaultHoloActive[slotIdx];
+        uint8_t physCh = prefs.isKey(keyC)
+                             ? prefs.getUChar(keyC, defaultHoloCh[slotIdx])
+                             : defaultHoloCh[slotIdx];
+
+        // 0x41 board pin formula. Firmware pin 16 still addresses 0x40 CH15 —
+        // the holo board starts at pin 17 (silkscreen CH0). See ADR 0004 for
+        // the chip-boundary math.
+        uint32_t group   = active ? servoDispatch.getGroup(i) : 0;
+        uint8_t  pin     = active ? (uint8_t)(16 + physCh + 1) : 0;
+        uint16_t start   = servoDispatch.getStart(i);
+        uint16_t end     = servoDispatch.getEnd(i);
+        uint16_t neutral = servoDispatch.getNeutral(i);
+
+        servoDispatch.setServo(i, pin, start, end, neutral, group);
+    }
+    prefs.end();
+}
+#endif // USE_I2C_ADDRESS
 
 // Panel servo auto-release — cut PWM after a close sequence so a stalled/
 // misconnected servo cannot grind indefinitely against its mechanical stop.
@@ -945,6 +1111,12 @@ void setup()
     delay(100); // Give I2C time to settle
     scan_i2c();
     Serial.println(F("=== END I2C DIAGNOSTICS ===\n"));
+
+    // Apply per-slot wiring overrides BEFORE SetupEvent::ready() — that call
+    // triggers the first PCA9685 I2C write, so any setServo() updates must be
+    // in place beforehand or the wrong channels would briefly drive. See ADR 0002.
+    panelConfigLoad();
+    holoConfigLoad();
 #endif
     SetupEvent::ready();
     loadPersistedPanelCalibration();
@@ -1646,6 +1818,10 @@ void mainLoop()
         releasePanelServos();
         sPanelReleaseAtMs = 0;
     }
+
+    // Advance the holo wiring-test sweep state machine. Cheap when idle —
+    // returns immediately if sHoloSweepActive is false. See AsyncWebInterface.h.
+    holoSweepPoll();
 
     if (sWakeTransitionPending && sWakeTransitionAtMs != 0 && (int32_t)(millis() - sWakeTransitionAtMs) >= 0)
     {

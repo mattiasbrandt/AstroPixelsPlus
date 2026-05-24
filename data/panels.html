@@ -303,6 +303,35 @@
     <div class="desc">5) Repeat for the closed position, then click <strong>Save Closed (#SC)</strong>.</div>
     <div class="desc mt-4"><strong>Tips:</strong> If a servo buzzes at a position, move the slider slightly away from the extreme. Most panels work well with values around <strong>900 μs (closed)</strong> and <strong>2100 μs (open)</strong>.</div>
     <div class="desc mt-4">Quick swap shortcut: <code>#SWxx</code> swaps open/closed values instantly. Use only during calibration, never at boot.</div>
+  </div>
+
+  <!-- Servo Wiring Config — collapsed by default; per-builder commissioning -->
+  <details class="card" id="wiring-config">
+    <summary><strong>Servo Wiring Config</strong> — assign physical PCA9685 channels to panel slots</summary>
+    <div class="desc mt-8">Panel servo board (PCA9685 @ 0x40) — channel numbers match the silkscreen on your board (0–15). Use the test button to identify which physical channel a wired panel is connected to. Changes take effect after a reboot.</div>
+    <div id="wiring-loading" class="desc mt-8">Loading current configuration…</div>
+    <div id="wiring-error" class="desc mt-8" style="display:none;color:var(--danger)"></div>
+    <div id="wiring-table-wrap" class="table-wrap mt-8" style="display:none;">
+      <table class="panel-table" id="wiring-table">
+        <thead>
+          <tr class="panel-head">
+            <td class="panel-cell">Panel</td>
+            <td class="panel-cell-center">Active</td>
+            <td class="panel-cell-center">Channel</td>
+            <td class="panel-cell-center">Command</td>
+            <td class="panel-cell-center">Test</td>
+          </tr>
+        </thead>
+        <tbody id="wiring-tbody"></tbody>
+      </table>
+    </div>
+    <div id="wiring-conflict" class="desc mt-8" style="display:none;color:var(--warning)"></div>
+    <div class="btn-grid mt-8">
+      <button id="wiring-save-btn" class="btn accent" onclick="savePanelWiring()" disabled>Save (reboot required)</button>
+      <button id="wiring-reload-btn" class="btn" onclick="loadPanelWiring()">Reload</button>
+    </div>
+    <div id="wiring-save-result" class="desc mt-8"></div>
+  </details>
 
   <div id="shell-status"></div>
   <script src="/shell.js"></script>
@@ -541,6 +570,238 @@
     }
 
     updateCalPreview();
+  </script>
+
+  <!-- Servo Wiring Config logic. Isolated IIFE; talks to /api/panels/config
+       and /api/servo/{test,stop}. Uses window.apiPost from app.js so the
+       X-AP-Token header is injected automatically. -->
+  <script>
+    (function() {
+      'use strict';
+      var LOCAL_KEY = 'panels.wiringOpen';
+      var BOARD = 'panels';
+      var details = document.getElementById('wiring-config');
+      var tbody = document.getElementById('wiring-tbody');
+      var tableWrap = document.getElementById('wiring-table-wrap');
+      var loading = document.getElementById('wiring-loading');
+      var errorEl = document.getElementById('wiring-error');
+      var conflictEl = document.getElementById('wiring-conflict');
+      var saveBtn = document.getElementById('wiring-save-btn');
+      var saveResult = document.getElementById('wiring-save-result');
+      var slots = [];        // { index, label, channel, active, cmd }
+      var activeTestIdx = -1; // row index currently in test mode, -1 = none
+
+      // Native <details> doesn't persist; restore from localStorage.
+      try {
+        if (localStorage.getItem(LOCAL_KEY) === '1') details.open = true;
+      } catch (e) {}
+      details.addEventListener('toggle', function() {
+        try { localStorage.setItem(LOCAL_KEY, details.open ? '1' : '0'); } catch (e) {}
+        // Lazy-load on first expand so the GET doesn't fire when the user
+        // never opens this section.
+        if (details.open && slots.length === 0) loadPanelWiring();
+      });
+
+      window.loadPanelWiring = function() {
+        loading.style.display = '';
+        errorEl.style.display = 'none';
+        tableWrap.style.display = 'none';
+        saveResult.textContent = '';
+        fetch('/api/panels/config').then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        }).then(function(j) {
+          slots = j.slots || [];
+          renderTable();
+          loading.style.display = 'none';
+          tableWrap.style.display = '';
+        }).catch(function(err) {
+          loading.style.display = 'none';
+          errorEl.textContent = 'Failed to load config: ' + err.message;
+          errorEl.style.display = '';
+        });
+      };
+
+      function renderTable() {
+        tbody.innerHTML = '';
+        slots.forEach(function(slot, idx) {
+          var tr = document.createElement('tr');
+          tr.dataset.idx = idx;
+
+          var nameTd = document.createElement('td');
+          nameTd.className = 'panel-cell';
+          nameTd.textContent = slot.label || ('Slot ' + idx);
+
+          var actTd = document.createElement('td');
+          actTd.className = 'panel-cell-center';
+          var actCb = document.createElement('input');
+          actCb.type = 'checkbox';
+          actCb.checked = !!slot.active;
+          actCb.addEventListener('change', function() {
+            slot.active = actCb.checked;
+            updateRowEnabled(tr, slot);
+            // If we just deactivated an active test row, cancel its visual state.
+            if (!slot.active && activeTestIdx === idx) {
+              resetTestButton(tr.querySelector('button'));
+              activeTestIdx = -1;
+            }
+            revalidate();
+          });
+          actTd.appendChild(actCb);
+
+          var chTd = document.createElement('td');
+          chTd.className = 'panel-cell-center';
+          var chSel = document.createElement('select');
+          for (var c = 0; c <= 15; c++) {
+            var opt = document.createElement('option');
+            opt.value = c;
+            opt.textContent = c;
+            if (c === slot.channel) opt.selected = true;
+            chSel.appendChild(opt);
+          }
+          chSel.addEventListener('change', function() {
+            slot.channel = parseInt(chSel.value, 10);
+            revalidate();
+          });
+          chTd.appendChild(chSel);
+
+          var cmdTd = document.createElement('td');
+          cmdTd.className = 'panel-cell-center';
+          cmdTd.style.color = 'var(--text-dim)';
+          cmdTd.style.fontSize = '.85em';
+          cmdTd.textContent = slot.cmd || '—';
+
+          var testTd = document.createElement('td');
+          testTd.className = 'panel-cell-center';
+          var testBtn = document.createElement('button');
+          testBtn.className = 'btn';
+          testBtn.textContent = '▶ Test';
+          testBtn.dataset.testing = '0';
+          testBtn.addEventListener('click', function() {
+            handleTestClick(idx, testBtn);
+          });
+          testTd.appendChild(testBtn);
+
+          tr.appendChild(nameTd);
+          tr.appendChild(actTd);
+          tr.appendChild(chTd);
+          tr.appendChild(cmdTd);
+          tr.appendChild(testTd);
+          tbody.appendChild(tr);
+
+          updateRowEnabled(tr, slot);
+        });
+        revalidate();
+      }
+
+      function updateRowEnabled(tr, slot) {
+        var sel = tr.querySelector('select');
+        var testBtn = tr.querySelector('button');
+        sel.disabled = !slot.active;
+        testBtn.disabled = !slot.active;
+        tr.style.opacity = slot.active ? '1' : '0.55';
+      }
+
+      function revalidate() {
+        // Find duplicate active channels and mark conflicting rows amber.
+        var byCh = {};
+        slots.forEach(function(slot, idx) {
+          if (!slot.active) return;
+          (byCh[slot.channel] = byCh[slot.channel] || []).push(idx);
+        });
+        Array.from(tbody.children).forEach(function(tr) { tr.style.background = ''; });
+        var msg = '';
+        var conflict = false;
+        Object.keys(byCh).forEach(function(ch) {
+          if (byCh[ch].length > 1) {
+            conflict = true;
+            var names = byCh[ch].map(function(i) { return slots[i].label; }).join(', ');
+            msg += 'Channel ' + ch + ' assigned to: ' + names + '. ';
+            byCh[ch].forEach(function(i) {
+              tbody.children[i].style.background = 'rgba(220,180,0,.18)';
+            });
+          }
+        });
+        if (conflict) {
+          conflictEl.textContent = msg;
+          conflictEl.style.display = '';
+          saveBtn.disabled = true;
+        } else {
+          conflictEl.style.display = 'none';
+          saveBtn.disabled = false;
+        }
+      }
+
+      function handleTestClick(idx, btn) {
+        if (btn.dataset.testing === '1') {
+          // Currently open — close it.
+          window.apiPost('/api/servo/stop', {
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ board: BOARD })
+          }).finally(function() {
+            resetTestButton(btn);
+            if (activeTestIdx === idx) activeTestIdx = -1;
+          });
+          return;
+        }
+        // Starting a new test — reset any previous row's button (server-side
+        // auto-stop closes the old channel, this just mirrors it visually).
+        if (activeTestIdx >= 0 && activeTestIdx !== idx) {
+          var prevRow = tbody.children[activeTestIdx];
+          if (prevRow) resetTestButton(prevRow.querySelector('button'));
+        }
+        var ch = slots[idx].channel;
+        window.apiPost('/api/servo/test', {
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ board: BOARD, channel: ch })
+        }).then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          btn.dataset.testing = '1';
+          btn.textContent = '■ Close';
+          btn.classList.add('accent');
+          activeTestIdx = idx;
+        }).catch(function(err) {
+          if (window.uiToast) window.uiToast('Test failed: ' + err.message, 'error');
+          else alert('Test failed: ' + err.message);
+        });
+      }
+
+      function resetTestButton(btn) {
+        if (!btn) return;
+        btn.dataset.testing = '0';
+        btn.textContent = '▶ Test';
+        btn.classList.remove('accent');
+      }
+
+      window.savePanelWiring = function() {
+        var body = {
+          slots: slots.map(function(s, i) {
+            return { index: i, channel: s.channel, active: !!s.active };
+          })
+        };
+        saveResult.innerHTML = 'Saving…';
+        window.apiPost('/api/panels/config', {
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        }).then(function(r) {
+          return r.json().then(function(j) { return { ok: r.ok, body: j }; });
+        }).then(function(res) {
+          if (!res.ok) {
+            saveResult.innerHTML = '<span style="color:var(--danger)">Save failed: ' +
+              (res.body && res.body.error ? res.body.error : 'unknown error') + '</span>';
+            return;
+          }
+          // Mirror setup.html's pattern: inline confirmation + nudge to reboot.
+          saveResult.innerHTML = '<span style="color:var(--success)">Saved.</span> ' +
+            'Reboot the dome to apply the new channel mapping.';
+        }).catch(function(err) {
+          saveResult.innerHTML = '<span style="color:var(--danger)">Save failed: ' + err.message + '</span>';
+        });
+      };
+
+      // If section is already open on load (persisted via localStorage), fetch now.
+      if (details.open) loadPanelWiring();
+    })();
   </script>
 </body>
 </html>

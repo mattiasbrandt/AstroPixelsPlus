@@ -459,6 +459,364 @@ static String buildStateJson()
 }
 
 // ---------------------------------------------------------------
+// Dynamic wiring config — JSON helpers, validation, NVS save
+//
+// Pulls per-slot channel assignments from NVS namespace "panels" / "holos",
+// falling back to the MK4 defaults in AstroPixelsPlus.ino. Used by the
+// GET/POST /api/{panels,holos}/config endpoints. NVS reads here mirror the
+// firmware-side panelConfigLoad() / holoConfigLoad() but DO NOT touch the
+// servoDispatch — saving via POST requires a reboot to take effect (returned
+// as reboot_required:true). See ADR 0001 / 0002 / 0004 for context.
+// ---------------------------------------------------------------
+
+// Panel labels for slot indexes 0–12 (MK4 printed-droid identifiers).
+// Slot 7 (PP5) and slot 12 (PP3) are unserviced on standard MK4 but their
+// identities are surfaced so a builder who wires a servo can activate them.
+static const char *panelSlotLabel(int slot)
+{
+    static const char *labels[NUM_PANEL_SLOTS] = {
+        "P1", "P2", "P3", "P4", "P7", "P11", "P13",
+        "PP5", "PP1", "PP2", "PP4", "PP6", "PP3",
+    };
+    return (slot >= 0 && slot < NUM_PANEL_SLOTS) ? labels[slot] : "?";
+}
+
+// Marcduino :OPnn command per slot. Empty string for unserviced slots and for
+// PP6 (slot 11, group-only). Panel command routing is hardcoded by slot index —
+// see ADR 0003 for why this is not configurable at runtime.
+static const char *panelSlotCommand(int slot)
+{
+    static const char *cmds[NUM_PANEL_SLOTS] = {
+        ":OP01", ":OP02", ":OP03", ":OP04", ":OP05", ":OP06", ":OP07",
+        "",      ":OP08", ":OP09", ":OP10", "",      "",
+    };
+    return (slot >= 0 && slot < NUM_PANEL_SLOTS) ? cmds[slot] : "";
+}
+
+// Fixed holo labels — "<projector> (<community equivalent>) — <axis>".
+static const char *holoSlotLabel(int slot)
+{
+    static const char *labels[NUM_HOLO_SLOTS] = {
+        "FHP (HP1) — H", "FHP (HP1) — V",
+        "THP (HP3) — H", "THP (HP3) — V",
+        "RHP (HP2) — V", "RHP (HP2) — H",
+    };
+    return (slot >= 0 && slot < NUM_HOLO_SLOTS) ? labels[slot] : "?";
+}
+
+// Read the current persisted config for the given namespace into the caller's
+// arrays, applying MK4 defaults for any keys not present in NVS.
+static void wiringConfigRead(const char *ns, const char *chFmt, const char *actFmt,
+                              int slotCount, const uint8_t *defaultCh,
+                              const bool *defaultActive,
+                              uint8_t *outCh, bool *outActive)
+{
+    Preferences prefs;
+    prefs.begin(ns, true);
+    for (int i = 0; i < slotCount; i++)
+    {
+        char keyC[12];
+        char keyA[12];
+        snprintf(keyC, sizeof(keyC), chFmt, i);
+        snprintf(keyA, sizeof(keyA), actFmt, i);
+        outCh[i]     = prefs.isKey(keyC) ? prefs.getUChar(keyC, defaultCh[i]) : defaultCh[i];
+        outActive[i] = prefs.isKey(keyA) ? prefs.getBool(keyA, defaultActive[i]) : defaultActive[i];
+    }
+    prefs.end();
+}
+
+// Build the GET response JSON for a wiring-config endpoint. Caller supplies
+// slot labels and (optionally) command strings — pass labelFn=nullptr to omit
+// the "label" field, cmdFn=nullptr to omit the "cmd" field.
+static String wiringConfigBuildJson(const char *board, int slotCount,
+                                     const uint8_t *channels, const bool *actives,
+                                     const char *(*labelFn)(int),
+                                     const char *(*cmdFn)(int))
+{
+    String json = "{";
+    json.reserve(64 + slotCount * 80);
+    json += "\"board\":\"";
+    json += board;
+    json += "\",\"slot_count\":";
+    json += slotCount;
+    json += ",\"slots\":[";
+    for (int i = 0; i < slotCount; i++)
+    {
+        if (i > 0) json += ',';
+        json += "{\"index\":";
+        json += i;
+        if (labelFn)
+        {
+            json += ",\"label\":\"";
+            json += jsonEscape(labelFn(i));
+            json += '"';
+        }
+        json += ",\"channel\":";
+        json += channels[i];
+        json += ",\"active\":";
+        json += actives[i] ? "true" : "false";
+        if (cmdFn)
+        {
+            json += ",\"cmd\":\"";
+            json += jsonEscape(cmdFn(i));
+            json += '"';
+        }
+        json += '}';
+    }
+    json += "]}";
+    return json;
+}
+
+// Minimal scanner over the POST body. Looks for the bare keys "index",
+// "channel", and "active" with their numeric/bool values — strict on shape
+// but tolerant of whitespace. On any structural failure or out-of-range
+// value, returns false with errMsg populated and outCh/outActive untouched.
+//
+// The full POST body must be a JSON object with a "slots" array of exactly
+// expectedSlots entries; each entry must carry index, channel (0–15), and
+// active (true|false). Indexes must match array position (slot 0 → index 0).
+// Duplicate active channels are detected by the caller, not here.
+static bool wiringConfigParseBody(const String &body, int expectedSlots,
+                                   uint8_t *outCh, bool *outActive, String &errMsg)
+{
+    int slotsKey = body.indexOf("\"slots\"");
+    if (slotsKey < 0) { errMsg = "missing slots array"; return false; }
+    int arrStart = body.indexOf('[', slotsKey);
+    if (arrStart < 0) { errMsg = "slots is not an array"; return false; }
+    int arrEnd = body.indexOf(']', arrStart);
+    if (arrEnd < 0) { errMsg = "unterminated slots array"; return false; }
+
+    int parsed = 0;
+    int pos = arrStart + 1;
+    while (pos < arrEnd && parsed < expectedSlots)
+    {
+        int objStart = body.indexOf('{', pos);
+        if (objStart < 0 || objStart > arrEnd) break;
+        int objEnd = body.indexOf('}', objStart);
+        if (objEnd < 0 || objEnd > arrEnd) { errMsg = "unterminated slot object"; return false; }
+        String slot = body.substring(objStart, objEnd + 1);
+
+        // Required fields: index, channel, active.
+        int idxKey = slot.indexOf("\"index\"");
+        int chKey  = slot.indexOf("\"channel\"");
+        int actKey = slot.indexOf("\"active\"");
+        if (idxKey < 0 || chKey < 0 || actKey < 0)
+        {
+            errMsg = "slot missing index/channel/active";
+            return false;
+        }
+        int idxColon = slot.indexOf(':', idxKey);
+        int chColon  = slot.indexOf(':', chKey);
+        int actColon = slot.indexOf(':', actKey);
+        long idxVal  = strtol(slot.c_str() + idxColon + 1, nullptr, 10);
+        long chVal   = strtol(slot.c_str() + chColon + 1, nullptr, 10);
+        String actStr = slot.substring(actColon + 1);
+        actStr.trim();
+        bool actVal;
+        if (actStr.startsWith("true"))       actVal = true;
+        else if (actStr.startsWith("false")) actVal = false;
+        else { errMsg = "active must be true or false"; return false; }
+
+        if (idxVal != parsed)
+        {
+            errMsg = "slot index mismatch (expected " + String(parsed) +
+                     ", got " + String(idxVal) + ")";
+            return false;
+        }
+        if (chVal < 0 || chVal > 15)
+        {
+            errMsg = "channel " + String(chVal) + " out of range (0-15) at slot " + String(parsed);
+            return false;
+        }
+        outCh[parsed]     = (uint8_t)chVal;
+        outActive[parsed] = actVal;
+        parsed++;
+        pos = objEnd + 1;
+    }
+
+    if (parsed != expectedSlots)
+    {
+        errMsg = "expected " + String(expectedSlots) + " slots, got " + String(parsed);
+        return false;
+    }
+    return true;
+}
+
+// Check for two active slots sharing the same physical channel — that would
+// drive the same PCA9685 output from two ReelTwo slots and produce undefined
+// behaviour at runtime. Returns false on conflict with errMsg populated.
+static bool wiringConfigCheckConflicts(int slotCount, const uint8_t *channels,
+                                        const bool *actives, String &errMsg)
+{
+    for (int a = 0; a < slotCount; a++)
+    {
+        if (!actives[a]) continue;
+        for (int b = a + 1; b < slotCount; b++)
+        {
+            if (!actives[b]) continue;
+            if (channels[a] == channels[b])
+            {
+                errMsg = "channel " + String(channels[a]) +
+                         " is assigned to slots " + String(a) + " and " + String(b);
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+// Atomic NVS write — opens the namespace read/write, writes all pairs, closes.
+// If the call returns true, every key was written; if false, the namespace may
+// be partially updated (NVS does not transact across keys), but validation runs
+// FIRST so we only reach this path with a fully-valid payload.
+static bool wiringConfigSave(const char *ns, const char *chFmt, const char *actFmt,
+                              int slotCount, const uint8_t *channels, const bool *actives)
+{
+    Preferences prefs;
+    if (!prefs.begin(ns, false)) return false;
+    for (int i = 0; i < slotCount; i++)
+    {
+        char keyC[12];
+        char keyA[12];
+        snprintf(keyC, sizeof(keyC), chFmt, i);
+        snprintf(keyA, sizeof(keyA), actFmt, i);
+        prefs.putUChar(keyC, channels[i]);
+        prefs.putBool(keyA,  actives[i]);
+    }
+    prefs.end();
+    return true;
+}
+
+// ---------------------------------------------------------------
+// Raw servo test — direct PCA9685 PWM writes for the wiring config UI
+//
+// These endpoints let an operator pulse a single physical channel on either
+// PCA9685 board without involving ServoDispatch / slot routing. That's the
+// point: the test is for identifying which silkscreen channel a wired servo
+// actually connects to, which has to work regardless of whether the slot is
+// configured or active. Direct I2C is also stateless and slot-independent.
+//
+// At rest the ReelTwo AnimationPlayer only writes I2C when a slot is actively
+// animating; a raw test pulse therefore persists on the channel until either
+// (a) /api/servo/stop is called, (b) another test is started on the same board
+// (server-side auto-stop), or (c) a Marcduino command moves that slot.
+// ---------------------------------------------------------------
+
+// PCA9685 board addresses match the I2C jumpers documented in HARDWARE_WIRING.md.
+static const uint8_t PCA9685_PANELS_ADDR = 0x40;
+static const uint8_t PCA9685_HOLOS_ADDR  = 0x41;
+
+// PWM count = round(pulse_µs × 4096 × 50 / 1_000_000) = round(µs × 0.2048).
+// Approximate values are fine — the goal is visible movement for identification,
+// not precision positioning. Per-slot calibration lives elsewhere and is unrelated.
+static const uint16_t PWM_PANEL_OPEN   = 369;  // 1800 µs
+static const uint16_t PWM_PANEL_CLOSED = 246;  // 1200 µs
+static const uint16_t PWM_HOLO_A       = 410;  // 2000 µs (one extreme)
+static const uint16_t PWM_HOLO_B       = 205;  // 1000 µs (other extreme)
+static const uint16_t PWM_NEUTRAL      = 307;  // 1500 µs (used as holo stop pulse)
+
+// Server-side test state. -1 means no test active on that board. We track one
+// channel per board so a second /api/servo/test on the same board auto-stops
+// the previous channel (mirroring the UI expectation that only one row can be
+// in test mode at a time).
+static int8_t   sPanelTestChannel = -1;
+static int8_t   sHoloTestChannel  = -1;
+
+// Async holo sweep state machine — polled from mainLoop() (matches the existing
+// sPanelReleaseAtMs pattern, no FreeRTOS task). Sweep alternates between two
+// extremes with a 1 s hold per phase.
+static volatile bool sHoloSweepActive   = false;
+static uint8_t       sHoloSweepChannel  = 0;
+static uint8_t       sHoloSweepPhase    = 0;        // 0 = at A, 1 = at B
+static uint32_t      sHoloSweepDeadline = 0;
+static const uint32_t HOLO_SWEEP_HOLD_MS = 1000;
+
+// Drive one PCA9685 channel directly. Standard 4-byte LED_ON_L / LED_ON_H /
+// LED_OFF_L / LED_OFF_H block starting at register 6 + channel * 4 (the
+// PCA9685 datasheet's LED0_ON_L base offset). LED_ON is 0 so the pulse always
+// starts at the beginning of the PWM period; LED_OFF is the count value.
+static void writePwm(uint8_t boardAddr, uint8_t channel, uint16_t count)
+{
+    if (channel > 15) return;  // out-of-range guard; UI clamps but be defensive
+    Wire.beginTransmission(boardAddr);
+    Wire.write(6 + channel * 4);
+    Wire.write(0);                // LED_ON_L
+    Wire.write(0);                // LED_ON_H
+    Wire.write(lowByte(count));   // LED_OFF_L
+    Wire.write(highByte(count));  // LED_OFF_H
+    Wire.endTransmission();
+}
+
+// Called once per mainLoop() tick to advance the holo sweep. Cheap when idle:
+// a single comparison short-circuits when no sweep is active.
+static void holoSweepPoll()
+{
+    if (!sHoloSweepActive) return;
+    if ((int32_t)(millis() - sHoloSweepDeadline) < 0) return;
+
+    // Time to flip phase. Phase 0 ⇄ 1; write the corresponding extreme.
+    sHoloSweepPhase = (sHoloSweepPhase == 0) ? 1 : 0;
+    writePwm(PCA9685_HOLOS_ADDR, sHoloSweepChannel,
+             (sHoloSweepPhase == 0) ? PWM_HOLO_A : PWM_HOLO_B);
+    sHoloSweepDeadline = millis() + HOLO_SWEEP_HOLD_MS;
+}
+
+// Stop whatever test is running on the given board (if any). Writes a
+// neutral/closed pulse to leave the servo at a known position, then clears
+// the tracked test channel and sweep state. Safe to call when nothing is
+// active — returns silently.
+static void servoTestStop(bool isPanels)
+{
+    if (isPanels)
+    {
+        if (sPanelTestChannel >= 0)
+        {
+            writePwm(PCA9685_PANELS_ADDR, sPanelTestChannel, PWM_PANEL_CLOSED);
+            sPanelTestChannel = -1;
+        }
+    }
+    else
+    {
+        // Clear the sweep flag BEFORE writing the stop pulse so the poll
+        // function cannot race in and flip phase between our writes.
+        sHoloSweepActive = false;
+        if (sHoloTestChannel >= 0)
+        {
+            writePwm(PCA9685_HOLOS_ADDR, sHoloTestChannel, PWM_NEUTRAL);
+            sHoloTestChannel = -1;
+        }
+    }
+}
+
+// Parse the JSON body for /api/servo/test (wantChannel=true) and /api/servo/stop
+// (wantChannel=false). Tiny, fixed-shape scanner mirroring wiringConfigParseBody.
+static bool servoTestParseBody(const String &body, bool &outIsPanels, int &outChannel,
+                                bool wantChannel, String &errMsg)
+{
+    int boardKey = body.indexOf("\"board\"");
+    if (boardKey < 0) { errMsg = "missing board"; return false; }
+    int boardColon = body.indexOf(':', boardKey);
+    int quoteStart = body.indexOf('"', boardColon + 1);
+    int quoteEnd   = (quoteStart >= 0) ? body.indexOf('"', quoteStart + 1) : -1;
+    if (quoteStart < 0 || quoteEnd < 0) { errMsg = "board must be a string"; return false; }
+    String boardStr = body.substring(quoteStart + 1, quoteEnd);
+    if (boardStr == "panels")      outIsPanels = true;
+    else if (boardStr == "holos")  outIsPanels = false;
+    else { errMsg = "board must be panels or holos"; return false; }
+
+    if (wantChannel)
+    {
+        int chKey = body.indexOf("\"channel\"");
+        if (chKey < 0) { errMsg = "missing channel"; return false; }
+        int chColon = body.indexOf(':', chKey);
+        long chVal = strtol(body.c_str() + chColon + 1, nullptr, 10);
+        if (chVal < 0 || chVal > 15) { errMsg = "channel out of range (0-15)"; return false; }
+        outChannel = (int)chVal;
+    }
+    return true;
+}
+
+// ---------------------------------------------------------------
 // Probe an I2C address — returns true if device ACKs
 // ---------------------------------------------------------------
 static uint8_t probeI2CCode(uint8_t addr, uint8_t attempts = 2)
@@ -1002,6 +1360,291 @@ static void initAsyncWeb()
             request->send(400, "application/json", "{\"error\":\"missing key/val params\"}");
         }
     });
+
+    // ---- REST API: Dynamic wiring config (panels) ----
+    // GET returns current channel/active per slot (NVS or MK4 defaults).
+    // POST saves a new config to NVS; reboot required to apply (panelConfigLoad
+    // runs in setup() before SetupEvent::ready()).
+    asyncServer.on("/api/panels/config", HTTP_GET, [](AsyncWebServerRequest *request)
+    {
+        uint8_t channels[NUM_PANEL_SLOTS];
+        bool    actives[NUM_PANEL_SLOTS];
+        wiringConfigRead(PREFERENCE_PANELS_NS, PREFERENCE_PANELS_CH_FMT,
+                         PREFERENCE_PANELS_ACT_FMT, NUM_PANEL_SLOTS,
+                         defaultPanelCh, defaultPanelActive, channels, actives);
+        request->send(200, "application/json",
+            wiringConfigBuildJson("panels", NUM_PANEL_SLOTS, channels, actives,
+                                   panelSlotLabel, panelSlotCommand));
+    });
+
+    asyncServer.on("/api/panels/config", HTTP_POST,
+        [](AsyncWebServerRequest *request)
+        {
+            // onRequest — fires after the body is fully buffered into _tempObject.
+            if (!checkWriteAuth(request))
+            {
+                request->send(401, "application/json", "{\"error\":\"unauthorized\"}");
+                if (request->_tempObject)
+                {
+                    delete (String *)request->_tempObject;
+                    request->_tempObject = nullptr;
+                }
+                return;
+            }
+            String *body = (String *)request->_tempObject;
+            if (!body || body->length() == 0)
+            {
+                request->send(400, "application/json", "{\"error\":\"empty body\"}");
+                if (body) { delete body; request->_tempObject = nullptr; }
+                return;
+            }
+
+            uint8_t channels[NUM_PANEL_SLOTS];
+            bool    actives[NUM_PANEL_SLOTS];
+            String  errMsg;
+            bool ok = wiringConfigParseBody(*body, NUM_PANEL_SLOTS, channels, actives, errMsg);
+            delete body;
+            request->_tempObject = nullptr;
+            if (!ok)
+            {
+                request->send(400, "application/json",
+                    String("{\"error\":\"") + jsonEscape(errMsg) + "\"}");
+                return;
+            }
+            if (!wiringConfigCheckConflicts(NUM_PANEL_SLOTS, channels, actives, errMsg))
+            {
+                request->send(400, "application/json",
+                    String("{\"error\":\"") + jsonEscape(errMsg) + "\"}");
+                return;
+            }
+            if (!wiringConfigSave(PREFERENCE_PANELS_NS, PREFERENCE_PANELS_CH_FMT,
+                                   PREFERENCE_PANELS_ACT_FMT, NUM_PANEL_SLOTS,
+                                   channels, actives))
+            {
+                request->send(500, "application/json", "{\"error\":\"NVS save failed\"}");
+                return;
+            }
+            logCapture.println("[API] panels/config saved; reboot required to apply");
+            request->send(200, "application/json", "{\"ok\":true,\"reboot_required\":true}");
+        },
+        NULL,
+        [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
+        {
+            // onBody — accumulate raw bytes; cap to guard against runaway payloads.
+            // Expected size is ~600 bytes for 13 slots; 4 KiB ceiling is generous.
+            if (total > 4096) return;
+            if (index == 0)
+            {
+                request->_tempObject = new String();
+                ((String *)request->_tempObject)->reserve(total + 1);
+            }
+            String *body = (String *)request->_tempObject;
+            if (body) body->concat((const char *)data, len);
+        });
+
+    // ---- REST API: Dynamic wiring config (holos) ----
+    asyncServer.on("/api/holos/config", HTTP_GET, [](AsyncWebServerRequest *request)
+    {
+        uint8_t channels[NUM_HOLO_SLOTS];
+        bool    actives[NUM_HOLO_SLOTS];
+        wiringConfigRead(PREFERENCE_HOLOS_NS, PREFERENCE_HOLOS_CH_FMT,
+                         PREFERENCE_HOLOS_ACT_FMT, NUM_HOLO_SLOTS,
+                         defaultHoloCh, defaultHoloActive, channels, actives);
+        // Holo endpoint omits the "cmd" field — holos don't have :OPnn equivalents.
+        request->send(200, "application/json",
+            wiringConfigBuildJson("holos", NUM_HOLO_SLOTS, channels, actives,
+                                   holoSlotLabel, nullptr));
+    });
+
+    asyncServer.on("/api/holos/config", HTTP_POST,
+        [](AsyncWebServerRequest *request)
+        {
+            if (!checkWriteAuth(request))
+            {
+                request->send(401, "application/json", "{\"error\":\"unauthorized\"}");
+                if (request->_tempObject)
+                {
+                    delete (String *)request->_tempObject;
+                    request->_tempObject = nullptr;
+                }
+                return;
+            }
+            String *body = (String *)request->_tempObject;
+            if (!body || body->length() == 0)
+            {
+                request->send(400, "application/json", "{\"error\":\"empty body\"}");
+                if (body) { delete body; request->_tempObject = nullptr; }
+                return;
+            }
+            uint8_t channels[NUM_HOLO_SLOTS];
+            bool    actives[NUM_HOLO_SLOTS];
+            String  errMsg;
+            bool ok = wiringConfigParseBody(*body, NUM_HOLO_SLOTS, channels, actives, errMsg);
+            delete body;
+            request->_tempObject = nullptr;
+            if (!ok)
+            {
+                request->send(400, "application/json",
+                    String("{\"error\":\"") + jsonEscape(errMsg) + "\"}");
+                return;
+            }
+            if (!wiringConfigCheckConflicts(NUM_HOLO_SLOTS, channels, actives, errMsg))
+            {
+                request->send(400, "application/json",
+                    String("{\"error\":\"") + jsonEscape(errMsg) + "\"}");
+                return;
+            }
+            if (!wiringConfigSave(PREFERENCE_HOLOS_NS, PREFERENCE_HOLOS_CH_FMT,
+                                   PREFERENCE_HOLOS_ACT_FMT, NUM_HOLO_SLOTS,
+                                   channels, actives))
+            {
+                request->send(500, "application/json", "{\"error\":\"NVS save failed\"}");
+                return;
+            }
+            logCapture.println("[API] holos/config saved; reboot required to apply");
+            request->send(200, "application/json", "{\"ok\":true,\"reboot_required\":true}");
+        },
+        NULL,
+        [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
+        {
+            if (total > 4096) return;
+            if (index == 0)
+            {
+                request->_tempObject = new String();
+                ((String *)request->_tempObject)->reserve(total + 1);
+            }
+            String *body = (String *)request->_tempObject;
+            if (body) body->concat((const char *)data, len);
+        });
+
+    // ---- REST API: Raw servo test (no slot routing, direct PCA9685 write) ----
+    // Panel test: opens the requested channel and holds it until /api/servo/stop
+    // or another test on the same board (server-side auto-stop). Holo test: starts
+    // a sweep state machine polled in mainLoop(). Both endpoints accept a JSON
+    // body of the shape { "board": "panels"|"holos", "channel": 0-15 }.
+    asyncServer.on("/api/servo/test", HTTP_POST,
+        [](AsyncWebServerRequest *request)
+        {
+            if (!checkWriteAuth(request))
+            {
+                request->send(401, "application/json", "{\"error\":\"unauthorized\"}");
+                if (request->_tempObject)
+                {
+                    delete (String *)request->_tempObject;
+                    request->_tempObject = nullptr;
+                }
+                return;
+            }
+            String *body = (String *)request->_tempObject;
+            if (!body || body->length() == 0)
+            {
+                request->send(400, "application/json", "{\"error\":\"empty body\"}");
+                if (body) { delete body; request->_tempObject = nullptr; }
+                return;
+            }
+            bool   isPanels = false;
+            int    channel  = -1;
+            String errMsg;
+            bool ok = servoTestParseBody(*body, isPanels, channel, /*wantChannel*/true, errMsg);
+            delete body;
+            request->_tempObject = nullptr;
+            if (!ok)
+            {
+                request->send(400, "application/json",
+                    String("{\"error\":\"") + jsonEscape(errMsg) + "\"}");
+                return;
+            }
+
+            // Server-side auto-stop: if a test is already running on this board,
+            // close it cleanly before driving the new channel. UI mirrors this
+            // by resetting the previous row's button — but the server enforces.
+            servoTestStop(isPanels);
+
+            if (isPanels)
+            {
+                writePwm(PCA9685_PANELS_ADDR, (uint8_t)channel, PWM_PANEL_OPEN);
+                sPanelTestChannel = (int8_t)channel;
+            }
+            else
+            {
+                // Prime the first phase at extreme A; mainLoop() will flip after
+                // HOLO_SWEEP_HOLD_MS. Set state in this exact order — channel and
+                // phase must be valid before sHoloSweepActive becomes true, since
+                // holoSweepPoll() reads them once it sees the active flag.
+                sHoloTestChannel    = (int8_t)channel;
+                sHoloSweepChannel   = (uint8_t)channel;
+                sHoloSweepPhase     = 0;
+                writePwm(PCA9685_HOLOS_ADDR, (uint8_t)channel, PWM_HOLO_A);
+                sHoloSweepDeadline  = millis() + HOLO_SWEEP_HOLD_MS;
+                sHoloSweepActive    = true;
+            }
+            String resp = String("{\"ok\":true,\"board\":\"") + (isPanels ? "panels" : "holos") +
+                          "\",\"channel\":" + channel + "}";
+            request->send(200, "application/json", resp);
+        },
+        NULL,
+        [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
+        {
+            if (total > 256) return;  // /api/servo/test body is tiny (~40 bytes)
+            if (index == 0)
+            {
+                request->_tempObject = new String();
+                ((String *)request->_tempObject)->reserve(total + 1);
+            }
+            String *body = (String *)request->_tempObject;
+            if (body) body->concat((const char *)data, len);
+        });
+
+    asyncServer.on("/api/servo/stop", HTTP_POST,
+        [](AsyncWebServerRequest *request)
+        {
+            if (!checkWriteAuth(request))
+            {
+                request->send(401, "application/json", "{\"error\":\"unauthorized\"}");
+                if (request->_tempObject)
+                {
+                    delete (String *)request->_tempObject;
+                    request->_tempObject = nullptr;
+                }
+                return;
+            }
+            String *body = (String *)request->_tempObject;
+            if (!body || body->length() == 0)
+            {
+                request->send(400, "application/json", "{\"error\":\"empty body\"}");
+                if (body) { delete body; request->_tempObject = nullptr; }
+                return;
+            }
+            bool   isPanels = false;
+            int    unusedChannel = -1;
+            String errMsg;
+            // Stop only needs the board; channel (if sent) is ignored — server
+            // already tracks which channel is active.
+            bool ok = servoTestParseBody(*body, isPanels, unusedChannel, /*wantChannel*/false, errMsg);
+            delete body;
+            request->_tempObject = nullptr;
+            if (!ok)
+            {
+                request->send(400, "application/json",
+                    String("{\"error\":\"") + jsonEscape(errMsg) + "\"}");
+                return;
+            }
+            servoTestStop(isPanels);  // no-op if nothing is active on that board
+            request->send(200, "application/json",
+                String("{\"ok\":true,\"board\":\"") + (isPanels ? "panels" : "holos") + "\"}");
+        },
+        NULL,
+        [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
+        {
+            if (total > 256) return;
+            if (index == 0)
+            {
+                request->_tempObject = new String();
+                ((String *)request->_tempObject)->reserve(total + 1);
+            }
+            String *body = (String *)request->_tempObject;
+            if (body) body->concat((const char *)data, len);
+        });
 
     // ---- REST API: Reboot ----
     asyncServer.on("/api/reboot", HTTP_POST, [](AsyncWebServerRequest *request)

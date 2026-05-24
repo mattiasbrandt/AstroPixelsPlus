@@ -305,6 +305,34 @@
     <div class="desc mt-4">Fires HPS9 at end of setup() — puts all three holos into autonomous random LED mode on every power-up. NVS key: <code>holo_boot_loop</code></div>
   </div>
 
+  <!-- Holo Wiring Config — collapsed by default; per-builder commissioning -->
+  <details class="card" id="holo-wiring-config">
+    <summary><strong>Holo Wiring Config</strong> — assign physical PCA9685 channels to holo servo axes</summary>
+    <div class="desc mt-8">Holo servo board (PCA9685 @ 0x41) — channel numbers match the silkscreen on your board (0–15). Test fires a sweep on the selected axis (one extreme → 1 s pause → other extreme → repeat) so you can identify which channel drives which projector. Changes take effect after a reboot.</div>
+    <div id="holo-wiring-loading" class="desc mt-8">Loading current configuration…</div>
+    <div id="holo-wiring-error" class="desc mt-8" style="display:none;color:var(--danger)"></div>
+    <div id="holo-wiring-table-wrap" class="table-wrap mt-8" style="display:none;">
+      <table class="panel-table" id="holo-wiring-table">
+        <thead>
+          <tr class="panel-head">
+            <td class="panel-cell">Axis</td>
+            <td class="panel-cell-center">Active</td>
+            <td class="panel-cell-center">Channel</td>
+            <td class="panel-cell-center">Direction</td>
+            <td class="panel-cell-center">Test</td>
+          </tr>
+        </thead>
+        <tbody id="holo-wiring-tbody"></tbody>
+      </table>
+    </div>
+    <div id="holo-wiring-conflict" class="desc mt-8" style="display:none;color:var(--warning)"></div>
+    <div class="btn-grid mt-8">
+      <button id="holo-wiring-save-btn" class="btn accent" onclick="saveHoloWiring()" disabled>Save (reboot required)</button>
+      <button id="holo-wiring-reload-btn" class="btn" onclick="loadHoloWiring()">Reload</button>
+    </div>
+    <div id="holo-wiring-save-result" class="desc mt-8"></div>
+  </details>
+
   <div id="shell-status"></div>
   <script src="/shell.js"></script>
   <script src="/app.js"></script>
@@ -480,6 +508,290 @@
         window.apiPostForm('/api/pref', 'key=' + encodeURIComponent(key) + '&val=' + (val ? 'true' : 'false'))
           .catch(function() { console.warn('Failed to save holo pref: ' + key); });
       };
+    })();
+  </script>
+
+  <!-- Holo Wiring Config logic. Mirrors the panel UI but groups rows by
+       projector (FHP / RHP / THP) and uses a sweep test that runs until
+       stopped. Uses window.apiPost for X-AP-Token injection. -->
+  <script>
+    (function() {
+      'use strict';
+      var LOCAL_KEY = 'holos.wiringOpen';
+      var BOARD = 'holos';
+      // Visual order matches the plan layout: FHP first (front), then RHP
+      // (rear), then THP (top). Slot data order is FHP, THP, RHP — we
+      // reorder for display only.
+      var GROUP_ORDER = ['FHP', 'RHP', 'THP'];
+      var GROUP_HEADINGS = {
+        FHP: 'FHP — Front Holo Projector (HP1)',
+        RHP: 'RHP — Rear Holo Projector (HP2)',
+        THP: 'THP — Top Holo Projector (HP3)'
+      };
+
+      var details = document.getElementById('holo-wiring-config');
+      var tbody = document.getElementById('holo-wiring-tbody');
+      var tableWrap = document.getElementById('holo-wiring-table-wrap');
+      var loading = document.getElementById('holo-wiring-loading');
+      var errorEl = document.getElementById('holo-wiring-error');
+      var conflictEl = document.getElementById('holo-wiring-conflict');
+      var saveBtn = document.getElementById('holo-wiring-save-btn');
+      var saveResult = document.getElementById('holo-wiring-save-result');
+      var slots = [];
+      var activeTestIdx = -1;
+
+      try {
+        if (localStorage.getItem(LOCAL_KEY) === '1') details.open = true;
+      } catch (e) {}
+      details.addEventListener('toggle', function() {
+        try { localStorage.setItem(LOCAL_KEY, details.open ? '1' : '0'); } catch (e) {}
+        if (details.open && slots.length === 0) loadHoloWiring();
+      });
+
+      // Label format from the server is "<group> (<community>) — <axis>",
+      // e.g. "FHP (HP1) — H". Split the prefix to get group key + axis.
+      function parseLabel(label) {
+        var dashIdx = label.indexOf(' — ');
+        var head = (dashIdx >= 0 ? label.substring(0, dashIdx) : label).trim();
+        var axis = (dashIdx >= 0 ? label.substring(dashIdx + 3) : '').trim();
+        var groupKey = head.split(' ')[0];  // "FHP (HP1)" → "FHP"
+        return { group: groupKey, axis: axis };
+      }
+
+      window.loadHoloWiring = function() {
+        loading.style.display = '';
+        errorEl.style.display = 'none';
+        tableWrap.style.display = 'none';
+        saveResult.textContent = '';
+        fetch('/api/holos/config').then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        }).then(function(j) {
+          slots = j.slots || [];
+          renderTable();
+          loading.style.display = 'none';
+          tableWrap.style.display = '';
+        }).catch(function(err) {
+          loading.style.display = 'none';
+          errorEl.textContent = 'Failed to load config: ' + err.message;
+          errorEl.style.display = '';
+        });
+      };
+
+      function renderTable() {
+        tbody.innerHTML = '';
+        // Group slots by projector, preserving the GROUP_ORDER above.
+        var groups = {};
+        slots.forEach(function(slot, idx) {
+          var meta = parseLabel(slot.label || '');
+          slot._meta = meta;
+          slot._origIdx = idx;
+          (groups[meta.group] = groups[meta.group] || []).push(slot);
+        });
+
+        GROUP_ORDER.forEach(function(g) {
+          if (!groups[g]) return;
+          // Group heading row spans all columns.
+          var hdr = document.createElement('tr');
+          var hdrTd = document.createElement('td');
+          hdrTd.colSpan = 5;
+          hdrTd.style.color = 'var(--accent)';
+          hdrTd.style.fontWeight = 'bold';
+          hdrTd.style.paddingTop = '0.5em';
+          hdrTd.textContent = GROUP_HEADINGS[g] || g;
+          hdr.appendChild(hdrTd);
+          tbody.appendChild(hdr);
+
+          groups[g].forEach(function(slot) { tbody.appendChild(buildRow(slot)); });
+        });
+
+        revalidate();
+      }
+
+      function buildRow(slot) {
+        var idx = slot._origIdx;
+        var meta = slot._meta;
+        var tr = document.createElement('tr');
+        tr.dataset.idx = idx;
+
+        var axisTd = document.createElement('td');
+        axisTd.className = 'panel-cell';
+        axisTd.textContent = (meta.axis === 'H') ? 'Horizontal' :
+                              (meta.axis === 'V') ? 'Vertical'   : (slot.label || '');
+
+        var actTd = document.createElement('td');
+        actTd.className = 'panel-cell-center';
+        var actCb = document.createElement('input');
+        actCb.type = 'checkbox';
+        actCb.checked = !!slot.active;
+        actCb.addEventListener('change', function() {
+          slot.active = actCb.checked;
+          updateRowEnabled(tr, slot);
+          if (!slot.active && activeTestIdx === idx) {
+            resetTestButton(tr.querySelector('button'));
+            activeTestIdx = -1;
+          }
+          revalidate();
+        });
+        actTd.appendChild(actCb);
+
+        var chTd = document.createElement('td');
+        chTd.className = 'panel-cell-center';
+        var chSel = document.createElement('select');
+        for (var c = 0; c <= 15; c++) {
+          var opt = document.createElement('option');
+          opt.value = c;
+          opt.textContent = c;
+          if (c === slot.channel) opt.selected = true;
+          chSel.appendChild(opt);
+        }
+        chSel.addEventListener('change', function() {
+          slot.channel = parseInt(chSel.value, 10);
+          revalidate();
+        });
+        chTd.appendChild(chSel);
+
+        // Sweep direction icon — ↔ for horizontal, ↕ for vertical.
+        var dirTd = document.createElement('td');
+        dirTd.className = 'panel-cell-center';
+        dirTd.style.color = 'var(--text-dim)';
+        dirTd.textContent = (meta.axis === 'H') ? '↔ sweep' :
+                             (meta.axis === 'V') ? '↕ sweep' : '—';
+
+        var testTd = document.createElement('td');
+        testTd.className = 'panel-cell-center';
+        var testBtn = document.createElement('button');
+        testBtn.className = 'btn';
+        testBtn.textContent = '▶ Test';
+        testBtn.dataset.testing = '0';
+        testBtn.addEventListener('click', function() {
+          handleTestClick(idx, testBtn);
+        });
+        testTd.appendChild(testBtn);
+
+        tr.appendChild(axisTd);
+        tr.appendChild(actTd);
+        tr.appendChild(chTd);
+        tr.appendChild(dirTd);
+        tr.appendChild(testTd);
+
+        updateRowEnabled(tr, slot);
+        return tr;
+      }
+
+      function updateRowEnabled(tr, slot) {
+        var sel = tr.querySelector('select');
+        var testBtn = tr.querySelector('button');
+        sel.disabled = !slot.active;
+        testBtn.disabled = !slot.active;
+        tr.style.opacity = slot.active ? '1' : '0.55';
+      }
+
+      function rowByIdx(idx) {
+        return tbody.querySelector('tr[data-idx="' + idx + '"]');
+      }
+
+      function revalidate() {
+        // Duplicate active channel detection — both boards are independent
+        // (0x40 vs 0x41), so we only compare holo slots against each other.
+        var byCh = {};
+        slots.forEach(function(slot, idx) {
+          if (!slot.active) return;
+          (byCh[slot.channel] = byCh[slot.channel] || []).push(idx);
+        });
+        Array.from(tbody.querySelectorAll('tr[data-idx]')).forEach(function(tr) {
+          tr.style.background = '';
+        });
+        var msg = '';
+        var conflict = false;
+        Object.keys(byCh).forEach(function(ch) {
+          if (byCh[ch].length > 1) {
+            conflict = true;
+            var names = byCh[ch].map(function(i) {
+              var m = slots[i]._meta || { group: '?', axis: '?' };
+              return m.group + ' ' + m.axis;
+            }).join(', ');
+            msg += 'Channel ' + ch + ' assigned to: ' + names + '. ';
+            byCh[ch].forEach(function(i) {
+              var r = rowByIdx(i);
+              if (r) r.style.background = 'rgba(220,180,0,.18)';
+            });
+          }
+        });
+        if (conflict) {
+          conflictEl.textContent = msg;
+          conflictEl.style.display = '';
+          saveBtn.disabled = true;
+        } else {
+          conflictEl.style.display = 'none';
+          saveBtn.disabled = false;
+        }
+      }
+
+      function handleTestClick(idx, btn) {
+        if (btn.dataset.testing === '1') {
+          window.apiPost('/api/servo/stop', {
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ board: BOARD })
+          }).finally(function() {
+            resetTestButton(btn);
+            if (activeTestIdx === idx) activeTestIdx = -1;
+          });
+          return;
+        }
+        if (activeTestIdx >= 0 && activeTestIdx !== idx) {
+          var prevRow = rowByIdx(activeTestIdx);
+          if (prevRow) resetTestButton(prevRow.querySelector('button'));
+        }
+        var ch = slots[idx].channel;
+        window.apiPost('/api/servo/test', {
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ board: BOARD, channel: ch })
+        }).then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          btn.dataset.testing = '1';
+          btn.textContent = '■ Stop';
+          btn.classList.add('accent');
+          activeTestIdx = idx;
+        }).catch(function(err) {
+          if (window.uiToast) window.uiToast('Sweep failed: ' + err.message, 'error');
+          else alert('Sweep failed: ' + err.message);
+        });
+      }
+
+      function resetTestButton(btn) {
+        if (!btn) return;
+        btn.dataset.testing = '0';
+        btn.textContent = '▶ Test';
+        btn.classList.remove('accent');
+      }
+
+      window.saveHoloWiring = function() {
+        var body = {
+          slots: slots.map(function(s, i) {
+            return { index: i, channel: s.channel, active: !!s.active };
+          })
+        };
+        saveResult.innerHTML = 'Saving…';
+        window.apiPost('/api/holos/config', {
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        }).then(function(r) {
+          return r.json().then(function(j) { return { ok: r.ok, body: j }; });
+        }).then(function(res) {
+          if (!res.ok) {
+            saveResult.innerHTML = '<span style="color:var(--danger)">Save failed: ' +
+              (res.body && res.body.error ? res.body.error : 'unknown error') + '</span>';
+            return;
+          }
+          saveResult.innerHTML = '<span style="color:var(--success)">Saved.</span> ' +
+            'Reboot the dome to apply the new channel mapping.';
+        }).catch(function(err) {
+          saveResult.innerHTML = '<span style="color:var(--danger)">Save failed: ' + err.message + '</span>';
+        });
+      };
+
+      if (details.open) loadHoloWiring();
     })();
   </script>
 </body>

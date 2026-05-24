@@ -621,6 +621,25 @@ Note: `:OP11` = OpenTopPanels (PIE_PANEL group), `:OP12` = OpenBottomPanels (DOM
 - Pie panels (55° wide, 5° gaps): PP3 fixed 332°–27° (straddles top), PP4 servo 32°–87°, PP2 servo 92°–147° (covers right ring gap 114°–122°), PP1 servo 152°–207°, PP6 servo 212°–267°, PP5 fixed 272°–327° (covers left ring gap 272°–280°).
 - Silver gaps appear only in the outer ring band — not in the pie area — because the pie panels are strategically positioned to cover the ring gap angles.
 
+### Dynamic Servo Wiring Config — Point-and-Test Channel Assignment
+
+A **builder-facing feature** that eliminates the physical guesswork of figuring out which PCA9685 silkscreen channel a servo is wired to. Replaces the iterative dome-disassembly cycle with a web UI that pulses individual channels on demand and persists per-slot channel/active overrides in NVS.
+
+**Why it matters:** the channel ambiguity problem — *"which physical header maps to which firmware slot?"* — affects every R2 builder using a PCA9685-based dome. Two separate +1 offset bugs shipped to date (panel slots, then holo slots), both because the firmware's 1-indexed `servoSettings[]` convention was silently off-by-one from the silkscreen-printed channel numbers builders wire to. ADRs [`0001`](docs/adr/0001-physical-channel-numbers-in-ui.md), [`0002`](docs/adr/0002-setservo-for-runtime-slot-override.md), [`0003`](docs/adr/0003-panel-command-routing-hardcoded-switch.md), and [`0004`](docs/adr/0004-holo-servosettings-starts-at-pin-17.md) document the math, the fix, and the reasoning behind the chosen runtime hook (`ServoDispatchPCA9685::setServo()` post-construction).
+
+**Coverage:** both PCA9685 boards — panel controller (`0x40`, 13 slots) and holo controller (`0x41`, 6 slots, two axes per projector). Every slot is individually testable, channel-overridable, and toggleable active/inactive.
+
+**Components:**
+
+- `servoSettings[]` defaults rewritten (`AstroPixelsPlus.ino`) — panel pins corrected to `physCh + 1`, holo pins corrected to `16 + physCh + 1` (was off-by-one, addressing `0x40` CH15 instead of `0x41` CH0). Inline comments now document the chip-boundary formula `pin = (n × 16) + physCh + 1` and the PROGMEM-pin-must-not-be-zero safety constraint.
+- `panelConfigLoad()` and `holoConfigLoad()` (`AstroPixelsPlus.ino`) — boot-time NVS overrides applied via `setServo()` between `Wire.begin()` and `SetupEvent::ready()` so the first PCA9685 I2C write reflects the operator's channel assignments. Inactive slots get `pin = 0, group = 0`, removing them from `ALL_DOME_PANELS_MASK` / `PIE_PANELS_MASK` and every individual `:OPnn` mask — they are silently skipped by all Marcduino sequences with no crash and no PWM output.
+- `GET / POST /api/panels/config` and `GET / POST /api/holos/config` — JSON endpoints returning current channel/active per slot (falling back to MK4 defaults when NVS is absent), and saving operator changes. Server-side validation enforces slot count, channel range (0–15), and no-duplicate-active-channels before any NVS write; invalid POSTs return HTTP 400 with no partial write.
+- `POST /api/servo/test` and `POST /api/servo/stop` — raw PCA9685 I2C writes (`LED_ON_L`/`LED_OFF_L` register block at `6 + ch × 4`) for slot-independent channel identification. Panel test holds an open pulse; holo test runs an async sweep state machine in `mainLoop()` (matching the existing `sPanelReleaseAtMs` pattern — no FreeRTOS task). Server tracks one active test per board; starting a second test on the same board automatically stops the previous channel before driving the new one.
+- `data/panels.html` and `data/holos.html` — collapsed `<details class="card">` Wiring Config sections placed below operational controls. Each row exposes panel/axis label, active checkbox, channel dropdown (0–15), command label (panels) or sweep-direction icon (holos), and a test ▶/■ button. Duplicate active channels turn both rows amber and disable Save. Collapse state persists via `localStorage`.
+- `docs/HARDWARE_WIRING.md` — Servo Channel Mapping section rewritten to use silkscreen-first numbering with a callout explaining the internal `pin = (n × 16) + physCh + 1` convention. Holo table now shows the corrected firmware pins (17–22) alongside silkscreen channels (0–5).
+
+**Documented limitations (out of scope, per [ADR 0003](docs/adr/0003-panel-command-routing-hardcoded-switch.md)):** Marcduino command routing remains hardcoded — `:OP01` always drives slot 0, `:OP02` always drives slot 1, etc. The operator configures the physical channel each slot reaches, not which `:OPnn` triggers which panel. Wave / flutter / marching-ants sequences have hardcoded per-step delays; an inactive mid-sequence slot produces a brief silent pause at that step (a ReelTwo `AnimationPlayer` constraint).
+
 ### Logic Effects UI Coverage
 Added a new **Custom effect** builder card on Logics page to construct full `@APLE` commands from UI controls instead of relying on shortcut-only coverage. Builder supports explicit target selection (both/front/rear), complete effect list, color chips, speed/sensitivity, and duration controls with live command preview.
 
