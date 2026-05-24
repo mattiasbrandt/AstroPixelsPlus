@@ -354,20 +354,36 @@ DataPanel dataPanel(ledChain1);
 
 ////////////////////////////////
 // Servo panel mapping for Mr. Baddeley MK4 complex dome (printed-droid labels).
-// Ring panels with servos: P1, P2, P3, P4, P7, P11, P13
-// Pie panels with servos:  PP1, PP2, PP4, PP6
-// Fixed (no servo): P5 (Magic Panel/frame), P6, P8 (Rear PSI), P9 (Rear Logic),
-//                   P12 (Front Logic), P14 (Front PSI), center top.
+// Ring panels with servos:    P1, P2, P3, P4, P7, P11, P13
+// Pie panels with servos:     PP1, PP2, PP4, PP6
+// Unserviced panels (slots exist, no servo wired on MK4): PP5 (slot 7), PP3 (slot 12).
+// Fixed (no slot, no servo):  P5 (Magic Panel/frame), P6, P8 (Rear PSI), P9 (Rear
+//                             Logic), P10, P12 (Front Logic), P14 (Front PSI).
 //
-// PCA9685 @ 0x40 channel → printed-droid panel → Marcduino command:
-//   ch 1-4  = P1-P4    :OP01-:OP04   (4 small ring panels)
-//   ch 5    = P7       :OP05          (small upper ring panel)
-//   ch 6    = P11      :OP06          (lower-left ring panel)
-//   ch 7    = P13      :OP07          (lower-front ring panel, near FLD)
-//   ch 8    = unused
-//   ch 9-11 = PP1/PP2/PP4  :OP08-:OP10  (3 individually-addressed pie panels)
-//   ch 12   = PP6      :OP11 group only  (4th pie panel, opened with all-top cmd)
-//   ch 13   = unused (no center-top servo on MK4)
+// Channel addressing — IMPORTANT:
+//   Each entry's first field is the ReelTwo "firmware pin", a 1-indexed value that
+//   ServoDispatchPCA9685 converts to (board, silkscreen-channel) at runtime via:
+//       pin = (n × 16) + physCh + 1
+//   where n = 0 for the 0x40 panel board, n = 1 for the 0x41 holo board, and physCh
+//   is the silkscreen number (0–15) printed on the PCA9685. So firmware pin 1 drives
+//   silkscreen CH0, pin 2 drives CH1, pin 17 drives 0x41 CH0, pin 22 drives 0x41 CH5.
+//   Pin 16 still addresses 0x40 CH15 — the holo board does NOT begin at pin 16.
+//   (See docs/adr/0004-holo-servosettings-starts-at-pin-17.md.)
+//
+//   PROGMEM safety: a pin value of 0 underflows fLastLength[channel-1] in the
+//   ServoDispatchPCA9685 constructor. Inactive slots must therefore carry a
+//   non-zero PROGMEM pin and be zeroed post-construction via setServo(i, 0, …, 0)
+//   in panelConfigLoad()/holoConfigLoad().
+//
+// PCA9685 @ 0x40 silkscreen channel → printed-droid panel → Marcduino command:
+//   CH 1-4  = P1-P4    :OP01-:OP04   (4 small ring panels)
+//   CH 5    = P7       :OP05          (small upper ring panel)
+//   CH 6    = P11      :OP06          (lower-left ring panel)
+//   CH 7    = P13      :OP07          (lower-front ring panel, near FLD)
+//   CH 8    = unused   —              (PP5 slot exists in firmware but no servo on MK4)
+//   CH 9-11 = PP1/PP2/PP4  :OP08-:OP10  (3 individually-addressed pie panels)
+//   CH 12   = PP6      :OP11 group only  (4th pie panel, opened with all-top cmd)
+//   CH 13   = unused   —              (PP3 slot exists in firmware but no servo on MK4)
 //
 // Group commands (no dedicated channel):
 //   :OP11 = all pie panels (PP1+PP2+PP4+PP6)
@@ -376,30 +392,34 @@ DataPanel dataPanel(ledChain1);
 //
 // See docs/HARDWARE_WIRING.md for the full PCA9685 wiring table.
 // Pulse widths (800-2200 µs) are defaults; per-panel calibration stored in NVS via web UI.
+// Channel assignments (firmware pins) are MK4 defaults; per-builder overrides live in
+// NVS namespaces "panels" / "holos" and are applied by panelConfigLoad() and
+// holoConfigLoad() before SetupEvent::ready().
 const ServoSettings servoSettings[] PROGMEM = {
 #ifndef USE_I2C_ADDRESS
-    // Panel Controller (PCA9685 @ 0x40)
-    {1,  800, 2200, PANEL_GROUP_1  | SMALL_PANEL}, /* slot 0:  P1  (ring)       ch1   :OP01 */
-    {2,  800, 2200, PANEL_GROUP_2  | SMALL_PANEL}, /* slot 1:  P2  (ring)       ch2   :OP02 */
-    {3,  800, 2200, PANEL_GROUP_3  | SMALL_PANEL}, /* slot 2:  P3  (ring)       ch3   :OP03 */
-    {4,  800, 2200, PANEL_GROUP_4  | SMALL_PANEL}, /* slot 3:  P4  (ring)       ch4   :OP04 */
-    {5,  800, 2200, PANEL_GROUP_5  | SMALL_PANEL}, /* slot 4:  P7  (ring upper) ch5   :OP05 */
-    {6,  800, 2200, PANEL_GROUP_6  | SMALL_PANEL}, /* slot 5:  P11 (ring lower) ch6   :OP06 */
-    {7,  800, 2200, PANEL_GROUP_7  | SMALL_PANEL}, /* slot 6:  P13 (ring front) ch7   :OP07 */
-    {8,  800, 2200, MINI_PANEL},                   /* slot 7:  unused           ch8   —     */
-    {9,  800, 2200, PANEL_GROUP_8  | PIE_PANEL},   /* slot 8:  PP1 (pie)        ch9   :OP08 */
-    {10, 800, 2200, PANEL_GROUP_9  | PIE_PANEL},   /* slot 9:  PP2 (pie)        ch10  :OP09 */
-    {11, 800, 2200, PANEL_GROUP_10 | PIE_PANEL},   /* slot 10: PP4 (pie)        ch11  :OP10 */
-    {12, 800, 2200, PIE_PANEL},                    /* slot 11: PP6 (pie)        ch12  :OP11 group only */
-    {13, 800, 2200, TOP_PIE_PANEL},                /* slot 12: unused           ch13  —     */
+    // Panel Controller (PCA9685 @ 0x40) — slots 0–12; firmware pin = silkscreen + 1.
+    {2,  800, 2200, PANEL_GROUP_1  | SMALL_PANEL}, /* slot 0:  P1  (ring)       CH1   :OP01 */
+    {3,  800, 2200, PANEL_GROUP_2  | SMALL_PANEL}, /* slot 1:  P2  (ring)       CH2   :OP02 */
+    {4,  800, 2200, PANEL_GROUP_3  | SMALL_PANEL}, /* slot 2:  P3  (ring)       CH3   :OP03 */
+    {5,  800, 2200, PANEL_GROUP_4  | SMALL_PANEL}, /* slot 3:  P4  (ring)       CH4   :OP04 */
+    {6,  800, 2200, PANEL_GROUP_5  | SMALL_PANEL}, /* slot 4:  P7  (ring upper) CH5   :OP05 */
+    {7,  800, 2200, PANEL_GROUP_6  | SMALL_PANEL}, /* slot 5:  P11 (ring lower) CH6   :OP06 */
+    {8,  800, 2200, PANEL_GROUP_7  | SMALL_PANEL}, /* slot 6:  P13 (ring front) CH7   :OP07 */
+    {9,  800, 2200, MINI_PANEL},                   /* slot 7:  PP5 (unserviced) CH8   —     panelConfigLoad() zeroes this slot at boot; PROGMEM pin is non-zero only to satisfy the constructor's fLastLength[pin-1] write. */
+    {10, 800, 2200, PANEL_GROUP_8  | PIE_PANEL},   /* slot 8:  PP1 (pie)        CH9   :OP08 */
+    {11, 800, 2200, PANEL_GROUP_9  | PIE_PANEL},   /* slot 9:  PP2 (pie)        CH10  :OP09 */
+    {12, 800, 2200, PANEL_GROUP_10 | PIE_PANEL},   /* slot 10: PP4 (pie)        CH11  :OP10 */
+    {13, 800, 2200, PIE_PANEL},                    /* slot 11: PP6 (pie)        CH12  :OP11 group only */
+    {14, 800, 2200, TOP_PIE_PANEL},                /* slot 12: PP3 (unserviced) CH13  —     panelConfigLoad() zeroes this slot at boot; PROGMEM pin is non-zero only to satisfy the constructor's fLastLength[pin-1] write. */
 
-    // Holo Controller (PCA9685 @ 0x41, solder bridge A0) — channels offset by 16
-    {16, 800, 2200, HOLO_HSERVO}, /* slot 13: FHP1 — front holo horizontal */
-    {17, 800, 2200, HOLO_VSERVO}, /* slot 14: FHP2 — front holo vertical   */
-    {18, 800, 2200, HOLO_HSERVO}, /* slot 15: THP1 — top holo horizontal   */
-    {19, 800, 2200, HOLO_VSERVO}, /* slot 16: THP2 — top holo vertical     */
-    {20, 800, 2200, HOLO_VSERVO}, /* slot 17: RHP2 — rear holo vertical    */
-    {21, 800, 2200, HOLO_HSERVO}, /* slot 18: RHP1 — rear holo horizontal  */
+    // Holo Controller (PCA9685 @ 0x41, A0 bridged) — slots 13–18; firmware pin = 16 + silkscreen + 1.
+    // Pin 16 still addresses 0x40 CH15 — see ADR 0004. Holo board begins at pin 17.
+    {17, 800, 2200, HOLO_HSERVO}, /* slot 13: FHP — front holo horizontal CH0  */
+    {18, 800, 2200, HOLO_VSERVO}, /* slot 14: FHP — front holo vertical   CH1  */
+    {19, 800, 2200, HOLO_HSERVO}, /* slot 15: THP — top holo horizontal   CH2  */
+    {20, 800, 2200, HOLO_VSERVO}, /* slot 16: THP — top holo vertical     CH3  */
+    {21, 800, 2200, HOLO_VSERVO}, /* slot 17: RHP — rear holo vertical    CH4  */
+    {22, 800, 2200, HOLO_HSERVO}, /* slot 18: RHP — rear holo horizontal  CH5  */
 #endif
 };
 

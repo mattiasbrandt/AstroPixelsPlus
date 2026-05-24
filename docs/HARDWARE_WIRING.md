@@ -242,10 +242,25 @@ All labels use printed-droid / Mr. Baddeley panel numbers throughout — firmwar
 
 ### Servo Channel Mapping
 
+> 📌 **Read this first — channel numbers in this document.**
+> All channel numbers shown below are the **physical silkscreen channels**
+> printed on the Adafruit PCA9685 boards (CH0–CH15 on each board). This is
+> the only numbering builders need to care about, and it's what the firmware
+> web UI shows.
+>
+> Internally, ReelTwo's `ServoDispatchPCA9685` uses a 1-indexed "firmware
+> pin" number obtained by `pin = (n × 16) + silkscreen + 1`, where n = 0 for
+> the 0x40 panel board and n = 1 for the 0x41 holo board. So firmware pin 2
+> drives 0x40 CH1, firmware pin 17 drives 0x41 CH0, and firmware pin 22
+> drives 0x41 CH5. This conversion happens inside `ServoDispatchPCA9685`
+> and is never exposed to the operator or to wiring documentation. If you
+> see firmware-pin numbers in source code or ADRs, mentally subtract one
+> (and the board offset) to recover the silkscreen channel.
+
 **Panel Controller (PCA9685 @ 0x40):**
 
-| PCA9685 Channel | Panel (printed-droid) | Marcduino | Notes |
-|-----------------|-----------------------|-----------|-------|
+| Silkscreen CH | Panel (printed-droid) | Marcduino | Notes |
+|---------------|-----------------------|-----------|-------|
 | 0 | — | — | Unused — leave unconnected |
 | 1 | **P1** | `:OP01` | Ring panel |
 | 2 | **P2** | `:OP02` | Ring panel |
@@ -254,12 +269,12 @@ All labels use printed-droid / Mr. Baddeley panel numbers throughout — firmwar
 | 5 | **P7** | `:OP05` | Ring panel (small upper) |
 | 6 | **P11** | `:OP06` | Ring panel (lower-left) |
 | 7 | **P13** | `:OP07` | Ring panel (lower-front, near FLD) |
-| 8 | — | — | Unused — leave unconnected |
+| 8 | — | — | Unused — **PP5** slot exists in firmware but no servo wired on standard MK4 |
 | 9 | **PP1** | `:OP08` | Pie panel 1 |
 | 10 | **PP2** | `:OP09` | Pie panel 2 |
 | 11 | **PP4** | `:OP10` | Pie panel 4 |
 | 12 | **PP6** | `:OP11` group | Pie panel 6 — no individual command, opens with all-top |
-| 13 | — | — | Unused (no center-top servo on MK4) |
+| 13 | — | — | Unused — **PP3** slot exists in firmware but no servo wired on standard MK4 |
 | 14–15 | — | — | Unused |
 
 **Group commands:**
@@ -273,16 +288,22 @@ All labels use printed-droid / Mr. Baddeley panel numbers throughout — firmwar
 
 **Holo Controller (PCA9685 @ 0x41, solder bridge A0) — channels 0–5:**
 
-| PCA9685 Channel | ReelTwo Channel | Holo | Axis | Notes |
-|-----------------|-----------------|------|------|-------|
-| 0 | 16 | Front (FHP) | Horizontal | FHP1 — left/right |
-| 1 | 17 | Front (FHP) | Vertical | FHP2 — up/down |
-| 2 | 18 | Top (THP) | Horizontal | THP1 — left/right |
-| 3 | 19 | Top (THP) | Vertical | THP2 — up/down |
-| 4 | 20 | Rear (RHP) | Vertical | RHP2 — up/down |
-| 5 | 21 | Rear (RHP) | Horizontal | RHP1 — left/right |
+| Silkscreen CH | Firmware pin | Holo | Axis | Notes |
+|---------------|--------------|------|------|-------|
+| 0 | 17 | Front (FHP / HP1) | Horizontal | left/right |
+| 1 | 18 | Front (FHP / HP1) | Vertical   | up/down |
+| 2 | 19 | Top (THP / HP3)   | Horizontal | left/right |
+| 3 | 20 | Top (THP / HP3)   | Vertical   | up/down |
+| 4 | 21 | Rear (RHP / HP2)  | Vertical   | up/down |
+| 5 | 22 | Rear (RHP / HP2)  | Horizontal | left/right |
 
-> ReelTwo channel numbers for holos start at 16 (second PCA9685 offset). FHP=16/17, THP=18/19, RHP=20/21.
+> The "Firmware pin" column is shown for reference only — it matches the
+> entries in `servoSettings[]` in `AstroPixelsPlus.ino`. Wire your servos
+> by the silkscreen channel column, not this one. Firmware pin 16 still
+> addresses the **panel** board (0x40 CH15), not the holo board — the holo
+> board begins at firmware pin 17. See
+> [ADR 0004](adr/0004-holo-servosettings-starts-at-pin-17.md) for the
+> chip-boundary math.
 
 ---
 
