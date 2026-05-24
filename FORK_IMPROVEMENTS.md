@@ -623,7 +623,7 @@ Note: `:OP11` = OpenTopPanels (PIE_PANEL group), `:OP12` = OpenBottomPanels (DOM
 
 ### Dynamic Servo Wiring Config — Point-and-Test Channel Assignment
 
-**The builder pain this fixes:** you wire panel and holo servos to the PCA9685 boards, fire `:OP01`, and... the wrong panel moves. Or nothing moves. Now you're climbing inside the dome with a label maker trying to figure out which servo cable went into which header. Every PCA9685-based R2 build hits this. The fork has shipped *two* separate "wrong by one channel" bugs to date — once on panels, once on holos — both because the channel numbers printed on the boards (0–15) and the channel numbers the firmware historically used in its source didn't line up.
+**The builder pain this fixes:** you wire panel and holo servos to the PCA9685 boards, fire `:OP01`, and... the wrong panel moves. Or nothing moves. The only way to debug it physically is to lift the dome off, disconnect the slip-ring, work back through your carefully zip-tied servo bundles, and trace each suspect cable from the panel hinge all the way down to its PCA9685 header — then re-route, re-tie, re-seat, and try again. Every PCA9685-based R2 build hits this. The fork has shipped *two* separate "wrong by one channel" bugs to date — once on panels, once on holos — both because the channel numbers printed on the boards (0–15) and the channel numbers the firmware historically used in its source didn't line up.
 
 **The fix:** a new **Servo Wiring Config** section on the Panels page and a matching **Holo Wiring Config** section on the Holos page. Both are collapsed by default — open them once at build/rewire time, leave them alone afterwards.
 
