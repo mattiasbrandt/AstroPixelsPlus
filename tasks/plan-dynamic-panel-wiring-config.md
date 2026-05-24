@@ -34,6 +34,7 @@ Landed across the following commits on `main` (in order):
 | `e81cc41` | Operator-facing warning when an active slot has no command-routing group bits (plan-mandated, missed in original feature commit). |
 | `e9b5135` | Logging overhaul — moved `LogCapture` instance earlier so boot-time wiring logs reach the web log viewer; added structured info/warn/error logs to all new endpoints and to both load functions. |
 | `2121040`, `85ab880` | `FORK_IMPROVEMENTS.md` entry rewritten in builder/operator language. |
+| `66d0d63` | Three Codex-review fixes (see *Post-implementation review fixes* below). |
 
 ### Deviations from the original spec
 
@@ -46,6 +47,16 @@ Landed across the following commits on `main` (in order):
 
 - **Group-bit safety warning** (edge case table line "`getGroup(i)` returns 0 for an active slot") was missing from the original feature commit. Added in `e81cc41` and `e9b5135` (now properly routes through `logCapture`).
 - **Two-commit-group structure** (R1 separate from F1–F11) was initially squashed into the working tree as one batch. Split into separate commits after the user pointed it out.
+
+### Post-implementation review fixes
+
+GPT Codex review on 2026-05-24 found three real defects in the shipped feature. All three landed in `66d0d63`:
+
+1. **UI stuck-on test on row deactivation.** Unchecking the Active checkbox for the currently-testing row only reset the button label and cleared `activeTestIdx` — it never called `/api/servo/stop`. Result: panels stayed held open under PWM after the row went inactive; holo sweeps kept running in `mainLoop()`. Both UI handlers now POST `/api/servo/stop` first and reset state inside `.finally()`.
+2. **Lax `strtol()` parsing.** Both `wiringConfigParseBody()` and `servoTestParseBody()` used `strtol(s, nullptr, 10)`, which returns 0 for non-numeric input (`"channel":"bad"`, `"channel":true`) — and that 0 was silently accepted as channel 0. A direct POST could pulse CH0 or save channel-0 assignments. Switched to the end-pointer form; rejects with `"channel must be a number"` if no digit was consumed, before the existing 0–15 range check.
+3. **Silent partial NVS save.** `wiringConfigSave()` ignored the return values of `Preferences.putUChar()`/`putBool()` (0 = flash write failed). Endpoint could return `{ok:true}` after a partial save. Now checks each write, short-circuits the loop on failure, and the POST handler returns the existing 500 with the `[API] Error: ... NVS save failed` log line.
+
+These defects would not have been caught by F9/F10 hardware verification — they require either a direct API client sending malformed bodies (#2), an NVS-full / corrupt scenario (#3), or the specific operator UI flow of deactivating a row mid-test (#1). Worth noting for future similar features: external API review catches a class of issues that hands-on hardware testing does not.
 
 ### Verification status
 
