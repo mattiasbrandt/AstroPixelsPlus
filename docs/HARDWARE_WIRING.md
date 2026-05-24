@@ -36,7 +36,7 @@ The AstroPixels firmware uses **two** Adafruit PCA9685 16-channel PWM servo driv
 
 | Board | I2C Address | Controls | Servos |
 |-------|-------------|----------|--------|
-| **Panel Controller** | 0x40 | Ring panels P1–P4, P7, P11, P13 + pie panels PP1, PP2, PP4, PP6 | 11 servo channels (MK4 dome) |
+| **Panel Controller** | 0x40 | Ring panels P1–P4, P7, P11, P13 + pie panels PP1, PP2, PP4, PP6 | 11 servo channels (MK4 Complex Dome) |
 | **Holo Controller** | 0x41 | Holoprojectors (FHP, RHP, THP) | 6 servos (2 per holo: H/V) |
 
 ### Why PCA9685?
@@ -265,25 +265,41 @@ All labels use printed-droid / Mr. Baddeley panel numbers throughout — firmwar
 > see firmware-pin numbers in source code or ADRs, mentally subtract one
 > (and the board offset) to recover the silkscreen channel.
 
-**Panel Controller (PCA9685 @ 0x40):**
+**Panel Controller (PCA9685 @ 0x40) — firmware default mapping:**
+
+> The Mr Baddeley MK4 Complex Dome standard defines **which panels exist** and
+> **which have servo mounting points** (P1–P4, P7, P11, P13 on the ring band;
+> PP1, PP2, PP4, PP6 on the pie band; PP3 and PP5 with optional mounts; the
+> rest fixed). Mr Baddeley also makes a Simple Dome variant with few or no
+> moving panels — this firmware targets the Complex Dome. The Complex Dome
+> standard says nothing about which servo controller to use or how to wire
+> the servos; PCA9685 happens to be the controller this firmware drives, and
+> channel assignments are entirely a per-builder choice.
+>
+> The table below shows the firmware's *default* mapping (what `:OPnn` drives
+> when no wiring config has been saved to NVS). The defaults put the first
+> ring panel at CH0 and pack panels from there as a sensible starting point.
+> If your physical wiring differs, set the per-slot mapping in the
+> **Servo Wiring Config** section on the Panels page of the web UI — the
+> saved mapping persists to NVS and is applied at boot. The rest of this
+> guide assumes the default mapping.
 
 | Silkscreen CH | Panel (printed-droid) | Marcduino | Notes |
 |---------------|-----------------------|-----------|-------|
-| 0 | — | — | Unused — leave unconnected |
-| 1 | **P1** | `:OP01` | Ring panel |
-| 2 | **P2** | `:OP02` | Ring panel |
-| 3 | **P3** | `:OP03` | Ring panel |
-| 4 | **P4** | `:OP04` | Ring panel |
-| 5 | **P7** | `:OP05` | Ring panel (small upper) |
-| 6 | **P11** | `:OP06` | Ring panel (lower-left) |
-| 7 | **P13** | `:OP07` | Ring panel (lower-front, near FLD) |
-| 8 | — | — | Unused — **PP5** slot exists in firmware but no servo wired on standard MK4 |
-| 9 | **PP1** | `:OP08` | Pie panel 1 |
-| 10 | **PP2** | `:OP09` | Pie panel 2 |
-| 11 | **PP4** | `:OP10` | Pie panel 4 |
-| 12 | **PP6** | `:OP11` group | Pie panel 6 — no individual command, opens with all-top |
-| 13 | — | — | Unused — **PP3** slot exists in firmware but no servo wired on standard MK4 |
-| 14–15 | — | — | Unused |
+| 0 | **P1** | `:OP01` | Ring panel |
+| 1 | **P2** | `:OP02` | Ring panel |
+| 2 | **P3** | `:OP03` | Ring panel |
+| 3 | **P4** | `:OP04` | Ring panel |
+| 4 | **P7** | `:OP05` | Ring panel (small upper) |
+| 5 | **P11** | `:OP06` | Ring panel (lower-left) |
+| 6 | **P13** | `:OP07` | Ring panel (lower-front, near FLD) |
+| 7 | — | — | Unused by default — **PP5** slot exists in firmware but inactive (no servo wired). Activate via Wiring Config UI if a servo is added. |
+| 8 | **PP1** | `:OP08` | Pie panel 1 |
+| 9 | **PP2** | `:OP09` | Pie panel 2 |
+| 10 | **PP4** | `:OP10` | Pie panel 4 |
+| 11 | **PP6** | `:OP11` group | Pie panel 6 — no individual command, opens with all-top |
+| 12 | — | — | Unused by default — **PP3** slot exists in firmware but inactive (no servo wired). Activate via Wiring Config UI if a servo is added. |
+| 13–15 | — | — | Unused |
 
 **Group commands:**
 

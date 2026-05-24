@@ -394,14 +394,14 @@ DataPanel dataPanel(ledChain1);
 //   in panelConfigLoad()/holoConfigLoad().
 //
 // PCA9685 @ 0x40 silkscreen channel → printed-droid panel → Marcduino command:
-//   CH 1-4  = P1-P4    :OP01-:OP04   (4 small ring panels)
-//   CH 5    = P7       :OP05          (small upper ring panel)
-//   CH 6    = P11      :OP06          (lower-left ring panel)
-//   CH 7    = P13      :OP07          (lower-front ring panel, near FLD)
-//   CH 8    = unused   —              (PP5 slot exists in firmware but no servo on MK4)
-//   CH 9-11 = PP1/PP2/PP4  :OP08-:OP10  (3 individually-addressed pie panels)
-//   CH 12   = PP6      :OP11 group only  (4th pie panel, opened with all-top cmd)
-//   CH 13   = unused   —              (PP3 slot exists in firmware but no servo on MK4)
+//   CH 0-3  = P1-P4    :OP01-:OP04   (4 small ring panels)
+//   CH 4    = P7       :OP05          (small upper ring panel)
+//   CH 5    = P11      :OP06          (lower-left ring panel)
+//   CH 6    = P13      :OP07          (lower-front ring panel, near FLD)
+//   CH 7    = unused   —              (PP5 slot exists in firmware but no servo on MK4)
+//   CH 8-10 = PP1/PP2/PP4  :OP08-:OP10  (3 individually-addressed pie panels)
+//   CH 11   = PP6      :OP11 group only  (4th pie panel, opened with all-top cmd)
+//   CH 12   = unused   —              (PP3 slot exists in firmware but no servo on MK4)
 //
 // Group commands (no dedicated channel):
 //   :OP11 = all pie panels (PP1+PP2+PP4+PP6)
@@ -416,19 +416,27 @@ DataPanel dataPanel(ledChain1);
 const ServoSettings servoSettings[] PROGMEM = {
 #ifndef USE_I2C_ADDRESS
     // Panel Controller (PCA9685 @ 0x40) — slots 0–12; firmware pin = silkscreen + 1.
-    {2,  800, 2200, PANEL_GROUP_1  | SMALL_PANEL}, /* slot 0:  P1  (ring)       CH1   :OP01 */
-    {3,  800, 2200, PANEL_GROUP_2  | SMALL_PANEL}, /* slot 1:  P2  (ring)       CH2   :OP02 */
-    {4,  800, 2200, PANEL_GROUP_3  | SMALL_PANEL}, /* slot 2:  P3  (ring)       CH3   :OP03 */
-    {5,  800, 2200, PANEL_GROUP_4  | SMALL_PANEL}, /* slot 3:  P4  (ring)       CH4   :OP04 */
-    {6,  800, 2200, PANEL_GROUP_5  | SMALL_PANEL}, /* slot 4:  P7  (ring upper) CH5   :OP05 */
-    {7,  800, 2200, PANEL_GROUP_6  | SMALL_PANEL}, /* slot 5:  P11 (ring lower) CH6   :OP06 */
-    {8,  800, 2200, PANEL_GROUP_7  | SMALL_PANEL}, /* slot 6:  P13 (ring front) CH7   :OP07 */
-    {9,  800, 2200, MINI_PANEL},                   /* slot 7:  PP5 (unserviced) CH8   —     panelConfigLoad() zeroes this slot at boot; PROGMEM pin is non-zero only to satisfy the constructor's fLastLength[pin-1] write. */
-    {10, 800, 2200, PANEL_GROUP_8  | PIE_PANEL},   /* slot 8:  PP1 (pie)        CH9   :OP08 */
-    {11, 800, 2200, PANEL_GROUP_9  | PIE_PANEL},   /* slot 9:  PP2 (pie)        CH10  :OP09 */
-    {12, 800, 2200, PANEL_GROUP_10 | PIE_PANEL},   /* slot 10: PP4 (pie)        CH11  :OP10 */
-    {13, 800, 2200, PIE_PANEL},                    /* slot 11: PP6 (pie)        CH12  :OP11 group only */
-    {14, 800, 2200, TOP_PIE_PANEL},                /* slot 12: PP3 (unserviced) CH13  —     panelConfigLoad() zeroes this slot at boot; PROGMEM pin is non-zero only to satisfy the constructor's fLastLength[pin-1] write. */
+    // The Mr Baddeley MK4 Complex Dome IS a standard for WHICH panels exist and which
+    // have servo mounts (slots 0–6 ring, slots 8–11 pie, slots 7+12 unserviced
+    // by default). The CHANNEL-TO-SLOT mapping below is NOT a standard —
+    // builders wire each servo to whichever PCA9685 silkscreen channel is
+    // physically convenient. The defaults pack panels compactly from CH0 as a
+    // sensible starting point; builders whose wiring differs override per-slot
+    // via the Wiring Config UI (panels.html), saved to NVS namespace "panels",
+    // applied at boot by panelConfigLoad().
+    {1,  800, 2200, PANEL_GROUP_1  | SMALL_PANEL}, /* slot 0:  P1  (ring)       CH0   :OP01 */
+    {2,  800, 2200, PANEL_GROUP_2  | SMALL_PANEL}, /* slot 1:  P2  (ring)       CH1   :OP02 */
+    {3,  800, 2200, PANEL_GROUP_3  | SMALL_PANEL}, /* slot 2:  P3  (ring)       CH2   :OP03 */
+    {4,  800, 2200, PANEL_GROUP_4  | SMALL_PANEL}, /* slot 3:  P4  (ring)       CH3   :OP04 */
+    {5,  800, 2200, PANEL_GROUP_5  | SMALL_PANEL}, /* slot 4:  P7  (ring upper) CH4   :OP05 */
+    {6,  800, 2200, PANEL_GROUP_6  | SMALL_PANEL}, /* slot 5:  P11 (ring lower) CH5   :OP06 */
+    {7,  800, 2200, PANEL_GROUP_7  | SMALL_PANEL}, /* slot 6:  P13 (ring front) CH6   :OP07 */
+    {8,  800, 2200, MINI_PANEL},                   /* slot 7:  PP5 (unserviced) CH7   —     panelConfigLoad() zeroes this slot at boot; PROGMEM pin is non-zero only to satisfy the constructor's fLastLength[pin-1] write. */
+    {9,  800, 2200, PANEL_GROUP_8  | PIE_PANEL},   /* slot 8:  PP1 (pie)        CH8   :OP08 */
+    {10, 800, 2200, PANEL_GROUP_9  | PIE_PANEL},   /* slot 9:  PP2 (pie)        CH9   :OP09 */
+    {11, 800, 2200, PANEL_GROUP_10 | PIE_PANEL},   /* slot 10: PP4 (pie)        CH10  :OP10 */
+    {12, 800, 2200, PIE_PANEL},                    /* slot 11: PP6 (pie)        CH11  :OP11 group only */
+    {13, 800, 2200, TOP_PIE_PANEL},                /* slot 12: PP3 (unserviced) CH12  —     panelConfigLoad() zeroes this slot at boot; PROGMEM pin is non-zero only to satisfy the constructor's fLastLength[pin-1] write. */
 
     // Holo Controller (PCA9685 @ 0x41, A0 bridged) — slots 13–18; firmware pin = 16 + silkscreen + 1.
     // Pin 16 still addresses 0x40 CH15 — see ADR 0004. Holo board begins at pin 17.
@@ -453,26 +461,29 @@ static_assert(
     "HOLO_SLOT_OFFSET must equal NUM_PANEL_SLOTS — holos sit immediately after panels");
 #endif
 
-// MK4 default channel assignments used when NVS is absent (fresh boot, factory reset).
+// Default channel assignments used when NVS is absent (fresh boot, factory reset).
 // Channels are physical silkscreen numbers (0–15) on each PCA9685 board; firmware pin
 // is computed at runtime by panelConfigLoad() / holoConfigLoad() with the formula
 // pin = (n × 16) + physCh + 1 (n = 0 for 0x40 panel board, n = 1 for 0x41 holo board).
 // Active=false marks a slot as having no servo wired — its setServo() call then uses
 // pin = 0, group = 0 to keep it out of all I2C writes and command-mask routing.
+// These are just defaults — there is no single canonical "MK4 wiring"; builders
+// whose physical wiring differs override per-slot via the Wiring Config UI on
+// panels.html, persisted to NVS namespace "panels".
 static const uint8_t defaultPanelCh[NUM_PANEL_SLOTS] = {
-    1,   // slot 0:  P1   (ring)
-    2,   // slot 1:  P2   (ring)
-    3,   // slot 2:  P3   (ring)
-    4,   // slot 3:  P4   (ring)
-    5,   // slot 4:  P7   (ring upper)
-    6,   // slot 5:  P11  (ring lower)
-    7,   // slot 6:  P13  (ring front)
-    0,   // slot 7:  PP5  — unserviced on MK4; channel value ignored when active=false
-    9,   // slot 8:  PP1  (pie)
-    10,  // slot 9:  PP2  (pie)
-    11,  // slot 10: PP4  (pie)
-    12,  // slot 11: PP6  (pie, :OP11 group only)
-    0,   // slot 12: PP3  — unserviced on MK4; channel value ignored when active=false
+    0,   // slot 0:  P1   (ring)
+    1,   // slot 1:  P2   (ring)
+    2,   // slot 2:  P3   (ring)
+    3,   // slot 3:  P4   (ring)
+    4,   // slot 4:  P7   (ring upper)
+    5,   // slot 5:  P11  (ring lower)
+    6,   // slot 6:  P13  (ring front)
+    0,   // slot 7:  PP5  — unserviced by default; channel value ignored when active=false
+    8,   // slot 8:  PP1  (pie)
+    9,   // slot 9:  PP2  (pie)
+    10,  // slot 10: PP4  (pie)
+    11,  // slot 11: PP6  (pie, :OP11 group only)
+    0,   // slot 12: PP3  — unserviced by default; channel value ignored when active=false
 };
 static const bool defaultPanelActive[NUM_PANEL_SLOTS] = {
     true,  // P1
@@ -482,12 +493,12 @@ static const bool defaultPanelActive[NUM_PANEL_SLOTS] = {
     true,  // P7
     true,  // P11
     true,  // P13
-    false, // PP5 — unserviced on standard MK4
+    false, // PP5 — inactive by default; flip to true via Wiring Config UI if a servo is wired
     true,  // PP1
     true,  // PP2
     true,  // PP4
     true,  // PP6
-    false, // PP3 — unserviced on standard MK4
+    false, // PP3 — inactive by default; flip to true via Wiring Config UI if a servo is wired
 };
 
 // Holo defaults — physical silkscreen channels on the 0x41 board.

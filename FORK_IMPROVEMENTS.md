@@ -647,8 +647,8 @@ A table, one row per servo slot:
 
 #### What the operator gets behaviourally
 
-- **Out of the box (no saved config)** — a standard Mr. Baddeley MK4 dome works without ever touching the new sections. Defaults match the documented MK4 wiring.
-- **Wired non-standard** — fix the mapping entirely from the web UI: change the channel dropdowns, click Save, reboot. Every Marcduino command (`:OP01`–`:OP11`, `:OP00`, `:CL00`, wave/flutter/marching-ants sequences, the panel SVG diagram clicks) now routes through the corrected mapping.
+- **Out of the box (no saved config)** — the dome works without touching the new sections if your physical wiring matches the firmware's shipped defaults: ring panels on silkscreen CH0–CH6 (P1–P4, P7, P11, P13), pie panels on CH8–CH11 (PP1, PP2, PP4, PP6), holo axes on the holo board's CH0–CH5. The Mr Baddeley MK4 Complex Dome standard defines which panels exist and which have servo mounts (he also makes a Simple Dome with few or no moving panels) — but it does NOT define controller choice or channel wiring, so these defaults are a firmware convention, not a community one.
+- **Wired differently than the defaults** — set the per-slot mapping entirely from the web UI: change the channel dropdowns to match your physical wiring, click Save, reboot. Every Marcduino command (`:OP01`–`:OP11`, `:OP00`, `:CL00`, wave/flutter/marching-ants sequences, the panel SVG diagram clicks) routes through whatever mapping you save.
 - **P11 not wired yet?** — uncheck Active for P11, save, reboot. `:OP06` and group commands skip it cleanly. No grinding, no errors. Wire it later, re-check, save, reboot.
 - **Two slots assigned the same channel** — both rows turn amber, the Save button greys out, with a message naming the conflicting channel. Even if the UI is bypassed entirely, the dome refuses to save a conflicting config (returns an error and leaves the saved settings untouched).
 - **Wiring stuck open?** — reboot. Test pulses don't survive a power cycle. The dome comes back with whatever the saved config says.
@@ -656,12 +656,8 @@ A table, one row per servo slot:
 
 #### What this also fixed in passing
 
-Both halves of the old "+1 channel" bug are corrected as part of this work:
-
-- **Panels:** `:OP01` now drives the panel servo on the channel labelled `1` on the panel board, not the channel labelled `0` as before.
-- **Holos:** the holo defaults used to silently address the panel board's last channel instead of the holo board's first channel. Front horizontal, front vertical, top horizontal, top vertical, rear vertical, rear horizontal now map to channels `0`–`5` on the holo board as the docs always claimed.
-
-The hardware wiring guide (`docs/HARDWARE_WIRING.md`) was rewritten in the same change so its channel tables and the firmware finally agree.
+- **Holo board off-by-one (real chip-boundary bug).** The holo defaults used to silently address the panel board's last channel instead of the holo board's first channel — the firmware-pin → board math meant that pin 16 stayed on the panel board (`0x40` CH15) instead of crossing to the holo board (`0x41` CH0). The original pins `{16,17,…,21}` were one short across all six holo axes. Corrected to `{17,…,22}` so the front/top/rear horizontal+vertical axes route to `0x41` CH0–CH5 as the chip-boundary math actually requires. See [ADR 0004](docs/adr/0004-holo-servosettings-starts-at-pin-17.md) for the math.
+- **Docs vs firmware alignment.** The panel section of `docs/HARDWARE_WIRING.md` previously claimed `CH1 = P1` (a 1-indexed silkscreen layout), while the firmware actually drove `CH0` for P1. Rewritten so the channel tables match what the firmware ships with (`CH0 = P1`) and with an explicit callout that the table is just the default — not a wiring standard. Builders whose physical wiring differs no longer have to reverse-engineer the firmware to figure out what `:OP01` will drive; they look at the Wiring Config UI.
 
 #### What this does NOT change
 
