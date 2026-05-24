@@ -86,7 +86,9 @@ static AsyncWebServer asyncServer(80);
 static AsyncWebSocket ws("/ws");
 
 // Log capture — wraps Serial, tees output to ring buffer for WS broadcast
-static LogCapture logCapture(Serial);
+// logCapture instance is declared in AstroPixelsPlus.ino (before panelConfigLoad)
+// so boot-time wiring-config logs reach the same ring buffer as runtime API logs.
+// Same translation unit — no extern needed.
 static uint32_t lastLogCount = 0;
 
 // Broadcast timers
@@ -1383,6 +1385,8 @@ static void initAsyncWeb()
             // onRequest — fires after the body is fully buffered into _tempObject.
             if (!checkWriteAuth(request))
             {
+                logCapture.println("[API] panels/config rejected: unauthorized "
+                                    "(missing or invalid X-AP-Token)");
                 request->send(401, "application/json", "{\"error\":\"unauthorized\"}");
                 if (request->_tempObject)
                 {
@@ -1394,6 +1398,7 @@ static void initAsyncWeb()
             String *body = (String *)request->_tempObject;
             if (!body || body->length() == 0)
             {
+                logCapture.println("[API] panels/config rejected: empty body");
                 request->send(400, "application/json", "{\"error\":\"empty body\"}");
                 if (body) { delete body; request->_tempObject = nullptr; }
                 return;
@@ -1407,12 +1412,14 @@ static void initAsyncWeb()
             request->_tempObject = nullptr;
             if (!ok)
             {
+                logCapture.printf("[API] panels/config rejected: %s\n", errMsg.c_str());
                 request->send(400, "application/json",
                     String("{\"error\":\"") + jsonEscape(errMsg) + "\"}");
                 return;
             }
             if (!wiringConfigCheckConflicts(NUM_PANEL_SLOTS, channels, actives, errMsg))
             {
+                logCapture.printf("[API] panels/config rejected: %s\n", errMsg.c_str());
                 request->send(400, "application/json",
                     String("{\"error\":\"") + jsonEscape(errMsg) + "\"}");
                 return;
@@ -1421,10 +1428,18 @@ static void initAsyncWeb()
                                    PREFERENCE_PANELS_ACT_FMT, NUM_PANEL_SLOTS,
                                    channels, actives))
             {
+                logCapture.println("[API] Error: panels/config NVS save failed "
+                                    "(flash full or NVS corrupt — investigate)");
                 request->send(500, "application/json", "{\"error\":\"NVS save failed\"}");
                 return;
             }
-            logCapture.println("[API] panels/config saved; reboot required to apply");
+            // Success path — count actives so the log carries enough detail to
+            // confirm at a glance what was saved without dumping all 13 slots.
+            int activeCount = 0;
+            for (int i = 0; i < NUM_PANEL_SLOTS; i++) if (actives[i]) activeCount++;
+            logCapture.printf("[API] panels/config saved: %d active, %d inactive "
+                               "— reboot required to apply\n",
+                               activeCount, NUM_PANEL_SLOTS - activeCount);
             request->send(200, "application/json", "{\"ok\":true,\"reboot_required\":true}");
         },
         NULL,
@@ -1461,6 +1476,8 @@ static void initAsyncWeb()
         {
             if (!checkWriteAuth(request))
             {
+                logCapture.println("[API] holos/config rejected: unauthorized "
+                                    "(missing or invalid X-AP-Token)");
                 request->send(401, "application/json", "{\"error\":\"unauthorized\"}");
                 if (request->_tempObject)
                 {
@@ -1472,6 +1489,7 @@ static void initAsyncWeb()
             String *body = (String *)request->_tempObject;
             if (!body || body->length() == 0)
             {
+                logCapture.println("[API] holos/config rejected: empty body");
                 request->send(400, "application/json", "{\"error\":\"empty body\"}");
                 if (body) { delete body; request->_tempObject = nullptr; }
                 return;
@@ -1484,12 +1502,14 @@ static void initAsyncWeb()
             request->_tempObject = nullptr;
             if (!ok)
             {
+                logCapture.printf("[API] holos/config rejected: %s\n", errMsg.c_str());
                 request->send(400, "application/json",
                     String("{\"error\":\"") + jsonEscape(errMsg) + "\"}");
                 return;
             }
             if (!wiringConfigCheckConflicts(NUM_HOLO_SLOTS, channels, actives, errMsg))
             {
+                logCapture.printf("[API] holos/config rejected: %s\n", errMsg.c_str());
                 request->send(400, "application/json",
                     String("{\"error\":\"") + jsonEscape(errMsg) + "\"}");
                 return;
@@ -1498,10 +1518,16 @@ static void initAsyncWeb()
                                    PREFERENCE_HOLOS_ACT_FMT, NUM_HOLO_SLOTS,
                                    channels, actives))
             {
+                logCapture.println("[API] Error: holos/config NVS save failed "
+                                    "(flash full or NVS corrupt — investigate)");
                 request->send(500, "application/json", "{\"error\":\"NVS save failed\"}");
                 return;
             }
-            logCapture.println("[API] holos/config saved; reboot required to apply");
+            int activeCount = 0;
+            for (int i = 0; i < NUM_HOLO_SLOTS; i++) if (actives[i]) activeCount++;
+            logCapture.printf("[API] holos/config saved: %d active, %d inactive "
+                               "— reboot required to apply\n",
+                               activeCount, NUM_HOLO_SLOTS - activeCount);
             request->send(200, "application/json", "{\"ok\":true,\"reboot_required\":true}");
         },
         NULL,
@@ -1527,6 +1553,8 @@ static void initAsyncWeb()
         {
             if (!checkWriteAuth(request))
             {
+                logCapture.println("[API] /servo/test rejected: unauthorized "
+                                    "(missing or invalid X-AP-Token)");
                 request->send(401, "application/json", "{\"error\":\"unauthorized\"}");
                 if (request->_tempObject)
                 {
@@ -1538,6 +1566,7 @@ static void initAsyncWeb()
             String *body = (String *)request->_tempObject;
             if (!body || body->length() == 0)
             {
+                logCapture.println("[API] /servo/test rejected: empty body");
                 request->send(400, "application/json", "{\"error\":\"empty body\"}");
                 if (body) { delete body; request->_tempObject = nullptr; }
                 return;
@@ -1550,6 +1579,7 @@ static void initAsyncWeb()
             request->_tempObject = nullptr;
             if (!ok)
             {
+                logCapture.printf("[API] /servo/test rejected: %s\n", errMsg.c_str());
                 request->send(400, "application/json",
                     String("{\"error\":\"") + jsonEscape(errMsg) + "\"}");
                 return;
@@ -1558,12 +1588,23 @@ static void initAsyncWeb()
             // Server-side auto-stop: if a test is already running on this board,
             // close it cleanly before driving the new channel. UI mirrors this
             // by resetting the previous row's button — but the server enforces.
+            const char *boardName = isPanels ? "panels" : "holos";
+            int8_t prevChannel = isPanels ? sPanelTestChannel : sHoloTestChannel;
+            if (prevChannel >= 0)
+            {
+                logCapture.printf("[Wiring] Auto-stopping previous test on %s CH%d "
+                                   "before starting new pulse\n",
+                                   boardName, (int)prevChannel);
+            }
             servoTestStop(isPanels);
 
             if (isPanels)
             {
                 writePwm(PCA9685_PANELS_ADDR, (uint8_t)channel, PWM_PANEL_OPEN);
                 sPanelTestChannel = (int8_t)channel;
+                logCapture.printf("[Wiring] Test pulse: panels CH%d held open "
+                                   "(stays open until /servo/stop or another test "
+                                   "on this board)\n", channel);
             }
             else
             {
@@ -1577,8 +1618,11 @@ static void initAsyncWeb()
                 writePwm(PCA9685_HOLOS_ADDR, (uint8_t)channel, PWM_HOLO_A);
                 sHoloSweepDeadline  = millis() + HOLO_SWEEP_HOLD_MS;
                 sHoloSweepActive    = true;
+                logCapture.printf("[Wiring] Test sweep started: holos CH%d "
+                                   "(alternating extremes with 1 s holds — "
+                                   "stays running until /servo/stop)\n", channel);
             }
-            String resp = String("{\"ok\":true,\"board\":\"") + (isPanels ? "panels" : "holos") +
+            String resp = String("{\"ok\":true,\"board\":\"") + boardName +
                           "\",\"channel\":" + channel + "}";
             request->send(200, "application/json", resp);
         },
@@ -1600,6 +1644,8 @@ static void initAsyncWeb()
         {
             if (!checkWriteAuth(request))
             {
+                logCapture.println("[API] /servo/stop rejected: unauthorized "
+                                    "(missing or invalid X-AP-Token)");
                 request->send(401, "application/json", "{\"error\":\"unauthorized\"}");
                 if (request->_tempObject)
                 {
@@ -1611,6 +1657,7 @@ static void initAsyncWeb()
             String *body = (String *)request->_tempObject;
             if (!body || body->length() == 0)
             {
+                logCapture.println("[API] /servo/stop rejected: empty body");
                 request->send(400, "application/json", "{\"error\":\"empty body\"}");
                 if (body) { delete body; request->_tempObject = nullptr; }
                 return;
@@ -1625,13 +1672,29 @@ static void initAsyncWeb()
             request->_tempObject = nullptr;
             if (!ok)
             {
+                logCapture.printf("[API] /servo/stop rejected: %s\n", errMsg.c_str());
                 request->send(400, "application/json",
                     String("{\"error\":\"") + jsonEscape(errMsg) + "\"}");
                 return;
             }
+            // Snapshot which channel was active so the log can name it; we
+            // still report success even if nothing was running (idempotent stop).
+            const char *boardName = isPanels ? "panels" : "holos";
+            int8_t prevChannel = isPanels ? sPanelTestChannel : sHoloTestChannel;
             servoTestStop(isPanels);  // no-op if nothing is active on that board
+            if (prevChannel >= 0)
+            {
+                logCapture.printf("[Wiring] Test stopped: %s CH%d (servo returned "
+                                   "to %s)\n", boardName, (int)prevChannel,
+                                   isPanels ? "closed" : "neutral");
+            }
+            else
+            {
+                logCapture.printf("[Wiring] /servo/stop: no active test on %s "
+                                   "(no-op)\n", boardName);
+            }
             request->send(200, "application/json",
-                String("{\"ok\":true,\"board\":\"") + (isPanels ? "panels" : "holos") + "\"}");
+                String("{\"ok\":true,\"board\":\"") + boardName + "\"}");
         },
         NULL,
         [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)

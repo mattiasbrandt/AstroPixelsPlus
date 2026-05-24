@@ -520,13 +520,38 @@ AnimationPlayer player(servoSequencer);
 // triggers the first PCA9685 I2C write, after which any slot still pointing at
 // the wrong channel would briefly drive that physical output. See ADR 0002 for
 // why setServo() is the right hook (vs construction reordering or PROGMEM editing).
+
+// LogCapture instance declared here (rather than in AsyncWebInterface.h, which is
+// included later in this TU) so that panelConfigLoad() / holoConfigLoad() — which
+// run during setup() before the web layer is brought up — can write to the same
+// captured ring buffer the web log viewer reads from. Tees to hardware Serial AND
+// the buffer; raw Serial.print() bypasses the buffer and won't reach the web UI.
+#include "LogCapture.h"
+static LogCapture logCapture(Serial);
+
 #ifndef USE_I2C_ADDRESS
+// Operator-visible labels for the wiring-config boot logs. Mirrored in
+// AsyncWebInterface.h's panelSlotLabel/holoSlotLabel — keep in sync.
+static const char *kPanelSlotLabels[NUM_PANEL_SLOTS] = {
+    "P1", "P2", "P3", "P4", "P7", "P11", "P13",
+    "PP5", "PP1", "PP2", "PP4", "PP6", "PP3",
+};
+static const char *kHoloSlotLabels[NUM_HOLO_SLOTS] = {
+    "FHP horizontal", "FHP vertical",
+    "THP horizontal", "THP vertical",
+    "RHP vertical",   "RHP horizontal",
+};
+
 static void panelConfigLoad()
 {
     Preferences prefs;
     // Read-only open: avoids creating an empty namespace on first boot and avoids
     // an unnecessary flash erase cycle when the user has never saved a config.
     prefs.begin(PREFERENCE_PANELS_NS, true);
+    int activeCount = 0;
+    int inactiveCount = 0;
+    int chOverrides = 0;
+    int actOverrides = 0;
     for (int i = 0; i < NUM_PANEL_SLOTS; i++)
     {
         char keyC[12];
@@ -537,12 +562,31 @@ static void panelConfigLoad()
         // active = NVS bool if present, else MK4 default. The active flag is the
         // sole source of truth for whether a servo is wired — channel value is
         // ignored when inactive (we don't use a sentinel like channel=255).
-        bool active = prefs.isKey(keyA)
-                          ? prefs.getBool(keyA, defaultPanelActive[i])
-                          : defaultPanelActive[i];
-        uint8_t physCh = prefs.isKey(keyC)
-                             ? prefs.getUChar(keyC, defaultPanelCh[i])
-                             : defaultPanelCh[i];
+        bool hasActOverride = prefs.isKey(keyA);
+        bool hasChOverride  = prefs.isKey(keyC);
+        bool active = hasActOverride ? prefs.getBool(keyA, defaultPanelActive[i])
+                                      : defaultPanelActive[i];
+        uint8_t physCh = hasChOverride ? prefs.getUChar(keyC, defaultPanelCh[i])
+                                        : defaultPanelCh[i];
+
+        // Log per-slot overrides that actually differ from the MK4 default so
+        // operators can verify their saved mapping took effect. Skip silent
+        // overrides where the saved value matches the default.
+        if (hasChOverride && physCh != defaultPanelCh[i])
+        {
+            logCapture.printf("[Wiring] Panel %s channel override: CH%u (default CH%u)\n",
+                              kPanelSlotLabels[i], (unsigned)physCh,
+                              (unsigned)defaultPanelCh[i]);
+            chOverrides++;
+        }
+        if (hasActOverride && active != defaultPanelActive[i])
+        {
+            logCapture.printf("[Wiring] Panel %s %s by saved config (default %s)\n",
+                              kPanelSlotLabels[i],
+                              active ? "enabled" : "disabled",
+                              defaultPanelActive[i] ? "enabled" : "disabled");
+            actOverrides++;
+        }
 
         // Preserve the PROGMEM group/pulse so command routing, mask membership,
         // and per-slot calibration are unchanged. We override only the pin and,
@@ -557,33 +601,39 @@ static void panelConfigLoad()
         uint16_t neutral = servoDispatch.getNeutral(i);
 
         // Operator-visible safety check: an enabled panel with no command
-        // routing won't move when any Marcduino panel command is sent. This
-        // only fires if a future firmware edit drops the group bits — it
-        // should never trigger on the shipped MK4 defaults.
+        // routing won't move when any Marcduino panel command is sent. Only
+        // fires if a future firmware edit drops the group bits — should never
+        // trigger on the shipped MK4 defaults.
         if (active && group == 0)
         {
-            static const char *kLabels[NUM_PANEL_SLOTS] = {
-                "P1", "P2", "P3", "P4", "P7", "P11", "P13",
-                "PP5", "PP1", "PP2", "PP4", "PP6", "PP3",
-            };
-            Serial.print(F("[Wiring] Warning: panel "));
-            Serial.print(kLabels[i]);
-            Serial.println(F(" is enabled in the wiring config but won't respond "
-                             "to any open/close commands. Either uncheck it in "
-                             "the Servo Wiring Config (if no servo is wired) or "
-                             "ask the firmware maintainer to restore its command "
-                             "group bits."));
+            logCapture.printf(
+                "[Wiring] Warning: panel %s is enabled in the wiring config "
+                "but won't respond to any open/close commands. Either uncheck "
+                "it in the Servo Wiring Config (if no servo is wired) or ask "
+                "the firmware maintainer to restore its command group bits.\n",
+                kPanelSlotLabels[i]);
         }
 
+        if (active) activeCount++; else inactiveCount++;
         servoDispatch.setServo(i, pin, start, end, neutral, group);
     }
     prefs.end();
+
+    // Boot-time summary — always logged so an operator who connects later can
+    // confirm at a glance that the load ran and how many channels are wired.
+    logCapture.printf("[Wiring] Panel config loaded: %d active, %d inactive "
+                       "(NVS overrides: %d channel, %d active flag)\n",
+                       activeCount, inactiveCount, chOverrides, actOverrides);
 }
 
 static void holoConfigLoad()
 {
     Preferences prefs;
     prefs.begin(PREFERENCE_HOLOS_NS, true);
+    int activeCount = 0;
+    int inactiveCount = 0;
+    int chOverrides = 0;
+    int actOverrides = 0;
     for (int i = HOLO_SLOT_OFFSET; i < HOLO_SLOT_OFFSET + NUM_HOLO_SLOTS; i++)
     {
         // slotIdx (0–5) is what we use for NVS keys and the default arrays;
@@ -594,12 +644,28 @@ static void holoConfigLoad()
         snprintf(keyC, sizeof(keyC), PREFERENCE_HOLOS_CH_FMT, slotIdx);
         snprintf(keyA, sizeof(keyA), PREFERENCE_HOLOS_ACT_FMT, slotIdx);
 
-        bool active = prefs.isKey(keyA)
-                          ? prefs.getBool(keyA, defaultHoloActive[slotIdx])
-                          : defaultHoloActive[slotIdx];
-        uint8_t physCh = prefs.isKey(keyC)
-                             ? prefs.getUChar(keyC, defaultHoloCh[slotIdx])
-                             : defaultHoloCh[slotIdx];
+        bool hasActOverride = prefs.isKey(keyA);
+        bool hasChOverride  = prefs.isKey(keyC);
+        bool active = hasActOverride ? prefs.getBool(keyA, defaultHoloActive[slotIdx])
+                                      : defaultHoloActive[slotIdx];
+        uint8_t physCh = hasChOverride ? prefs.getUChar(keyC, defaultHoloCh[slotIdx])
+                                        : defaultHoloCh[slotIdx];
+
+        if (hasChOverride && physCh != defaultHoloCh[slotIdx])
+        {
+            logCapture.printf("[Wiring] Holo %s channel override: CH%u (default CH%u)\n",
+                              kHoloSlotLabels[slotIdx], (unsigned)physCh,
+                              (unsigned)defaultHoloCh[slotIdx]);
+            chOverrides++;
+        }
+        if (hasActOverride && active != defaultHoloActive[slotIdx])
+        {
+            logCapture.printf("[Wiring] Holo %s %s by saved config (default %s)\n",
+                              kHoloSlotLabels[slotIdx],
+                              active ? "enabled" : "disabled",
+                              defaultHoloActive[slotIdx] ? "enabled" : "disabled");
+            actOverrides++;
+        }
 
         // 0x41 board pin formula. Firmware pin 16 still addresses 0x40 CH15 —
         // the holo board starts at pin 17 (silkscreen CH0). See ADR 0004 for
@@ -610,28 +676,24 @@ static void holoConfigLoad()
         uint16_t end     = servoDispatch.getEnd(i);
         uint16_t neutral = servoDispatch.getNeutral(i);
 
-        // Operator-visible safety check: an enabled holo axis with no command
-        // routing won't move when any holo command (*HP / *RD / *HN) is sent.
-        // Only fires if a future firmware edit drops the group bits.
         if (active && group == 0)
         {
-            static const char *kLabels[NUM_HOLO_SLOTS] = {
-                "FHP horizontal", "FHP vertical",
-                "THP horizontal", "THP vertical",
-                "RHP vertical",   "RHP horizontal",
-            };
-            Serial.print(F("[Wiring] Warning: holo "));
-            Serial.print(kLabels[slotIdx]);
-            Serial.println(F(" is enabled in the wiring config but won't "
-                             "respond to any holo commands. Either uncheck "
-                             "it in the Holo Wiring Config (if no servo is "
-                             "wired) or ask the firmware maintainer to "
-                             "restore its command group bits."));
+            logCapture.printf(
+                "[Wiring] Warning: holo %s is enabled in the wiring config "
+                "but won't respond to any holo commands. Either uncheck it "
+                "in the Holo Wiring Config (if no servo is wired) or ask the "
+                "firmware maintainer to restore its command group bits.\n",
+                kHoloSlotLabels[slotIdx]);
         }
 
+        if (active) activeCount++; else inactiveCount++;
         servoDispatch.setServo(i, pin, start, end, neutral, group);
     }
     prefs.end();
+
+    logCapture.printf("[Wiring] Holo config loaded: %d active, %d inactive "
+                       "(NVS overrides: %d channel, %d active flag)\n",
+                       activeCount, inactiveCount, chOverrides, actOverrides);
 }
 #endif // USE_I2C_ADDRESS
 
