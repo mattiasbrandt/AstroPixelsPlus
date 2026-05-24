@@ -1,12 +1,13 @@
 ---
 description: "Dynamic servo wiring config — per-slot PCA9685 channel assignment and test UI for panel and holo boards"
 created-date: 2026-05-23
-spec-reference: docs/adr/0001-physical-channel-numbers-in-ui.md, docs/adr/0002-setservo-for-runtime-slot-override.md, docs/adr/0003-panel-command-routing-hardcoded-switch.md
+implemented-date: 2026-05-24
+spec-reference: docs/adr/0001-physical-channel-numbers-in-ui.md, docs/adr/0002-setservo-for-runtime-slot-override.md, docs/adr/0003-panel-command-routing-hardcoded-switch.md, docs/adr/0004-holo-servosettings-starts-at-pin-17.md
 ---
 
 # Plan: Dynamic Servo Wiring Configuration UI
 
-**Status:** Reviewed — ready for implementation  
+**Status:** Implemented on `main` — pending hardware verification (F9 flash + F10 empirical channel walk-through).
 **Scope:** Medium-large (4–5 files, new NVS schema, new API endpoints, new UI sections
 in two pages, firmware refactor prerequisite)  
 **Prerequisite:** None — replaces the need for a physical rewire guess-and-check cycle
@@ -19,6 +20,50 @@ in two pages, firmware refactor prerequisite)
 > quality-of-life advancement beyond the upstream firmware. Covers both panel
 > servos and holo projector servos. When shipped, `FORK_IMPROVEMENTS.md` should
 > call this out prominently.
+
+---
+
+## Implementation Results (2026-05-24)
+
+Landed across the following commits on `main` (in order):
+
+| Commit | Scope |
+|---|---|
+| `5728db6` | R1 — `servoSettings[]` defaults corrected, `HARDWARE_WIRING.md` rewritten silkscreen-first, ADR 0004 added (holo pin off-by-one). |
+| `6f81b19` | F1–F11 — slot constants + defaults, `panelConfigLoad()`/`holoConfigLoad()`, four API endpoints, raw I2C writer, `holoSweepPoll()` state machine, two UI sections, ADRs 0001/0002/0003, CONTEXT.md, this plan, design notes, `FORK_IMPROVEMENTS.md`. |
+| `e81cc41` | Operator-facing warning when an active slot has no command-routing group bits (plan-mandated, missed in original feature commit). |
+| `e9b5135` | Logging overhaul — moved `LogCapture` instance earlier so boot-time wiring logs reach the web log viewer; added structured info/warn/error logs to all new endpoints and to both load functions. |
+| `2121040`, `85ab880` | `FORK_IMPROVEMENTS.md` entry rewritten in builder/operator language. |
+
+### Deviations from the original spec
+
+- **Default arrays placed after `servoSettings[]`** (in F1) instead of "immediately before `panelConfigLoad()`" — functionally equivalent (same file scope, same visibility) but reads differently.
+- **GET response carries extra `board` and `slot_count` fields** not in the original API contract. Harmless extras; the UI ignores them but they aid debug via `curl`.
+- **Added a Reload button** in both UI sections (not in spec, not forbidden). Re-fetches from server — discards local edits without resetting to factory defaults, so the no-reset-to-defaults rule from the spec still holds.
+- **F11 (`FORK_IMPROVEMENTS.md` entry) was completed before F10 (empirical channel verification).** Dependency reversal: the entry describes what was built, makes no empirical claims, so this is harmless. F10 will still be done on hardware.
+
+### Plan-instruction misses caught and fixed in follow-up commits
+
+- **Group-bit safety warning** (edge case table line "`getGroup(i)` returns 0 for an active slot") was missing from the original feature commit. Added in `e81cc41` and `e9b5135` (now properly routes through `logCapture`).
+- **Two-commit-group structure** (R1 separate from F1–F11) was initially squashed into the working tree as one batch. Split into separate commits after the user pointed it out.
+
+### Verification status
+
+- **Local build** — clean across all commits (RAM 18.6%, Flash 84.0%).
+- **Local browser smoke** — structural only (pages serve 200, markup well-formed, div balance correct). Interactive UI flow (table render, conflict highlighting, save banner) not driven manually.
+- **Hardware flash + Marcduino compat matrix** — **pending** (F9).
+- **Empirical channel walk-through using the new test UI** — **pending** (F10). MK4 channel defaults in code are best-available information; F10 is the ground-truth confirmation step. Any discrepancy at F10 requires a small correction commit to `defaultPanelCh[]` / `defaultHoloCh[]`.
+
+### Operator-visible logging summary
+
+All wiring-config events route through `logCapture` (visible in the web log viewer) using the existing `[Subsystem]` / inline-marker convention. See `e9b5135` commit message for the full catalogue. Sample lines:
+
+- Boot: `[Wiring] Panel config loaded: 11 active, 2 inactive (NVS overrides: 0 channel, 0 active flag)`
+- NVS override applied: `[Wiring] Panel P3 channel override: CH7 (default CH3)`
+- Test pulse: `[Wiring] Test pulse: panels CH3 held open ...`
+- Auto-stop: `[Wiring] Auto-stopping previous test on panels CH3 before starting new pulse`
+- Validation rejection: `[API] panels/config rejected: channel 5 is assigned to slots 2 and 4`
+- Save success: `[API] panels/config saved: 11 active, 2 inactive — reboot required to apply`
 
 ---
 
