@@ -37,6 +37,7 @@ Landed across the following commits on `main` (in order):
 | `66d0d63` | Codex review round 1 — three fixes (see *Post-implementation review fixes* below). |
 | `afe6eaf` | Codex review round 2 — too-many-slots accepted; numeric-prefix `5bad` and `truejunk` accepted. |
 | `803f8a8` | Codex review round 3 — whitespace treated as value terminator (`5 garbage` accepted); Reload didn't stop active test. |
+| `6a6e16d` | Codex review round 4 — six UI `.finally()` sites silently desynced from server on stop-call failure. |
 
 ### Deviations from the original spec
 
@@ -70,9 +71,13 @@ GPT Codex performed three review rounds on 2026-05-24. Each round caught defects
 6. **Whitespace treated as a value terminator.** Round 2's helper accepted whitespace as a valid terminator, so `"channel": 5 garbage` and `"active": true garbage` parsed cleanly — the parser stopped at the space and the space itself passed the check. Whitespace is a *separator*, not a *terminator*. Renamed the helper to `jsonValueEndsCleanly(const char *)` with a stricter algorithm (skip whitespace, *then* require `,`, `}`, `]`, or NUL). All four call sites updated.
 7. **Reload didn't stop active test.** `loadPanelWiring()` / `loadHoloWiring()` re-rendered the table from `/api/{panels,holos}/config` without stopping any active test. Clicking Reload while a panel was held open reset every row's button visually, but the server-side test kept the panel under PWM (or the holo sweep state machine kept flipping phases). Both loaders now POST `/api/servo/stop` first if `activeTestIdx >= 0`, then clear state, then fetch.
 
-**Meta note — why each round caught more.** Each round's previous fix patched the *exact* case the previous report named without surveying the surrounding validation surface. The pattern broke after Round 3 because the helper rename (`isJsonValueTerminator` → `jsonValueEndsCleanly`) pushed the right algorithm by name. Lesson for future similar work: when adding input validation, name the helper after the *intent* (does this token end cleanly?), not the surface check (is this char a terminator?), and audit the full validation surface rather than each named case in isolation.
+**Round 4 — `6a6e16d`:**
 
-None of these defects would have surfaced through F9/F10 hardware verification — they require direct API clients sending malformed bodies, NVS-failure scenarios, or specific UI sequencing flows that hands-on operator testing rarely exercises. External API review is genuinely catching issues that hardware testing cannot.
+8. **Six UI `.finally()` sites silently desynced on stop-call failure.** Every wiring-config UI site that POSTs `/api/servo/stop` was using `.finally()` to reset state. `.finally()` fires regardless of HTTP status AND on network errors — so a 401 / 500 / timeout would silently desync the UI from the server: button shows the idle label, the row checkbox shows inactive, or the table reloads, while the panel stays held open or the holo sweep keeps running server-side. Switched all six sites to `.then() + throw on !r.ok + .catch()`. On failure: test-button stay in ■ Close / ■ Stop; checkbox revert to checked; Reload aborted. Error toasts name the operator-visible consequence ("panel may still be held open", "sweep may still be running"). Same root cause as Round 1 item 1 — that fix patched the named case but kept `.finally()` everywhere else.
+
+**Meta note — why each round caught more.** Each round's previous fix patched the *exact* case the previous report named without surveying the surrounding code shape. Round 2 hit because round 1 didn't audit the rest of the parser surface. Round 3 hit because round 2 only checked `isTerminator(*end)` for the named tokens. Round 4 hit because round 1's `.finally()` fix wasn't generalised to the other five sites with the same shape. The pattern only breaks when fixes generalise — rename the helper to push the right algorithm by name (round 3), audit every site sharing the same anti-pattern (round 4). Lesson: when a report names one case, treat it as a *sample* of a class, not the whole class. Search for the shape, not the symptom.
+
+None of these defects would have surfaced through F9/F10 hardware verification — they require direct API clients sending malformed bodies, NVS-failure scenarios, transient stop-call failures, or specific UI sequencing flows that hands-on operator testing rarely exercises. External API review is genuinely catching issues that hardware testing cannot.
 
 ### Verification status
 
