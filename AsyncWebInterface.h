@@ -95,7 +95,6 @@ static uint32_t lastLogCount = 0;
 // Broadcast timers
 static uint32_t lastStateBroadcast = 0;
 static uint32_t lastHealthBroadcast = 0;
-static bool authWarningLogged = false;
 static bool rebootScheduled = false;
 static uint32_t rebootAtMs = 0;
 static bool otaUploadFailed = false;
@@ -256,7 +255,7 @@ static bool isAllowedPrefKey(const String &key)
            key == "mwifi" || key == "mwifipass" ||
            key == "msound" || key == "msoundser" || key == "mvolume" ||
            key == "msoundstart" || key == "mrandom" || key == "mrandommin" ||
-           key == "mrandommax" || key == "msoundlocal" || key == "apitoken" ||
+           key == "mrandommax" || key == "msoundlocal" ||
            key == "dname" ||
            key == "mbodylink" || key == "mbodywifi" || key == "bodypeerip" ||
            key == PREFERENCE_BADMOTIVATOR_ENABLED || key == PREFERENCE_FIRESTRIP_ENABLED ||
@@ -267,7 +266,7 @@ static bool isAllowedPrefKey(const String &key)
 static size_t maxPrefValueLen(const String &key)
 {
     if (key == "ssid" || key == "rhost") return 32;
-    if (key == "pass" || key == "rsecret" || key == "apitoken") return 64;
+    if (key == "pass" || key == "rsecret") return 64;
     if (key == "dname") return 24;
     if (key == "bodypeerip") return 15;
     return 16;
@@ -351,28 +350,6 @@ static String jsonEscape(const String &in)
     return out;
 }
 
-static bool checkWriteAuth(AsyncWebServerRequest *request)
-{
-    String token = preferences.getString("apitoken", "");
-    if (token.length() == 0)
-    {
-        if (!authWarningLogged)
-        {
-            logCapture.println("[Auth] Write API token not configured; write endpoints are open");
-            authWarningLogged = true;
-        }
-        return true;
-    }
-
-    if (request->hasHeader("X-AP-Token") && request->getHeader("X-AP-Token")->value() == token)
-        return true;
-
-    if (request->hasParam("token", true) && request->getParam("token", true)->value() == token)
-        return true;
-
-    return false;
-}
-
 // ---------------------------------------------------------------
 // WebSocket event handler
 // ---------------------------------------------------------------
@@ -396,9 +373,6 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
             char cmd[64];
             if (parseWsCommand(data, len, cmd, sizeof(cmd)))
             {
-                // TODO(security): Known gap for early-development builds.
-                // WS command frames currently bypass checkWriteAuth(), unlike REST write endpoints.
-                // Keep behavior for now, but harden by authenticating WS sessions before command ingress.
                 processMarcduinoCommandWithSource("astropixel-web-ws", cmd);
                 broadcastState();
             }
@@ -1021,11 +995,6 @@ static void initAsyncWeb()
     // ---- REST API: Send Marcduino command ----
     asyncServer.on("/api/cmd", HTTP_POST, [](AsyncWebServerRequest *request)
     {
-        if (!checkWriteAuth(request))
-        {
-            request->send(401, "application/json", "{\"error\":\"unauthorized\"}");
-            return;
-        }
         if (request->hasParam("cmd", true))
         {
             String cmd = request->getParam("cmd", true)->value();
@@ -1144,11 +1113,6 @@ static void initAsyncWeb()
     // ---- REST API: Set preference ----
     asyncServer.on("/api/pref", HTTP_POST, [](AsyncWebServerRequest *request)
     {
-        if (!checkWriteAuth(request))
-        {
-            request->send(401, "application/json", "{\"error\":\"unauthorized\"}");
-            return;
-        }
         if (request->hasParam("key", true) && request->hasParam("val", true))
         {
             String key = request->getParam("key", true)->value();
@@ -1253,18 +1217,6 @@ static void initAsyncWeb()
         [](AsyncWebServerRequest *request)
         {
             // onRequest — fires after the body is fully buffered into _tempObject.
-            if (!checkWriteAuth(request))
-            {
-                logCapture.println("[API] panels/config rejected: unauthorized "
-                                    "(missing or invalid X-AP-Token)");
-                request->send(401, "application/json", "{\"error\":\"unauthorized\"}");
-                if (request->_tempObject)
-                {
-                    delete (String *)request->_tempObject;
-                    request->_tempObject = nullptr;
-                }
-                return;
-            }
             String *body = (String *)request->_tempObject;
             if (!body || body->length() == 0)
             {
@@ -1344,18 +1296,6 @@ static void initAsyncWeb()
     asyncServer.on("/api/holos/config", HTTP_POST,
         [](AsyncWebServerRequest *request)
         {
-            if (!checkWriteAuth(request))
-            {
-                logCapture.println("[API] holos/config rejected: unauthorized "
-                                    "(missing or invalid X-AP-Token)");
-                request->send(401, "application/json", "{\"error\":\"unauthorized\"}");
-                if (request->_tempObject)
-                {
-                    delete (String *)request->_tempObject;
-                    request->_tempObject = nullptr;
-                }
-                return;
-            }
             String *body = (String *)request->_tempObject;
             if (!body || body->length() == 0)
             {
@@ -1421,18 +1361,6 @@ static void initAsyncWeb()
     asyncServer.on("/api/servo/test", HTTP_POST,
         [](AsyncWebServerRequest *request)
         {
-            if (!checkWriteAuth(request))
-            {
-                logCapture.println("[API] /servo/test rejected: unauthorized "
-                                    "(missing or invalid X-AP-Token)");
-                request->send(401, "application/json", "{\"error\":\"unauthorized\"}");
-                if (request->_tempObject)
-                {
-                    delete (String *)request->_tempObject;
-                    request->_tempObject = nullptr;
-                }
-                return;
-            }
             String *body = (String *)request->_tempObject;
             if (!body || body->length() == 0)
             {
@@ -1512,18 +1440,6 @@ static void initAsyncWeb()
     asyncServer.on("/api/servo/stop", HTTP_POST,
         [](AsyncWebServerRequest *request)
         {
-            if (!checkWriteAuth(request))
-            {
-                logCapture.println("[API] /servo/stop rejected: unauthorized "
-                                    "(missing or invalid X-AP-Token)");
-                request->send(401, "application/json", "{\"error\":\"unauthorized\"}");
-                if (request->_tempObject)
-                {
-                    delete (String *)request->_tempObject;
-                    request->_tempObject = nullptr;
-                }
-                return;
-            }
             String *body = (String *)request->_tempObject;
             if (!body || body->length() == 0)
             {
@@ -1582,22 +1498,12 @@ static void initAsyncWeb()
     // ---- REST API: Reboot ----
     asyncServer.on("/api/reboot", HTTP_POST, [](AsyncWebServerRequest *request)
     {
-        if (!checkWriteAuth(request))
-        {
-            request->send(401, "application/json", "{\"error\":\"unauthorized\"}");
-            return;
-        }
         request->send(200, "application/json", "{\"ok\":true,\"msg\":\"rebooting\"}");
         scheduleReboot(500);
     });
 
     asyncServer.on("/api/sleep", HTTP_POST, [](AsyncWebServerRequest *request)
     {
-        if (!checkWriteAuth(request))
-        {
-            request->send(401, "application/json", "{\"error\":\"unauthorized\"}");
-            return;
-        }
         bool changed = enterSoftSleepMode();
         request->send(200, "application/json", changed
             ? "{\"ok\":true,\"sleepMode\":true,\"changed\":true}"
@@ -1607,11 +1513,6 @@ static void initAsyncWeb()
 
     asyncServer.on("/api/wake", HTTP_POST, [](AsyncWebServerRequest *request)
     {
-        if (!checkWriteAuth(request))
-        {
-            request->send(401, "application/json", "{\"error\":\"unauthorized\"}");
-            return;
-        }
         bool changed = exitSoftSleepMode();
         request->send(200, "application/json", changed
             ? "{\"ok\":true,\"sleepMode\":false,\"changed\":true}"
@@ -1622,11 +1523,6 @@ static void initAsyncWeb()
     // ---- REST API: Smoke control ----
     asyncServer.on("/api/smoke", HTTP_POST, [](AsyncWebServerRequest *request)
     {
-        if (!checkWriteAuth(request))
-        {
-            request->send(401, "application/json", "{\"error\":\"unauthorized\"}");
-            return;
-        }
         if (request->hasParam("state", true))
         {
             String state = request->getParam("state", true)->value();
@@ -1654,11 +1550,6 @@ static void initAsyncWeb()
     // ---- REST API: Fire effects control ----
     asyncServer.on("/api/fire", HTTP_POST, [](AsyncWebServerRequest *request)
     {
-        if (!checkWriteAuth(request))
-        {
-            request->send(401, "application/json", "{\"error\":\"unauthorized\"}");
-            return;
-        }
         if (request->hasParam("state", true))
         {
             String state = request->getParam("state", true)->value();
@@ -1692,11 +1583,6 @@ static void initAsyncWeb()
 
     asyncServer.on("/api/cbi", HTTP_POST, [](AsyncWebServerRequest *request)
     {
-        if (!checkWriteAuth(request))
-        {
-            request->send(401, "application/json", "{\"error\":\"unauthorized\"}");
-            return;
-        }
         if (request->hasParam("action", true))
         {
             String action = request->getParam("action", true)->value();
@@ -1750,11 +1636,6 @@ static void initAsyncWeb()
 
     asyncServer.on("/api/datapanel", HTTP_POST, [](AsyncWebServerRequest *request)
     {
-        if (!checkWriteAuth(request))
-        {
-            request->send(401, "application/json", "{\"error\":\"unauthorized\"}");
-            return;
-        }
         if (request->hasParam("action", true))
         {
             String action = request->getParam("action", true)->value();
@@ -1802,11 +1683,6 @@ static void initAsyncWeb()
     // ---- REST API: Panel calibration reset ----
     asyncServer.on("/api/panelcal/reset", HTTP_POST, [](AsyncWebServerRequest *request)
     {
-        if (!checkWriteAuth(request))
-        {
-            request->send(401, "application/json", "{\"error\":\"unauthorized\"}");
-            return;
-        }
         if (!request->hasParam("target", true))
         {
             request->send(400, "application/json", "{\"error\":\"missing target param\"}");
@@ -1868,11 +1744,6 @@ static void initAsyncWeb()
         // Response handler (called after upload completes)
         [](AsyncWebServerRequest *request)
         {
-            if (!checkWriteAuth(request))
-            {
-                request->send(401, "text/plain", "Unauthorized");
-                return;
-            }
             otaInProgress = false;
             if (otaUploadFailed || Update.hasError())
             {
@@ -1892,9 +1763,6 @@ static void initAsyncWeb()
         [](AsyncWebServerRequest *request, const String &filename,
            size_t index, uint8_t *data, size_t len, bool final)
         {
-            // TODO(security): Known gap for early-development builds.
-            // Auth is currently enforced in the POST completion callback, not here.
-            // Harden by checking checkWriteAuth(request) before Update.begin()/Update.write.
             if (index == 0)
             {
                 // First chunk — start the update
@@ -1960,11 +1828,6 @@ static void initAsyncWeb()
     asyncServer.on("/upload/filesystem", HTTP_POST,
         [](AsyncWebServerRequest *request)
         {
-            if (!checkWriteAuth(request))
-            {
-                request->send(401, "text/plain", "Unauthorized");
-                return;
-            }
             otaInProgress = false;
             if (otaUploadFailed || Update.hasError())
             {

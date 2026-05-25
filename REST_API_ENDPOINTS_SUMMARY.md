@@ -44,8 +44,7 @@ Successfully added 4 new REST API endpoints to `AsyncWebInterface.h` for control
 - Added after existing `/api/wake` endpoint, before `/upload/firmware` endpoint
 
 ### Design Patterns Followed
-1. **Authentication**: All POST endpoints use `checkWriteAuth(request)` for security
-2. **Error Handling**: Proper HTTP status codes and JSON error responses
+1. **Error Handling**: Proper HTTP status codes and JSON error responses
 3. **Parameter Validation**: Validates required parameters and acceptable values
 4. **Command Processing**: Uses `processMarcduinoCommandWithSource()` with "astropixel-web-api" source
 5. **JSON Responses**: Consistent JSON response format matching existing endpoints
@@ -53,8 +52,8 @@ Successfully added 4 new REST API endpoints to `AsyncWebInterface.h` for control
 
 ### Response Formats
 - **Success**: `{"ok":true,"state":"on"}` or `{"ok":true,"action":"flicker","duration":"5"}`
-- **Error**: `{"error":"unauthorized"}`, `{"error":"invalid state, use 'on' or 'off'"}`, etc.
-- **Status Codes**: 200 (success), 401 (unauthorized), 400 (bad request)
+- **Error**: `{"error":"invalid state, use 'on' or 'off'"}`, etc.
+- **Status Codes**: 200 (success), 400 (bad request)
 
 ### Command Mapping
 Based on existing sequence definitions in `MarcduinoSequence.h`:
@@ -99,11 +98,6 @@ curl -X POST http://192.168.4.1/api/datapanel -d 'action=disable&duration=2'
 ```
 
 ## Integration Notes
-
-### Authentication
-- Uses existing `checkWriteAuth()` function
-- Supports API token via `X-AP-Token` header or `token` POST parameter
-- If no token configured, endpoints are open (logs warning)
 
 ### Command Source Tracking
 - All commands logged with source "astropixel-web-api" 

@@ -116,51 +116,18 @@
     }, 1800);
   }
 
-  function getApiToken() {
-    try {
-      return localStorage.getItem('apitoken') || '';
-    } catch (e) {
-      return '';
-    }
-  }
-
-  window.getApiToken = getApiToken;
-
-  window.setApiToken = function(token) {
-    try {
-      if (token) localStorage.setItem('apitoken', token);
-      else localStorage.removeItem('apitoken');
-    } catch (e) {}
-  };
-
-  function withWriteAuthHeaders(headers) {
-    var merged = headers || {};
-    var token = getApiToken();
-    if (token) {
-      merged['X-AP-Token'] = token;
-    }
-    return merged;
-  }
-
   window.apiPostForm = function(path, body) {
     return fetch(path, {
       method: 'POST',
-      headers: withWriteAuthHeaders({'Content-Type': 'application/x-www-form-urlencoded'}),
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
       body: body
-    }).then(function(resp) {
-      if (resp.status === 401) uiToast('Write request unauthorized (token required)', 'error');
-      return resp;
     });
   };
 
   window.apiPost = function(path, options) {
     var opts = options || {};
     opts.method = 'POST';
-    opts.headers = withWriteAuthHeaders(opts.headers || {});
-    return fetch(path, opts).then(function(resp) {
-      if (resp.status === 401) uiToast('Write request unauthorized (token required)', 'error');
-      return resp;
-    });
+    return fetch(path, opts);
   };
 
   function holoName(id) {

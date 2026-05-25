@@ -164,21 +164,6 @@
     <div class="desc mt-4">OTA firmware flashing, diagnostic log, and factory reset are on the firmware page.</div>
   </div>
 
-  <!-- API Token -->
-  <div class="card">
-    <h3>Write API Token</h3>
-    <div class="desc">Optional. Stored in this browser only and sent with write requests when API protection is enabled.</div>
-    <details class="gadget-details mt-10">
-      <summary>Edit API Token</summary>
-      <div class="row mt-8">
-        <input type="password" id="api-token" placeholder="Enter token..." class="flex-1">
-        <button class="btn accent" onclick="saveApiToken()">Save</button>
-        <button class="btn danger" onclick="clearApiToken()">Clear</button>
-      </div>
-    </details>
-    <div class="desc mt-6" id="api-token-status">Not set</div>
-  </div>
-
   <!-- Hardware Gadgets (collapsed) -->
   <details class="card">
     <summary>Hardware Gadgets <span class="label-dim" style="font-weight:400"> — optional hardware modules</span></summary>
@@ -466,28 +451,6 @@
         apiPostForm('/api/pref', 'key=_clear&val=1&reboot=1');
       }
     }
-
-    /* ── API Token ── */
-    function refreshTokenStatus() {
-      var token = getApiToken();
-      var el = document.getElementById('api-token-status');
-      if (el) el.textContent = token ? 'Token stored in this browser' : 'Not set';
-    }
-
-    function saveApiToken() {
-      var token = document.getElementById('api-token').value.trim();
-      setApiToken(token);
-      refreshTokenStatus();
-      if (typeof uiToast === 'function') uiToast(token ? 'Token saved.' : 'Token cleared.');
-    }
-
-    function clearApiToken() {
-      setApiToken('');
-      document.getElementById('api-token').value = '';
-      refreshTokenStatus();
-    }
-
-    refreshTokenStatus();
 
     /* ── Gadget prefs — load all optional hardware toggles on page load ── */
     fetch('/api/pref?keys=badmot,firest,cbienb,dpenab')

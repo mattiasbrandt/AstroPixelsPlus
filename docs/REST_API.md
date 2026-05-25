@@ -4,14 +4,12 @@ This document provides practical examples for integrating AstroPixelsPlus with h
 
 ## Overview
 
-AstroPixelsPlus exposes a REST API for controlling dome functions programmatically. All endpoints require authentication unless configured otherwise.
+AstroPixelsPlus exposes a REST API for controlling dome functions programmatically.
 
 **Base URL:** `http://<astropixels-ip>/api/`
 
-**Authentication:** Include API token in header or query parameter
-
 ```bash
-curl -H "Authorization: Bearer YOUR_TOKEN" http://192.168.4.1/api/state
+curl http://192.168.4.1/api/state
 ```
 
 ---
@@ -336,9 +334,6 @@ Body: cmd=:OP00
 // Sleep mode blocked command
 {"error":"sleeping","hint":"POST /api/wake"}
 
-// Unauthorized
-{"error":"unauthorized"}
-
 // Invalid command (no effect, no error for silent failures)
 ```
 
@@ -365,9 +360,7 @@ No explicit rate limiting, but avoid:
 
 ## Security
 
-- Always use authentication in production
-- HTTPS recommended if exposing to internet
-- API tokens can be configured via web UI
+- HTTPS not supported on ESP32 AsyncWebServer; this API is intended for home LAN use only
 - Default WiFi password should be changed
 
 ---

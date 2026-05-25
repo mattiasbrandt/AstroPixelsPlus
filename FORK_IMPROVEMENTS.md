@@ -56,7 +56,7 @@ Health model is intentionally split into two layers:
 Deep diagnostics JSON reports scan context and operator-facing details: `scan_mode`, `devices`, `device_count`, `scan_duration_us`, `scan_age_ms`, per-controller codes/streaks, and `operator.faults` / `operator.hints`.
 
 ### Soft Sleep / Wake Runtime Control
-Added runtime soft sleep state tracking in firmware (`sleepMode`, `sleepSinceMs`) while keeping ESP32, WiFi, and async web services online. Added new authenticated API endpoints:
+Added runtime soft sleep state tracking in firmware (`sleepMode`, `sleepSinceMs`) while keeping ESP32, WiFi, and async web services online. Added new API endpoints:
 - `POST /api/sleep` to enter quiet low-activity profile
 - `POST /api/wake` to restore active profile
 
@@ -213,9 +213,6 @@ Comprehensive review of correctness, robustness, and static-analysis issues comp
 
 Implemented a targeted reliability patchset after a full fork review:
 
-- Added inline TODO security notes (intentionally deferred in early development) for:
-    - WebSocket command auth parity (`/ws` write path)
-    - OTA upload-chunk auth enforcement sequencing (`/upload/firmware`)
 - Fixed sound bank indexing to avoid out-of-bounds array access for bank 9.
 - Fixed random-sound upper-bound exclusion so the last candidate sound can be selected.
 - Hardened panel calibration value parsing (`#SO/#SC/:MV`) to require exactly four digits.
