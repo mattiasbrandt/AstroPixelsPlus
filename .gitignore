@@ -28,3 +28,11 @@ AGENTS.md
 CODE_REVIEW_*.md
 ESP32_CODE_REVIEW_TEMPLATE.md
 data/AGENTS.md
+
+# Playwright / browser-automation scratch
+.playwright-mcp/
+.playwright-cli/
+
+# Screenshot artefacts from iterative SVG / UI work
+panels-*.png
+holos-*.png
