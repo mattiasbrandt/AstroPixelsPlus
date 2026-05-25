@@ -126,14 +126,7 @@
 #define NUM_HOLO_SLOTS     6
 #define HOLO_SLOT_OFFSET  13
 
-// NVS namespaces and key prefixes for the dynamic wiring config. Keys are
-// kept short (<= 15 chars) to satisfy ESP32 NVS's key-length limit.
-#define PREFERENCE_PANELS_NS       "panels"
-#define PREFERENCE_PANELS_CH_FMT   "pc_ch%d"   // pc_ch0..pc_ch12 — physical silkscreen channel
-#define PREFERENCE_PANELS_ACT_FMT  "pc_act%d"  // pc_act0..pc_act12 — bool active
-#define PREFERENCE_HOLOS_NS        "holos"
-#define PREFERENCE_HOLOS_CH_FMT    "hc_ch%d"   // hc_ch0..hc_ch5
-#define PREFERENCE_HOLOS_ACT_FMT   "hc_act%d"  // hc_act0..hc_act5
+#include "WiringConfig.h"
 
 
 #define PREFERENCE_MARCSOUND "msound"
@@ -461,58 +454,6 @@ static_assert(
     "HOLO_SLOT_OFFSET must equal NUM_PANEL_SLOTS — holos sit immediately after panels");
 #endif
 
-// Default channel assignments used when NVS is absent (fresh boot, factory reset).
-// Channels are physical silkscreen numbers (0–15) on each PCA9685 board; firmware pin
-// is computed at runtime by panelConfigLoad() / holoConfigLoad() with the formula
-// pin = (n × 16) + physCh + 1 (n = 0 for 0x40 panel board, n = 1 for 0x41 holo board).
-// Active=false marks a slot as having no servo wired — its setServo() call then uses
-// pin = 0, group = 0 to keep it out of all I2C writes and command-mask routing.
-// These are just defaults — there is no single canonical "MK4 wiring"; builders
-// whose physical wiring differs override per-slot via the Wiring Config UI on
-// panels.html, persisted to NVS namespace "panels".
-static const uint8_t defaultPanelCh[NUM_PANEL_SLOTS] = {
-    0,   // slot 0:  P1   (ring)
-    1,   // slot 1:  P2   (ring)
-    2,   // slot 2:  P3   (ring)
-    3,   // slot 3:  P4   (ring)
-    4,   // slot 4:  P7   (ring upper)
-    5,   // slot 5:  P11  (ring lower)
-    6,   // slot 6:  P13  (ring front)
-    0,   // slot 7:  PP5  — unserviced by default; channel value ignored when active=false
-    8,   // slot 8:  PP1  (pie)
-    9,   // slot 9:  PP2  (pie)
-    10,  // slot 10: PP4  (pie)
-    11,  // slot 11: PP6  (pie, :OP11 group only)
-    0,   // slot 12: PP3  — unserviced by default; channel value ignored when active=false
-};
-static const bool defaultPanelActive[NUM_PANEL_SLOTS] = {
-    true,  // P1
-    true,  // P2
-    true,  // P3
-    true,  // P4
-    true,  // P7
-    true,  // P11
-    true,  // P13
-    false, // PP5 — inactive by default; flip to true via Wiring Config UI if a servo is wired
-    true,  // PP1
-    true,  // PP2
-    true,  // PP4
-    true,  // PP6
-    false, // PP3 — inactive by default; flip to true via Wiring Config UI if a servo is wired
-};
-
-// Holo defaults — physical silkscreen channels on the 0x41 board.
-static const uint8_t defaultHoloCh[NUM_HOLO_SLOTS] = {
-    0,  // slot 13 (holo 0): FHP — front holo horizontal
-    1,  // slot 14 (holo 1): FHP — front holo vertical
-    2,  // slot 15 (holo 2): THP — top holo horizontal
-    3,  // slot 16 (holo 3): THP — top holo vertical
-    4,  // slot 17 (holo 4): RHP — rear holo vertical
-    5,  // slot 18 (holo 5): RHP — rear holo horizontal
-};
-static const bool defaultHoloActive[NUM_HOLO_SLOTS] = {
-    true, true, true, true, true, true,
-};
 
 #ifdef USE_I2C_ADDRESS
 ServoDispatchDirect<SizeOfArray(servoSettings)> servoDispatch(servoSettings);
@@ -541,18 +482,6 @@ AnimationPlayer player(servoSequencer);
 static LogCapture logCapture(Serial);
 
 #ifndef USE_I2C_ADDRESS
-// Operator-visible labels for the wiring-config boot logs. Mirrored in
-// AsyncWebInterface.h's panelSlotLabel/holoSlotLabel — keep in sync.
-static const char *kPanelSlotLabels[NUM_PANEL_SLOTS] = {
-    "P1", "P2", "P3", "P4", "P7", "P11", "P13",
-    "PP5", "PP1", "PP2", "PP4", "PP6", "PP3",
-};
-static const char *kHoloSlotLabels[NUM_HOLO_SLOTS] = {
-    "FHP horizontal", "FHP vertical",
-    "THP horizontal", "THP vertical",
-    "RHP vertical",   "RHP horizontal",
-};
-
 static void panelConfigLoad()
 {
     Preferences prefs;
@@ -609,7 +538,7 @@ static void panelConfigLoad()
         // PANEL_GROUP_n bit drives :OPnn routing). pin=0 + group=0 is the
         // ReelTwo convention for "no servo on this slot".
         uint32_t group   = active ? servoDispatch.getGroup(i) : 0;
-        uint8_t  pin     = active ? (physCh + 1) : 0;          // 0x40: silkscreen → firmware pin
+        uint8_t  pin     = active ? wiringConfigFirmwarePin(0, physCh) : 0;
         uint16_t start   = servoDispatch.getStart(i);
         uint16_t end     = servoDispatch.getEnd(i);
         uint16_t neutral = servoDispatch.getNeutral(i);
@@ -688,7 +617,7 @@ static void holoConfigLoad()
         // the holo board starts at pin 17 (silkscreen CH0). See ADR 0004 for
         // the chip-boundary math.
         uint32_t group   = active ? servoDispatch.getGroup(i) : 0;
-        uint8_t  pin     = active ? (uint8_t)(16 + physCh + 1) : 0;
+        uint8_t  pin     = active ? wiringConfigFirmwarePin(1, physCh) : 0;
         uint16_t start   = servoDispatch.getStart(i);
         uint16_t end     = servoDispatch.getEnd(i);
         uint16_t neutral = servoDispatch.getNeutral(i);
