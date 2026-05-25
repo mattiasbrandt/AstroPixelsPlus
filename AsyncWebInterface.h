@@ -164,6 +164,44 @@ static bool parseDurationSeconds(const String &raw, uint8_t minValue, uint8_t ma
     return true;
 }
 
+// Read a required POST string param, trim it, write to out.
+// Sends 400 and returns false if the param is absent.
+static bool parsePostParam(AsyncWebServerRequest *request, const char *name, String &out)
+{
+    if (!request->hasParam(name, true))
+    {
+        char msg[64];
+        snprintf(msg, sizeof(msg), "{\"error\":\"missing %s param\"}", name);
+        request->send(400, "application/json", msg);
+        return false;
+    }
+    out = request->getParam(name, true)->value();
+    out.trim();
+    return true;
+}
+
+// Validate a Marcduino command string. Sends 400 and returns false if invalid.
+static bool validateMarcduinoCmd(AsyncWebServerRequest *request, const String &cmd)
+{
+    if (!isValidCommandString(cmd))
+    {
+        request->send(400, "application/json", "{\"error\":\"invalid cmd\"}");
+        return false;
+    }
+    return true;
+}
+
+// Return true (and send 423) if the command should be blocked while in sleep mode.
+static bool guardSleep(AsyncWebServerRequest *request, const char *cmd)
+{
+    if (shouldBlockCommandDuringSleep(cmd))
+    {
+        request->send(423, "application/json", "{\"error\":\"sleeping\",\"hint\":\"POST /api/wake\"}");
+        return true;
+    }
+    return false;
+}
+
 static void processMarcduinoCommandWithSource(const char *source, const char *cmd)
 {
     if (cmd == nullptr || cmd[0] == '\0') return;
@@ -995,29 +1033,14 @@ static void initAsyncWeb()
     // ---- REST API: Send Marcduino command ----
     asyncServer.on("/api/cmd", HTTP_POST, [](AsyncWebServerRequest *request)
     {
-        if (request->hasParam("cmd", true))
-        {
-            String cmd = request->getParam("cmd", true)->value();
-            cmd.trim();
-            if (!isValidCommandString(cmd))
-            {
-                request->send(400, "application/json", "{\"error\":\"invalid cmd\"}");
-                return;
-            }
-            if (shouldBlockCommandDuringSleep(cmd.c_str()))
-            {
-                request->send(423, "application/json", "{\"error\":\"sleeping\",\"hint\":\"POST /api/wake\"}");
-                return;
-            }
-            logCapture.printf("[API] cmd=%s len=%u\n", cmd.c_str(), (unsigned int)cmd.length());
-            processMarcduinoCommandWithSource("astropixel-web-api", cmd.c_str());
-            broadcastState();
-            request->send(200, "application/json", "{\"ok\":true}");
-        }
-        else
-        {
-            request->send(400, "application/json", "{\"error\":\"missing cmd param\"}");
-        }
+        String cmd;
+        if (!parsePostParam(request, "cmd", cmd)) return;
+        if (!validateMarcduinoCmd(request, cmd)) return;
+        if (guardSleep(request, cmd.c_str())) return;
+        logCapture.printf("[API] cmd=%s len=%u\n", cmd.c_str(), (unsigned int)cmd.length());
+        processMarcduinoCommandWithSource("astropixel-web-api", cmd.c_str());
+        broadcastState();
+        request->send(200, "application/json", "{\"ok\":true}");
     });
 
     // ---- REST API: Get state ----
@@ -1523,54 +1546,42 @@ static void initAsyncWeb()
     // ---- REST API: Smoke control ----
     asyncServer.on("/api/smoke", HTTP_POST, [](AsyncWebServerRequest *request)
     {
-        if (request->hasParam("state", true))
+        String state;
+        if (!parsePostParam(request, "state", state)) return;
+        if (state == "on")
         {
-            String state = request->getParam("state", true)->value();
-            if (state == "on")
-            {
-                processMarcduinoCommandWithSource("astropixel-web-api", "BMON");
-                request->send(200, "application/json", "{\"ok\":true,\"state\":\"on\"}");
-            }
-            else if (state == "off")
-            {
-                processMarcduinoCommandWithSource("astropixel-web-api", "BMOFF");
-                request->send(200, "application/json", "{\"ok\":true,\"state\":\"off\"}");
-            }
-            else
-            {
-                request->send(400, "application/json", "{\"error\":\"invalid state, use 'on' or 'off'\"}");
-            }
+            processMarcduinoCommandWithSource("astropixel-web-api", "BMON");
+            request->send(200, "application/json", "{\"ok\":true,\"state\":\"on\"}");
+        }
+        else if (state == "off")
+        {
+            processMarcduinoCommandWithSource("astropixel-web-api", "BMOFF");
+            request->send(200, "application/json", "{\"ok\":true,\"state\":\"off\"}");
         }
         else
         {
-            request->send(400, "application/json", "{\"error\":\"missing state param\"}");
+            request->send(400, "application/json", "{\"error\":\"invalid state, use 'on' or 'off'\"}");
         }
     });
 
     // ---- REST API: Fire effects control ----
     asyncServer.on("/api/fire", HTTP_POST, [](AsyncWebServerRequest *request)
     {
-        if (request->hasParam("state", true))
+        String state;
+        if (!parsePostParam(request, "state", state)) return;
+        if (state == "on")
         {
-            String state = request->getParam("state", true)->value();
-            if (state == "on")
-            {
-                processMarcduinoCommandWithSource("astropixel-web-api", "FS11000");
-                request->send(200, "application/json", "{\"ok\":true,\"state\":\"on\"}");
-            }
-            else if (state == "off")
-            {
-                processMarcduinoCommandWithSource("astropixel-web-api", "FSOFF");
-                request->send(200, "application/json", "{\"ok\":true,\"state\":\"off\"}");
-            }
-            else
-            {
-                request->send(400, "application/json", "{\"error\":\"invalid state, use 'on' or 'off'\"}");
-            }
+            processMarcduinoCommandWithSource("astropixel-web-api", "FS11000");
+            request->send(200, "application/json", "{\"ok\":true,\"state\":\"on\"}");
+        }
+        else if (state == "off")
+        {
+            processMarcduinoCommandWithSource("astropixel-web-api", "FSOFF");
+            request->send(200, "application/json", "{\"ok\":true,\"state\":\"off\"}");
         }
         else
         {
-            request->send(400, "application/json", "{\"error\":\"missing state param\"}");
+            request->send(400, "application/json", "{\"error\":\"invalid state, use 'on' or 'off'\"}");
         }
     });
 
@@ -1583,47 +1594,41 @@ static void initAsyncWeb()
 
     asyncServer.on("/api/cbi", HTTP_POST, [](AsyncWebServerRequest *request)
     {
-        if (request->hasParam("action", true))
+        String action;
+        if (!parsePostParam(request, "action", action)) return;
+        if (action == "flicker")
         {
-            String action = request->getParam("action", true)->value();
-            if (action == "flicker")
+            uint8_t durationSec = 6;
+            if (request->hasParam("duration", true) &&
+                !parseDurationSeconds(request->getParam("duration", true)->value(), 1, 99, durationSec))
             {
-                uint8_t durationSec = 6;
-                if (request->hasParam("duration", true) &&
-                    !parseDurationSeconds(request->getParam("duration", true)->value(), 1, 99, durationSec))
-                {
-                    request->send(400, "application/json", "{\"error\":\"invalid duration, use 1-99 seconds\"}");
-                    return;
-                }
-                char duration[3];
-                snprintf(duration, sizeof(duration), "%02u", durationSec);
-                String cmd = "CB2" + String(duration) + "006";
-                processMarcduinoCommandWithSource("astropixel-web-api", cmd.c_str());
-                request->send(200, "application/json", "{\"ok\":true,\"action\":\"flicker\",\"duration\":" + String(durationSec) + "}");
+                request->send(400, "application/json", "{\"error\":\"invalid duration, use 1-99 seconds\"}");
+                return;
             }
-            else if (action == "disable")
+            char duration[3];
+            snprintf(duration, sizeof(duration), "%02u", durationSec);
+            String cmd = "CB2" + String(duration) + "006";
+            processMarcduinoCommandWithSource("astropixel-web-api", cmd.c_str());
+            request->send(200, "application/json", "{\"ok\":true,\"action\":\"flicker\",\"duration\":" + String(durationSec) + "}");
+        }
+        else if (action == "disable")
+        {
+            uint8_t durationSec = 8;
+            if (request->hasParam("duration", true) &&
+                !parseDurationSeconds(request->getParam("duration", true)->value(), 1, 99, durationSec))
             {
-                uint8_t durationSec = 8;
-                if (request->hasParam("duration", true) &&
-                    !parseDurationSeconds(request->getParam("duration", true)->value(), 1, 99, durationSec))
-                {
-                    request->send(400, "application/json", "{\"error\":\"invalid duration, use 1-99 seconds\"}");
-                    return;
-                }
-                char duration[3];
-                snprintf(duration, sizeof(duration), "%02u", durationSec);
-                String cmd = "CB1" + String(duration) + "008";
-                processMarcduinoCommandWithSource("astropixel-web-api", cmd.c_str());
-                request->send(200, "application/json", "{\"ok\":true,\"action\":\"disable\",\"duration\":" + String(durationSec) + "}");
+                request->send(400, "application/json", "{\"error\":\"invalid duration, use 1-99 seconds\"}");
+                return;
             }
-            else
-            {
-                request->send(400, "application/json", "{\"error\":\"invalid action, use 'flicker' or 'disable'\"}");
-            }
+            char duration[3];
+            snprintf(duration, sizeof(duration), "%02u", durationSec);
+            String cmd = "CB1" + String(duration) + "008";
+            processMarcduinoCommandWithSource("astropixel-web-api", cmd.c_str());
+            request->send(200, "application/json", "{\"ok\":true,\"action\":\"disable\",\"duration\":" + String(durationSec) + "}");
         }
         else
         {
-            request->send(400, "application/json", "{\"error\":\"missing action param\"}");
+            request->send(400, "application/json", "{\"error\":\"invalid action, use 'flicker' or 'disable'\"}");
         }
     });
 
@@ -1636,61 +1641,49 @@ static void initAsyncWeb()
 
     asyncServer.on("/api/datapanel", HTTP_POST, [](AsyncWebServerRequest *request)
     {
-        if (request->hasParam("action", true))
+        String action;
+        if (!parsePostParam(request, "action", action)) return;
+        if (action == "flicker")
         {
-            String action = request->getParam("action", true)->value();
-            if (action == "flicker")
+            uint8_t durationSec = 6;
+            if (request->hasParam("duration", true) &&
+                !parseDurationSeconds(request->getParam("duration", true)->value(), 1, 99, durationSec))
             {
-                uint8_t durationSec = 6;
-                if (request->hasParam("duration", true) &&
-                    !parseDurationSeconds(request->getParam("duration", true)->value(), 1, 99, durationSec))
-                {
-                    request->send(400, "application/json", "{\"error\":\"invalid duration, use 1-99 seconds\"}");
-                    return;
-                }
-                char duration[3];
-                snprintf(duration, sizeof(duration), "%02u", durationSec);
-                String cmd = "DP2" + String(duration) + "006";
-                processMarcduinoCommandWithSource("astropixel-web-api", cmd.c_str());
-                request->send(200, "application/json", "{\"ok\":true,\"action\":\"flicker\",\"duration\":" + String(durationSec) + "}");
+                request->send(400, "application/json", "{\"error\":\"invalid duration, use 1-99 seconds\"}");
+                return;
             }
-            else if (action == "disable")
+            char duration[3];
+            snprintf(duration, sizeof(duration), "%02u", durationSec);
+            String cmd = "DP2" + String(duration) + "006";
+            processMarcduinoCommandWithSource("astropixel-web-api", cmd.c_str());
+            request->send(200, "application/json", "{\"ok\":true,\"action\":\"flicker\",\"duration\":" + String(durationSec) + "}");
+        }
+        else if (action == "disable")
+        {
+            uint8_t durationSec = 8;
+            if (request->hasParam("duration", true) &&
+                !parseDurationSeconds(request->getParam("duration", true)->value(), 1, 99, durationSec))
             {
-                uint8_t durationSec = 8;
-                if (request->hasParam("duration", true) &&
-                    !parseDurationSeconds(request->getParam("duration", true)->value(), 1, 99, durationSec))
-                {
-                    request->send(400, "application/json", "{\"error\":\"invalid duration, use 1-99 seconds\"}");
-                    return;
-                }
-                char duration[3];
-                snprintf(duration, sizeof(duration), "%02u", durationSec);
-                String cmd = "DP1" + String(duration) + "008";
-                processMarcduinoCommandWithSource("astropixel-web-api", cmd.c_str());
-                request->send(200, "application/json", "{\"ok\":true,\"action\":\"disable\",\"duration\":" + String(durationSec) + "}");
+                request->send(400, "application/json", "{\"error\":\"invalid duration, use 1-99 seconds\"}");
+                return;
             }
-            else
-            {
-                request->send(400, "application/json", "{\"error\":\"invalid action, use 'flicker' or 'disable'\"}");
-            }
+            char duration[3];
+            snprintf(duration, sizeof(duration), "%02u", durationSec);
+            String cmd = "DP1" + String(duration) + "008";
+            processMarcduinoCommandWithSource("astropixel-web-api", cmd.c_str());
+            request->send(200, "application/json", "{\"ok\":true,\"action\":\"disable\",\"duration\":" + String(durationSec) + "}");
         }
         else
         {
-            request->send(400, "application/json", "{\"error\":\"missing action param\"}");
+            request->send(400, "application/json", "{\"error\":\"invalid action, use 'flicker' or 'disable'\"}");
         }
     });
 
     // ---- REST API: Panel calibration reset ----
     asyncServer.on("/api/panelcal/reset", HTTP_POST, [](AsyncWebServerRequest *request)
     {
-        if (!request->hasParam("target", true))
-        {
-            request->send(400, "application/json", "{\"error\":\"missing target param\"}");
-            return;
-        }
-
-        String target = request->getParam("target", true)->value();
-        target.trim();
+        String target;
+        if (!parsePostParam(request, "target", target)) return;
         uint8_t tgt = 0;
         uint32_t mask = 0;
         if (!parseTwoDigitTarget(target.c_str(), tgt) || target.length() != 2 || !panelTargetToMask(tgt, mask))
