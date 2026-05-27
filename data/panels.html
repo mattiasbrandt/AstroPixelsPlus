@@ -30,6 +30,15 @@
       <button class="btn" onclick="sendCmd(':CL00')">Close All</button>
       <button class="btn" onclick="sendCmd(':OF00')">Flutter All</button>
     </div>
+    <div class="desc mt-8">Panel groups (MarcDuino V3 — :OP14 = all pie, :OP15 = all ring)</div>
+    <div class="btn-grid mt-4">
+      <button class="btn" onclick="sendCmd(':OP14')">Open Top (Pie)</button>
+      <button class="btn" onclick="sendCmd(':CL14')">Close Top (Pie)</button>
+      <button class="btn" onclick="sendCmd(':OF14')">Flutter Top (Pie)</button>
+      <button class="btn" onclick="sendCmd(':OP15')">Open Bottom (Ring)</button>
+      <button class="btn" onclick="sendCmd(':CL15')">Close Bottom (Ring)</button>
+      <button class="btn" onclick="sendCmd(':OF15')">Flutter Bottom (Ring)</button>
+    </div>
   </div>
 
   <!-- Panel Animations -->
@@ -60,6 +69,8 @@
 .pp{fill:#1e3a6e;stroke:#60a5fa;stroke-width:1;cursor:pointer;transition:fill .15s}
 .pp:hover,.pp.open{fill:#ea580c}
 .pe{fill:#c4c9d4;stroke:#9ca3af;stroke-width:.5}
+.pu{fill:#b0b8c8;stroke:#9ca3af;stroke-width:.8;cursor:pointer;transition:fill .15s}
+.pu:hover,.pu.open{fill:#6b7280}
 .pf{fill:#a0a8b4;stroke:#6b7280;stroke-width:.8}
 .rl{stroke:#6b7280;stroke-width:.8;fill:none}
 .cr{fill:#111827;stroke:#3b82f6;stroke-width:1.5;cursor:pointer}
@@ -77,16 +88,16 @@
 </style>
 <circle class="dbg" cx="240" cy="240" r="172"/>
 <circle class="pbg" cx="240" cy="240" r="119"/>
-<!-- Pie wedges, CW from top: PP4 (top, servo), PP3 (upper-right, fixed, hosts THP/HP3),
-     PP2 (right, servo), PP1 (bottom, servo — ALIGNED WITH FHP), PP6 (lower-left, servo,
-     group only), PP5 (upper-left, fixed). Wedge angle ranges unchanged from earlier
+<!-- Pie wedges, CW from top: PP4 (top, servo), PP3 (upper-right, unserviced on MK4, hosts THP/HP3),
+     PP2 (right, servo), PP1 (bottom, servo — ALIGNED WITH FHP), PP6 (lower-left, servo),
+     PP5 (upper-left, unserviced on MK4). Wedge angle ranges unchanged from earlier
      v3; panel identities rotated one wedge CW so PP1 aligns with HP1 at the bottom. -->
-<path class="pp" id="dp10" onclick="domePanelClick('10')" d="M 184.6,135.8 A 118,118 0 0 1 293.6,134.9 L 264.5,191.9 A 54,54 0 0 0 214.6,192.3 Z"><title>PP4</title></path>
-<path class="pe" id="pp3" d="M 302.5,139.9 A 118,118 0 0 1 357.8,233.8 L 293.9,237.2 A 54,54 0 0 0 268.6,194.2 Z"><title>PP3 (fixed, hosts THP)</title></path>
-<path class="pp" id="dp09" onclick="domePanelClick('09')" d="M 357.9,244.1 A 118,118 0 0 1 304.3,339.0 L 269.4,285.3 A 54,54 0 0 0 294.0,241.9 Z"><title>PP2</title></path>
-<path class="pp" id="dp08" onclick="domePanelClick('08')" d="M 295.4,344.2 A 118,118 0 0 1 186.4,345.1 L 215.5,288.1 A 54,54 0 0 0 265.4,287.7 Z"><title>PP1</title></path>
-<path class="pp" id="dp11" onclick="domePanelClick('11')" d="M 177.5,340.1 A 118,118 0 0 1 122.2,246.2 L 186.1,242.8 A 54,54 0 0 0 211.4,285.8 Z"><title>PP6 (group only)</title></path>
-<path class="pe" id="pp5" d="M 122.1,235.9 A 118,118 0 0 1 175.7,141.0 L 210.6,194.7 A 54,54 0 0 0 186.0,238.1 Z"><title>PP5 (fixed)</title></path>
+<path class="pp" id="pp4" onclick="domePanelClick('PP4')" d="M 184.6,135.8 A 118,118 0 0 1 293.6,134.9 L 264.5,191.9 A 54,54 0 0 0 214.6,192.3 Z"><title>PP4</title></path>
+<path class="pu" id="pp3" onclick="domePanelClick('PP3')" d="M 302.5,139.9 A 118,118 0 0 1 357.8,233.8 L 293.9,237.2 A 54,54 0 0 0 268.6,194.2 Z"><title>PP3 (unserviced — no servo on standard MK4; hosts THP/HP3)</title></path>
+<path class="pp" id="pp2" onclick="domePanelClick('PP2')" d="M 357.9,244.1 A 118,118 0 0 1 304.3,339.0 L 269.4,285.3 A 54,54 0 0 0 294.0,241.9 Z"><title>PP2</title></path>
+<path class="pp" id="pp1" onclick="domePanelClick('PP1')" d="M 295.4,344.2 A 118,118 0 0 1 186.4,345.1 L 215.5,288.1 A 54,54 0 0 0 265.4,287.7 Z"><title>PP1</title></path>
+<path class="pp" id="pp6" onclick="domePanelClick('PP6')" d="M 177.5,340.1 A 118,118 0 0 1 122.2,246.2 L 186.1,242.8 A 54,54 0 0 0 211.4,285.8 Z"><title>PP6</title></path>
+<path class="pu" id="pp5" onclick="domePanelClick('PP5')" d="M 122.1,235.9 A 118,118 0 0 1 175.7,141.0 L 210.6,194.7 A 54,54 0 0 0 186.0,238.1 Z"><title>PP5 (unserviced — no servo on standard MK4)</title></path>
 <!-- Outer ring v4 — 17 positions CW from top with three changes from v3:
      1. P6 + MP + P5 merged into a single fixed-panel arc (3 separate callouts
         still point into it for the individual labels).
@@ -98,17 +109,17 @@
      on P8/P14/P12/P9 respectively. -->
 <ellipse class="hp" cx="240.0" cy="81.0" rx="14.1" ry="10.9" transform="rotate(0.0 240.0 81.0)"><title>HP2 — Rear Holo Projector</title></ellipse>
 <path class="pf" id="r_p8" d="M 272.8,71.2 A 172,172 0 0 1 318.1,86.7 L 306.3,109.9 A 146,146 0 0 0 267.9,96.7 Z"><title>P8 — fixed (RPSI mounted on it)</title></path>
-<path class="pr" id="dp05" onclick="domePanelClick('05')" d="M 331.1,94.1 A 172,172 0 0 1 391.9,159.3 L 368.9,171.5 A 146,146 0 0 0 317.4,116.2 Z"><title>P7 — ring panel (wide, ~2.3× P1)</title></path>
+<path class="pr" id="p7" onclick="domePanelClick('P7')" d="M 331.1,94.1 A 172,172 0 0 1 391.9,159.3 L 368.9,171.5 A 146,146 0 0 0 317.4,116.2 Z"><title>P7 — ring panel (wide, ~2.3× P1)</title></path>
 <path class="pf" id="r_merge" d="M 398.3,172.8 A 172,172 0 0 1 409.4,210.1 L 383.8,214.6 A 146,146 0 0 0 374.4,183.0 Z"><title>P6 / MP / P5 — combined fixed structure (compact)</title></path>
-<path class="pr" id="dp04" onclick="domePanelClick('04')" d="M 411.3,225.0 A 172,172 0 0 1 395.9,312.7 L 372.3,301.7 A 146,146 0 0 0 385.4,227.3 Z"><title>P4 — ring panel (wide, ~2.3× P1)</title></path>
-<path class="pr" id="dp03" onclick="domePanelClick('03')" d="M 389.0,326.0 A 172,172 0 0 1 365.8,357.3 L 346.8,339.6 A 146,146 0 0 0 366.4,313.0 Z"><title>P3 — ring panel</title></path>
-<path class="pr" id="dp02" onclick="domePanelClick('02')" d="M 355.1,367.8 A 172,172 0 0 1 323.4,390.4 L 310.8,367.7 A 146,146 0 0 0 337.7,348.5 Z"><title>P2 — ring panel</title></path>
-<path class="pr" id="dp01" onclick="domePanelClick('01')" d="M 310.0,397.1 A 172,172 0 0 1 272.8,408.8 L 267.9,383.3 A 146,146 0 0 0 299.4,373.4 Z"><title>P1 — ring panel</title></path>
+<path class="pr" id="p4" onclick="domePanelClick('P4')" d="M 411.3,225.0 A 172,172 0 0 1 395.9,312.7 L 372.3,301.7 A 146,146 0 0 0 385.4,227.3 Z"><title>P4 — ring panel (wide, ~2.3× P1)</title></path>
+<path class="pr" id="p3" onclick="domePanelClick('P3')" d="M 389.0,326.0 A 172,172 0 0 1 365.8,357.3 L 346.8,339.6 A 146,146 0 0 0 366.4,313.0 Z"><title>P3 — ring panel</title></path>
+<path class="pr" id="p2" onclick="domePanelClick('P2')" d="M 355.1,367.8 A 172,172 0 0 1 323.4,390.4 L 310.8,367.7 A 146,146 0 0 0 337.7,348.5 Z"><title>P2 — ring panel</title></path>
+<path class="pr" id="p1" onclick="domePanelClick('P1')" d="M 310.0,397.1 A 172,172 0 0 1 272.8,408.8 L 267.9,383.3 A 146,146 0 0 0 299.4,373.4 Z"><title>P1 — ring panel</title></path>
 <ellipse class="hp" cx="237.2" cy="399.0" rx="16.5" ry="10.9" transform="rotate(181.0 237.2 399.0)"><title>HP1 — Front Holo Projector</title></ellipse>
 <path class="pf" id="r_p14" d="M 198.4,406.9 A 172,172 0 0 1 154.0,389.0 L 167.0,366.4 A 146,146 0 0 0 204.7,381.7 Z"><title>P14 — fixed (FPSI mounted on it)</title></path>
-<path class="pr" id="dp07" onclick="domePanelClick('07')" d="M 138.9,379.2 A 172,172 0 0 1 124.9,367.8 L 142.3,348.5 A 146,146 0 0 0 154.2,358.1 Z"><title>P13 — ring panel (narrow)</title></path>
+<path class="pr" id="p13" onclick="domePanelClick('P13')" d="M 138.9,379.2 A 172,172 0 0 1 124.9,367.8 L 142.3,348.5 A 146,146 0 0 0 154.2,358.1 Z"><title>P13 — ring panel (narrow)</title></path>
 <path class="pf" id="r_p12" d="M 112.2,355.1 A 172,172 0 0 1 88.1,320.7 L 111.1,308.5 A 146,146 0 0 0 131.5,337.7 Z"><title>P12 — fixed (FLDs mounted on it)</title></path>
-<path class="pr" id="dp06" onclick="domePanelClick('06')" d="M 80.5,304.4 A 172,172 0 0 1 74.7,287.4 L 99.7,280.2 A 146,146 0 0 0 104.6,294.7 Z"><title>P11 — ring panel (narrow)</title></path>
+<path class="pr" id="p11" onclick="domePanelClick('P11')" d="M 80.5,304.4 A 172,172 0 0 1 74.7,287.4 L 99.7,280.2 A 146,146 0 0 0 104.6,294.7 Z"><title>P11 — ring panel (narrow)</title></path>
 <path class="pf" id="r_p10" d="M 70.6,269.9 A 172,172 0 0 1 88.1,159.3 L 111.1,171.5 A 146,146 0 0 0 96.2,265.4 Z"><title>P10 — wide fixed panel</title></path>
 <path class="pf" id="r_p9" d="M 97.4,143.8 A 172,172 0 0 1 192.6,74.7 L 199.8,99.7 A 146,146 0 0 0 119.0,158.4 Z"><title>P9 — wide fixed (RLD mounted on it)</title></path>
 <circle class="pf" cx="240" cy="240" r="22"/>
@@ -124,7 +135,7 @@
 <text class="lf2" x="309.3" y="34.6">P8</text>
 <text class="lf2" x="309.3" y="43.6">RPSI</text>
 <line x1="395.8" y1="94.7" x2="377.5" y2="111.8" class="conn-r"/>
-<circle class="cr" cx="395.8" cy="94.7" r="12" onclick="domePanelClick('05')"><title>P7 — ring panel (wide, ~2.3× P1)</title></circle>
+<circle class="cr" cx="395.8" cy="94.7" r="12" onclick="domePanelClick('P7')"><title>P7 — ring panel (wide, ~2.3× P1)</title></circle>
 <text class="lt" x="395.8" y="94.7">P7</text>
 <!-- Merged P6/MP/P5 single callout — three stacked labels for the combined fixed structure -->
 <line x1="444.2" y1="179.5" x2="420.3" y2="186.6" class="conn-f"/>
@@ -133,30 +144,30 @@
 <text class="lf2" x="444.2" y="179.5">MP</text>
 <text class="lf2" x="444.2" y="186.5">P5</text>
 <line x1="449.8" y1="277.0" x2="425.1" y2="272.6" class="conn-r"/>
-<circle class="cr" cx="449.8" cy="277.0" r="12" onclick="domePanelClick('04')"><title>P4 — ring panel (wide, ~2.3× P1)</title></circle>
+<circle class="cr" cx="449.8" cy="277.0" r="12" onclick="domePanelClick('P4')"><title>P4 — ring panel (wide, ~2.3× P1)</title></circle>
 <text class="lt" x="449.8" y="277.0">P4</text>
 <line x1="411.2" y1="366.7" x2="391.1" y2="351.8" class="conn-r"/>
-<circle class="cr" cx="411.2" cy="366.7" r="12" onclick="domePanelClick('03')"><title>P3 — ring panel</title></circle>
+<circle class="cr" cx="411.2" cy="366.7" r="12" onclick="domePanelClick('P3')"><title>P3 — ring panel</title></circle>
 <text class="lt" x="411.2" y="366.7">P3</text>
 <line x1="363.7" y1="413.4" x2="349.2" y2="393.1" class="conn-r"/>
-<circle class="cr" cx="363.7" cy="413.4" r="12" onclick="domePanelClick('02')"><title>P2 — ring panel</title></circle>
+<circle class="cr" cx="363.7" cy="413.4" r="12" onclick="domePanelClick('P2')"><title>P2 — ring panel</title></circle>
 <text class="lt" x="363.7" y="413.4">P2</text>
 <line x1="304.1" y1="443.1" x2="296.5" y2="419.3" class="conn-r"/>
-<circle class="cr" cx="304.1" cy="443.1" r="12" onclick="domePanelClick('01')"><title>P1 — ring panel</title></circle>
+<circle class="cr" cx="304.1" cy="443.1" r="12" onclick="domePanelClick('P1')"><title>P1 — ring panel</title></circle>
 <text class="lt" x="304.1" y="443.1">P1</text>
 <line x1="160.2" y1="437.5" x2="169.6" y2="414.3" class="conn-f"/>
 <circle class="cf" cx="160.2" cy="437.5" r="14"><title>P14 — fixed (FPSI mounted on it)</title></circle>
 <text class="lf2" x="160.2" y="433.5">P14</text>
 <text class="lf2" x="160.2" y="442.5">FPSI</text>
 <line x1="106.0" y1="405.5" x2="121.7" y2="386.1" class="conn-r"/>
-<circle class="cr" cx="106.0" cy="405.5" r="12" onclick="domePanelClick('07')"><title>P13 — ring panel (narrow)</title></circle>
+<circle class="cr" cx="106.0" cy="405.5" r="12" onclick="domePanelClick('P13')"><title>P13 — ring panel (narrow)</title></circle>
 <text class="lt" x="106.0" y="405.5">P13</text>
 <line x1="65.5" y1="362.2" x2="86.0" y2="347.8" class="conn-f"/>
 <circle class="cf" cx="65.5" cy="362.2" r="14"><title>P12 — fixed (FLDs mounted on it)</title></circle>
 <text class="lf2" x="65.5" y="358.2">P12</text>
 <text class="lf2" x="65.5" y="367.2">FLDs</text>
 <line x1="38.6" y1="309.3" x2="62.2" y2="301.2" class="conn-r"/>
-<circle class="cr" cx="38.6" cy="309.3" r="12" onclick="domePanelClick('06')"><title>P11 — ring panel (narrow)</title></circle>
+<circle class="cr" cx="38.6" cy="309.3" r="12" onclick="domePanelClick('P11')"><title>P11 — ring panel (narrow)</title></circle>
 <text class="lt" x="38.6" y="309.3">P11</text>
 <line x1="29.6" y1="206.7" x2="54.3" y2="210.6" class="conn-f"/>
 <circle class="cf" cx="29.6" cy="206.7" r="11"><title>P10 — wide fixed panel</title></circle>
@@ -218,17 +229,17 @@
         <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CL04')">Close</button></td>
         <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OF04')">Flutter</button></td></tr>
       <tr><td class="panel-cell">Panel 7 (P7)</td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OP05')">Open</button></td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CL05')">Close</button></td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OF05')">Flutter</button></td></tr>
-      <tr><td class="panel-cell">Panel 11 (P11)</td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OP06')">Open</button></td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CL06')">Close</button></td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OF06')">Flutter</button></td></tr>
-      <tr><td class="panel-cell">Panel 13 (P13)</td>
         <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OP07')">Open</button></td>
         <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CL07')">Close</button></td>
         <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OF07')">Flutter</button></td></tr>
+      <tr><td class="panel-cell">Panel 11 (P11)</td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OP11')">Open</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CL11')">Close</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OF11')">Flutter</button></td></tr>
+      <tr><td class="panel-cell">Panel 13 (P13)</td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OP13')">Open</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CL13')">Close</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OF13')">Flutter</button></td></tr>
     </table>
     </div>
   </div>
@@ -244,19 +255,29 @@
         <td class="panel-cell-center">Flutter</td>
       </tr>
       <tr><td class="panel-cell">Pie Panel 1 (PP1)</td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OP08')">Open</button></td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CL08')">Close</button></td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OF08')">Flutter</button></td></tr>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OPP1')">Open</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CLP1')">Close</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OFP1')">Flutter</button></td></tr>
       <tr><td class="panel-cell">Pie Panel 2 (PP2)</td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OP09')">Open</button></td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CL09')">Close</button></td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OF09')">Flutter</button></td></tr>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OPP2')">Open</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CLP2')">Close</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OFP2')">Flutter</button></td></tr>
+      <tr title="PP3 has no servo on a standard MK4 build — commands are accepted but do nothing until a servo is wired via Wiring Config"><td class="panel-cell-dim">Pie Panel 3 (PP3) <span style="font-size:.8em">unserviced</span></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OPP3')" title="No-op on standard MK4">Open</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CLP3')" title="No-op on standard MK4">Close</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OFP3')" title="No-op on standard MK4">Flutter</button></td></tr>
       <tr><td class="panel-cell">Pie Panel 4 (PP4)</td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OP10')">Open</button></td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CL10')">Close</button></td>
-        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OF10')">Flutter</button></td></tr>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OPP4')">Open</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CLP4')">Close</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OFP4')">Flutter</button></td></tr>
+      <tr title="PP5 has no servo on a standard MK4 build — commands are accepted but do nothing until a servo is wired via Wiring Config"><td class="panel-cell-dim">Pie Panel 5 (PP5) <span style="font-size:.8em">unserviced</span></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OPP5')" title="No-op on standard MK4">Open</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CLP5')" title="No-op on standard MK4">Close</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OFP5')" title="No-op on standard MK4">Flutter</button></td></tr>
       <tr><td class="panel-cell">Pie Panel 6 (PP6)</td>
-        <td class="panel-cell-center" colspan="3" style="color:var(--text-dim);font-size:.85em">Opens with All Pie (:OP11)</td></tr>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OPP6')">Open</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':CLP6')">Close</button></td>
+        <td class="panel-cell-center"><button class="btn" onclick="sendCmd(':OFP6')">Flutter</button></td></tr>
     </table>
     </div>
   </div>
@@ -264,7 +285,7 @@
   <div class="card">
     <h3>Panel Servo Calibration</h3>
     <div class="desc">Select a panel, test position with temporary move, then store open/closed values.</div>
-    <div class="desc mt-4">Extended compatibility targets are supported for builds that expose top/bottom aliases.</div>
+    <div class="desc mt-4">Pie panels PP1/PP2/PP4/PP6 use community-alias numbers for calibration (PP1=08, PP2=09, PP4=10, PP6=12). PP3 and PP5 have no servo on a standard MK4 and are not listed here.</div>
 
     <div class="row mt-8">
       <label class="label-dim" for="cal-panel">Panel:</label>
@@ -274,15 +295,15 @@
           <option value="02">Panel 2 (P2)</option>
           <option value="03">Panel 3 (P3)</option>
           <option value="04">Panel 4 (P4)</option>
-          <option value="05">Panel 7 (P7)</option>
-          <option value="06">Panel 11 (P11)</option>
-          <option value="07">Panel 13 (P13)</option>
+          <option value="07">Panel 7 (P7)</option>
+          <option value="11">Panel 11 (P11)</option>
+          <option value="13">Panel 13 (P13)</option>
         </optgroup>
         <optgroup label="Pie Panels">
           <option value="08">Pie Panel 1 (PP1)</option>
           <option value="09">Pie Panel 2 (PP2)</option>
           <option value="10">Pie Panel 4 (PP4)</option>
-          <option value="11">Pie Panel 6 (PP6)</option>
+          <option value="12">Pie Panel 6 (PP6)</option>
         </optgroup>
       </select>
     </div>
@@ -497,12 +518,51 @@
     })();
 
     function domePanelClick(id) {
-      var el = document.getElementById('dp' + id);
+      var el = document.getElementById(id.toLowerCase());
       if (!el) return;
       var isOpen = el.classList.contains('open');
-      el.classList.toggle('open', !isOpen);
-      sendCmd(isOpen ? ':CL' + id : ':OP' + id);
+      // Unserviced panels (.pu) send the command but don't toggle the SVG open
+      // state — no servo moves on a standard MK4, so showing the wedge as open
+      // would be misleading. Builders who have wired a servo still get the action.
+      if (!el.classList.contains('pu')) {
+        el.classList.toggle('open', !isOpen);
+      }
+      // Pie panels (PP1–PP6) use the fork :OPP/:CLP namespace.
+      // Ring panels use :OP/:CL with the physical panel number zero-padded to
+      // two digits — identity-matched so P7→:OP07, P11→:OP11, P13→:OP13.
+      var open, close;
+      if (id.slice(0, 2) === 'PP') {
+        open  = ':OPP' + id.slice(2);
+        close = ':CLP' + id.slice(2);
+      } else {
+        var raw = id.slice(1);
+        var nn  = raw.length < 2 ? '0' + raw : raw;
+        open  = ':OP' + nn;
+        close = ':CL' + nn;
+      }
+      sendCmd(isOpen ? close : open);
     }
+
+    // On load: if PP3 or PP5 have a non-zero PCA9685 channel configured (a
+    // builder wired a servo), remove .pu so the SVG diagram tracks open/close
+    // state normally. Slot 7 = PP5, slot 12 = PP3 per NUM_PANEL_SLOTS order.
+    (function() {
+      fetch('/api/panels/config').then(function(r) { return r.json(); })
+        .then(function(data) {
+          var slots = data.slots || [];
+          [{ idx: 7, id: 'pp5', name: 'PP5' }, { idx: 12, id: 'pp3', name: 'PP3' }]
+            .forEach(function(p) {
+              var slot = slots[p.idx];
+              if (slot && slot.channel !== 0) {
+                var el = document.getElementById(p.id);
+                if (!el) return;
+                el.classList.remove('pu');
+                var t = el.querySelector('title');
+                if (t) t.textContent = p.name + ' (servo wired — ch ' + slot.channel + ')';
+              }
+            });
+        }).catch(function() { /* config unavailable — keep .pu defaults */ });
+    })();
 
     function twoDigitPanel(v) {
       var n = String(v || '').replace(/\D/g, '');

@@ -665,6 +665,7 @@ table td { color: var(--silver); }
 .panel-table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
 .panel-head { color: var(--text-dim); }
 .panel-cell { padding: 4px; }
+.panel-cell-dim { padding: 4px; color: var(--text-dim); }
 .panel-cell-center { padding: 4px; text-align: center; }
 .table-wrap {
   overflow-x: auto;

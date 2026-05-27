@@ -206,12 +206,28 @@
     if (cmd === ':CL00') return 'Close all dome panels';
     if (cmd === ':OF00') return 'Flutter all dome panels';
 
+    m = cmd.match(/^:OPP([1-6])$/);
+    if (m) return 'Open pie panel PP' + m[1];
+    m = cmd.match(/^:CLP([1-6])$/);
+    if (m) return 'Close pie panel PP' + m[1];
+    m = cmd.match(/^:OFP([1-6])$/);
+    if (m) return 'Flutter pie panel PP' + m[1];
+
+    // Community-standard aliases: pie panels inherit command numbers from the
+    // fixed-panel slots they share a position with (08=PP1, 09=PP2, 10=PP4,
+    // 12=PP6). 14/15 are MarcDuino V3 group shortcuts (top=pie, bottom=ring).
+    var panelLabel = {
+      '01':'P1', '02':'P2', '03':'P3', '04':'P4',
+      '07':'P7', '11':'P11', '13':'P13',
+      '08':'PP1', '09':'PP2', '10':'PP4', '12':'PP6',
+      '14':'top panels (pie)', '15':'bottom panels (ring)'
+    };
     m = cmd.match(/^:OP(\d{2})$/);
-    if (m) return 'Open panel/group ' + m[1];
+    if (m) return 'Open ' + (panelLabel[m[1]] || 'panel/group ' + m[1]);
     m = cmd.match(/^:CL(\d{2})$/);
-    if (m) return 'Close panel/group ' + m[1];
+    if (m) return 'Close ' + (panelLabel[m[1]] || 'panel/group ' + m[1]);
     m = cmd.match(/^:OF(\d{2})$/);
-    if (m) return 'Flutter panel/group ' + m[1];
+    if (m) return 'Flutter ' + (panelLabel[m[1]] || 'panel/group ' + m[1]);
 
     m = cmd.match(/^:SE(\d{2})$/);
     if (m) return 'Run sequence ' + m[1];

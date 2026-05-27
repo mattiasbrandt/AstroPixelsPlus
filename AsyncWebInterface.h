@@ -494,14 +494,17 @@ static const char *panelSlotLabel(int slot)
     return (slot >= 0 && slot < NUM_PANEL_SLOTS) ? kPanelSlotLabels[slot] : "?";
 }
 
-// Marcduino :OPnn command per slot. Empty string for unserviced slots and for
-// PP6 (slot 11, group-only). Panel command routing is hardcoded by slot index —
-// see ADR 0003 for why this is not configurable at runtime.
+// Marcduino open command per slot. Slots 7 (PP5) and 12 (PP3) are unserviced
+// on a standard MK4 but still carry a command so a builder who wires a servo
+// can activate them. Pie panels use the :OPP* fork namespace (ADR 0007).
+// Ring panels P7, P11, P13 use their identity number, not the old slot index.
 static const char *panelSlotCommand(int slot)
 {
     static const char *cmds[NUM_PANEL_SLOTS] = {
-        ":OP01", ":OP02", ":OP03", ":OP04", ":OP05", ":OP06", ":OP07",
-        "",      ":OP08", ":OP09", ":OP10", "",      "",
+        //  P1       P2       P3       P4       P7       P11      P13
+        ":OP01", ":OP02", ":OP03", ":OP04", ":OP07", ":OP11", ":OP13",
+        //  PP5      PP1      PP2      PP4      PP6      PP3
+        ":OPP5", ":OPP1", ":OPP2", ":OPP4", ":OPP6", ":OPP3",
     };
     return (slot >= 0 && slot < NUM_PANEL_SLOTS) ? cmds[slot] : "";
 }
