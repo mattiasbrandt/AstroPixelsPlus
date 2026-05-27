@@ -583,23 +583,25 @@ Resolved systematic mislabeling and incorrect servo-to-panel mapping for the **M
 
 **`servoSettings[]` remapped (`AstroPixelsPlus.ino`):**
 
-| PCA9685 ch | Panel (printed-droid) | Marcduino | PANEL_GROUP |
-|---|---|---|---|
-| 1 | P1 | `:OP01` | PANEL_GROUP_1 |
-| 2 | P2 | `:OP02` | PANEL_GROUP_2 |
-| 3 | P3 | `:OP03` | PANEL_GROUP_3 |
-| 4 | P4 | `:OP04` | PANEL_GROUP_4 |
-| 5 | P7 | `:OP05` | PANEL_GROUP_5 |
-| 6 | P11 | `:OP06` | PANEL_GROUP_6 |
-| 7 | P13 | `:OP07` | PANEL_GROUP_7 |
-| 8 | — | unused | MINI_PANEL |
-| 9 | PP1 | `:OP08` | PANEL_GROUP_8 \| PIE_PANEL |
-| 10 | PP2 | `:OP09` | PANEL_GROUP_9 \| PIE_PANEL |
-| 11 | PP4 | `:OP10` | PANEL_GROUP_10 \| PIE_PANEL |
-| 12 | PP6 | group-only | PIE_PANEL |
-| 13 | — | unused | TOP_PIE_PANEL |
+This table was updated by the Panel Command Numbering Fix (2026-05-27) — see that section below for the full migration story. Current state:
 
-Note: `:OP11` = OpenTopPanels (PIE_PANEL group), `:OP12` = OpenBottomPanels (DOME_PANELS_MASK group) — these are **group commands**, not individual panels.
+| PCA9685 ch | Panel (printed-droid) | Marcduino | Address bit |
+|---|---|---|---|
+| 1 | P1 | `:OP01` | `PANEL_P1` |
+| 2 | P2 | `:OP02` | `PANEL_P2` |
+| 3 | P3 | `:OP03` | `PANEL_P3` |
+| 4 | P4 | `:OP04` | `PANEL_P4` |
+| 5 | P7 | `:OP07` | `PANEL_P7` |
+| 6 | P11 | `:OP11` | `PANEL_P11` |
+| 7 | P13 | `:OP13` | `PANEL_P13` |
+| 8 | PP5 | `:OPP5` | `PANEL_PP5` (unserviced on standard MK4) |
+| 9 | PP1 | `:OPP1` (alias `:OP08`) | `PANEL_PP1` |
+| 10 | PP2 | `:OPP2` (alias `:OP09`) | `PANEL_PP2` |
+| 11 | PP4 | `:OPP4` (alias `:OP10`) | `PANEL_PP4` |
+| 12 | PP6 | `:OPP6` (alias `:OP12`) | `PANEL_PP6` |
+| 13 | PP3 | `:OPP3` | `TOP_PIE_PANEL` (unserviced on standard MK4) |
+
+Group shortcuts (MarcDuino V3): `:OP14` / `:CL14` / `:OF14` = all pie panels; `:OP15` / `:CL15` / `:OF15` = all ring panels.
 
 **Changes applied:**
 
@@ -878,6 +880,68 @@ The fork moved to async web + SPIFFS UI because it solves the structural bottlen
 - Better stability under richer UI.
 - Clearer separation of concerns (firmware command execution vs web presentation).
 - Faster iteration on operator UX without reintroducing static-init heap pressure.
+
+---
+
+## Panel Command Numbering Fix (2026-05-27)
+
+### Problem
+
+During hardware testing, individual ring-panel commands (`:OP05`–`:OP07`) drove the wrong physical panels. `:OP05` moved P7, `:OP06` moved P11, and `:OP07` moved P13 — one slot off in each case — because the firmware mapped `:OPnn` to `servoSettings[]` **slot index n-1** rather than to **physical panel number n**. In addition, `:OP11` and `:OP12` were repurposed as group shortcuts (all pie / all dome), conflicting with MarcDuino V3's individual-panel numbering convention.
+
+### Fix
+
+The fix aligns this firmware with the MarcDuino V3 13-panel standard:
+
+- `:OP01`–`:OP04` / `:CL01`–`:CL04` / `:OF01`–`:OF04` — ring panels P1–P4 (unchanged)
+- `:OP07` / `:CL07` / `:OF07` — ring panel P7 (was `:OP05`)
+- `:OP11` / `:CL11` / `:OF11` — ring panel P11 (was repurposed as "open all pie")
+- `:OP13` / `:CL13` / `:OF13` — ring panel P13 (was missing entirely)
+- `:OP08` / `:OP09` / `:OP10` / `:OP12` — pie panels PP1 / PP2 / PP4 / PP6 (community-standard aliases, unchanged)
+
+### Operator migration for saved macros
+
+If you have saved macros that relied on the old group shortcuts, update them:
+
+| Old command | Old behavior | New command for same effect |
+|-------------|-------------|----------------------------|
+| `:OP11` | Open all pie panels | `:OP14` |
+| `:CL11` | Close all pie panels | `:CL14` |
+| `:OP12` | Open all dome panels | `:OP15` or `:OP00` |
+| `:CL12` | Close all dome panels | `:CL15` or `:CL00` |
+| `:OP05` | Moved P7 (wrong label) | `:OP07` (correct) |
+| `:OP06` | Moved P11 (wrong label) | `:OP11` (correct) |
+| `:OP07` | Moved P13 (wrong label) | `:OP13` (correct) |
+
+`:OP14` / `:CL14` = **top panel group** (all pie panels — MarcDuino V3 style).  
+`:OP15` / `:CL15` = **bottom panel group** (all ring panels — MarcDuino V3 style).
+
+### Fork-specific pie panel namespace (`:OPP*` / `:CLP*` / `:OFP*`)
+
+This fork adds a readable alternative command namespace for pie panels that does not require knowing the community-alias numbers:
+
+| Panel | Community alias | Fork alias |
+|-------|----------------|-----------|
+| PP1   | `:OP08`        | `:OPP1`   |
+| PP2   | `:OP09`        | `:OPP2`   |
+| PP3   | *(no-op on standard MK4)* | `:OPP3` |
+| PP4   | `:OP10`        | `:OPP4`   |
+| PP5   | *(no-op on standard MK4)* | `:OPP5` |
+| PP6   | `:OP12`        | `:OPP6`   |
+
+Both addressing schemes target the same servo. The fork aliases are listed in the web UI pie panel table alongside the community aliases.
+
+### PP5 and PP3 — unserviced slots
+
+PP5 (upper-left wedge) and PP3 (upper-right wedge, hosts the Top Holo Projector) have no servo on a standard MK4 build. Their command slots exist in firmware with zero channel numbers. Any `:OPP3` / `:OPP5` command is accepted and silently skipped (`_moveServoToPulse` short-circuits on channel=0). If a builder wires a servo to those slots via the wiring config page, the commands become live with no firmware change.
+
+PP5 was previously classified as `MINI_PANEL` (a body-panel type). It has been reclassified to `PIE_PANEL` so it participates correctly in group mask operations that target the pie wedge area.
+
+### Dome sequence updates
+
+All 17 `DM:*` dome sequences (`domeOpenClosePies`, `domeOpenCloseLow`, `domeOpenCloseAll`, `domeFlutter`, `domeBloom`, `domeScream`, `domeResetAll`, `domeCantina`, `domeRockMarch`, and others) were audited and updated to use identity-based slot constants (`D_P1`–`D_P13`, `D_PP1`–`D_PP6`) and to include PP3 and PP5 in sequences where the entire pie ring participates. On a standard MK4, PP3/PP5 slots are inactive no-ops; on a fully-wired dome, all 6 pie wedges will animate.
+
+Sequences that are pure logic/holo/sound with no panel movement (`domeHeart`, `domeAlarm`, `domeDisco`, `domeVader`, `domeLeiaMode`) were not changed.
 
 ---
 
