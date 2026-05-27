@@ -222,11 +222,11 @@ MARCDUINO_ACTION(FullAwakeModeReset, :SE11, ({
 ////////////////
 
 MARCDUINO_ACTION(TopPanelsShowcase, :SE12, ({
-    cancelPanelRelease(PIE_PANEL);
+    cancelPanelRelease(PIE_PANEL | TOP_PIE_PANEL);
     // Demo top-panel choreography with a coordinated holo LED cycle
-    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpenClose, PIE_PANEL);
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpenClose, PIE_PANEL | TOP_PIE_PANEL);
     CommandEvent::process(F("HPA0040"));
-    schedulePanelRelease(PIE_PANEL, 8000);
+    schedulePanelRelease(PIE_PANEL | TOP_PIE_PANEL, 8000);
 }))
 
 ////////////////
@@ -438,15 +438,15 @@ MARCDUINO_ANIMATION(GirlOnFireSequence, $821)
 MARCDUINO_ANIMATION(YodaClearMind, $720)
 {
     DO_START()
-    DO_ONCE({ cancelPanelRelease(PANEL_GROUP_6); })
-    DO_SEQUENCE(SeqPanelAllOpen, PANEL_GROUP_6)
+    DO_ONCE({ cancelPanelRelease(PANEL_P11); })
+    DO_SEQUENCE(SeqPanelAllOpen, PANEL_P11)
     DO_COMMAND(F(
         // Yoda LED sequence
         "HPO006|15\n"))
     // Wait 15 seconds
     DO_WAIT_SEC(15)
-    DO_SEQUENCE(SeqPanelAllClose, PANEL_GROUP_6)
-    DO_ONCE({ schedulePanelRelease(PANEL_GROUP_6); })
+    DO_SEQUENCE(SeqPanelAllClose, PANEL_P11)
+    DO_ONCE({ schedulePanelRelease(PANEL_P11); })
     DO_RESET({
         resetSequence();
     })

@@ -25,21 +25,21 @@ static bool panelTargetToMask(uint8_t target, uint32_t &mask)
     switch (target)
     {
         case 0:  mask = ALL_DOME_PANELS_MASK; return true;
-        case 1:  mask = PANEL_GROUP_1; return true;
-        case 2:  mask = PANEL_GROUP_2; return true;
-        case 3:  mask = PANEL_GROUP_3; return true;
-        case 4:  mask = PANEL_GROUP_4; return true;
-        case 5:  mask = PANEL_GROUP_5; return true;
-        case 6:  mask = PANEL_GROUP_6; return true;
-        case 7:  mask = PANEL_GROUP_7; return true;
-        case 8:  mask = PANEL_GROUP_8; return true;
-        case 9:  mask = PANEL_GROUP_9; return true;
-        case 10: mask = PANEL_GROUP_10; return true;
-        case 11: mask = PIE_PANEL; return true;
-        case 12: mask = DOME_PANELS_MASK; return true;
-        case 13: mask = TOP_PIE_PANEL; return true;
-        case 14: mask = (PIE_PANEL | TOP_PIE_PANEL); return true;
-        case 15: mask = DOME_PANELS_MASK; return true;
+        case 1:  mask = PANEL_P1;  return true;
+        case 2:  mask = PANEL_P2;  return true;
+        case 3:  mask = PANEL_P3;  return true;
+        case 4:  mask = PANEL_P4;  return true;
+        case 5:  return false;               // P5 — fixed panel, no servo
+        case 6:  return false;               // P6 — fixed panel, no servo
+        case 7:  mask = PANEL_P7;  return true;
+        case 8:  mask = PANEL_PP1; return true;
+        case 9:  mask = PANEL_PP2; return true;
+        case 10: mask = PANEL_PP4; return true;
+        case 11: mask = PANEL_P11; return true;
+        case 12: mask = PANEL_PP6; return true;
+        case 13: mask = PANEL_P13; return true;
+        case 14: mask = (PIE_PANEL | TOP_PIE_PANEL); return true;  // MarcDuino V3 top-panels shortcut
+        case 15: mask = DOME_PANELS_MASK; return true;              // MarcDuino V3 bottom-panels shortcut
         default: return false;
     }
 }
@@ -594,252 +594,412 @@ MARCDUINO_ACTION(ClosePanelGroupDynamic, :CL$, ({
 }))
 
 ////////////////
+// MarcDuino V3 group shortcuts — decimal target 14 and 15 route through
+// panelTargetToMask(), but the $-wildcard handlers parse their suffix as hex
+// (strtol base-16), so :OP14 → 0x14 = 20, not the intended mask. These six
+// literal handlers intercept :OP14/:CL14/:OF14 (all pie, incl. PP3) and
+// :OP15/:CL15/:OF15 (all ring panels) before the wildcard can misfire.
 
-MARCDUINO_ACTION(OpenPanelGroup1, :OP01, ({
-    cancelPanelRelease(PANEL_GROUP_1);
-    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_GROUP_1);
+MARCDUINO_ACTION(OpenTopPanels, :OP14, ({
+    // target 14 = PIE_PANEL | TOP_PIE_PANEL (all pie panels, including PP3)
+    cancelPanelRelease(PIE_PANEL | TOP_PIE_PANEL);
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PIE_PANEL | TOP_PIE_PANEL);
 }))
 
 ////////////////
 
-MARCDUINO_ACTION(OpenPanelGroup2, :OP02, ({
-    cancelPanelRelease(PANEL_GROUP_2);
-    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_GROUP_2);
+MARCDUINO_ACTION(CloseTopPanels, :CL14, ({
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PIE_PANEL | TOP_PIE_PANEL);
+    schedulePanelRelease(PIE_PANEL | TOP_PIE_PANEL);
 }))
 
 ////////////////
 
-MARCDUINO_ACTION(OpenPanelGroup3, :OP03, ({
-    cancelPanelRelease(PANEL_GROUP_3);
-    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_GROUP_3);
+MARCDUINO_ACTION(FlutterTopPanels, :OF14, ({
+    cancelPanelRelease(PIE_PANEL | TOP_PIE_PANEL);
+    SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PIE_PANEL | TOP_PIE_PANEL, 10, 50);
 }))
 
 ////////////////
 
-MARCDUINO_ACTION(OpenPanelGroup4, :OP04, ({
-    cancelPanelRelease(PANEL_GROUP_4);
-    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_GROUP_4);
-}))
-
-////////////////
-
-MARCDUINO_ACTION(OpenPanelGroup5, :OP05, ({
-    cancelPanelRelease(PANEL_GROUP_5);
-    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_GROUP_5);
-}))
-
-////////////////
-
-MARCDUINO_ACTION(OpenPanelGroup6, :OP06, ({
-    cancelPanelRelease(PANEL_GROUP_6);
-    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_GROUP_6);
-}))
-
-////////////////
-
-MARCDUINO_ACTION(OpenPanelGroup7, :OP07, ({
-    cancelPanelRelease(PANEL_GROUP_7);
-    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_GROUP_7);
-}))
-
-////////////////
-
-MARCDUINO_ACTION(OpenPanelGroup8, :OP08, ({
-    cancelPanelRelease(PANEL_GROUP_8);
-    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_GROUP_8);
-}))
-
-////////////////
-
-MARCDUINO_ACTION(OpenPanelGroup9, :OP09, ({
-    cancelPanelRelease(PANEL_GROUP_9);
-    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_GROUP_9);
-}))
-
-////////////////
-
-MARCDUINO_ACTION(OpenPanelGroup10, :OP10, ({
-    cancelPanelRelease(PANEL_GROUP_10);
-    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_GROUP_10);
-}))
-
-////////////////
-
-MARCDUINO_ACTION(OpenTopPanels, :OP11, ({
-    cancelPanelRelease(PIE_PANEL);
-    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PIE_PANEL);
-}))
-
-////////////////
-
-MARCDUINO_ACTION(OpenBottomPanels, :OP12, ({
+MARCDUINO_ACTION(OpenBottomPanels, :OP15, ({
+    // target 15 = DOME_PANELS_MASK (all ring panels: small + medium + big)
     cancelPanelRelease(DOME_PANELS_MASK);
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, DOME_PANELS_MASK);
 }))
 
-
-MARCDUINO_ACTION(ClosePanelGroup1, :CL01, ({
-    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_GROUP_1);
-    schedulePanelRelease(PANEL_GROUP_1);
-}))
-
 ////////////////
 
-MARCDUINO_ACTION(ClosePanelGroup2, :CL02, ({
-    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_GROUP_2);
-    schedulePanelRelease(PANEL_GROUP_2);
-}))
-
-////////////////
-
-MARCDUINO_ACTION(ClosePanelGroup3, :CL03, ({
-    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_GROUP_3);
-    schedulePanelRelease(PANEL_GROUP_3);
-}))
-
-////////////////
-
-MARCDUINO_ACTION(ClosePanelGroup4, :CL04, ({
-    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_GROUP_4);
-    schedulePanelRelease(PANEL_GROUP_4);
-}))
-
-////////////////
-
-MARCDUINO_ACTION(ClosePanelGroup5, :CL05, ({
-    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_GROUP_5);
-    schedulePanelRelease(PANEL_GROUP_5);
-}))
-
-////////////////
-
-MARCDUINO_ACTION(ClosePanelGroup6, :CL06, ({
-    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_GROUP_6);
-    schedulePanelRelease(PANEL_GROUP_6);
-}))
-
-////////////////
-
-MARCDUINO_ACTION(ClosePanelGroup7, :CL07, ({
-    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_GROUP_7);
-    schedulePanelRelease(PANEL_GROUP_7);
-}))
-
-////////////////
-
-MARCDUINO_ACTION(ClosePanelGroup8, :CL08, ({
-    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_GROUP_8);
-    schedulePanelRelease(PANEL_GROUP_8);
-}))
-
-////////////////
-
-MARCDUINO_ACTION(ClosePanelGroup9, :CL09, ({
-    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_GROUP_9);
-    schedulePanelRelease(PANEL_GROUP_9);
-}))
-
-////////////////
-
-MARCDUINO_ACTION(ClosePanelGroup10, :CL10, ({
-    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_GROUP_10);
-    schedulePanelRelease(PANEL_GROUP_10);
-}))
-
-////////////////
-
-MARCDUINO_ACTION(CloseTopPanels, :CL11, ({
-    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PIE_PANEL);
-    schedulePanelRelease(PIE_PANEL);
-}))
-
-////////////////
-
-MARCDUINO_ACTION(CloseBottomPanels, :CL12, ({
+MARCDUINO_ACTION(CloseBottomPanels, :CL15, ({
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, DOME_PANELS_MASK);
     schedulePanelRelease(DOME_PANELS_MASK);
 }))
 
 ////////////////
 
-MARCDUINO_ACTION(FlutterPanelGroup1, :OF01, ({
-    cancelPanelRelease(PANEL_GROUP_1);
-    SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_GROUP_1, 10, 50);
-}))
-
-////////////////
-
-MARCDUINO_ACTION(FlutterPanelGroup2, :OF02, ({
-    cancelPanelRelease(PANEL_GROUP_2);
-    SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_GROUP_2, 10, 50);
-}))
-
-////////////////
-
-MARCDUINO_ACTION(FlutterPanelGroup3, :OF03, ({
-    cancelPanelRelease(PANEL_GROUP_3);
-    SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_GROUP_3, 10, 50);
-}))
-
-////////////////
-
-MARCDUINO_ACTION(FlutterPanelGroup4, :OF04, ({
-    cancelPanelRelease(PANEL_GROUP_4);
-    SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_GROUP_4, 10, 50);
-}))
-
-////////////////
-
-MARCDUINO_ACTION(FlutterPanelGroup5, :OF05, ({
-    cancelPanelRelease(PANEL_GROUP_5);
-    SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_GROUP_5, 10, 50);
-}))
-
-////////////////
-
-MARCDUINO_ACTION(FlutterPanelGroup6, :OF06, ({
-    cancelPanelRelease(PANEL_GROUP_6);
-    SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_GROUP_6, 10, 50);
-}))
-
-////////////////
-
-MARCDUINO_ACTION(FlutterPanelGroup7, :OF07, ({
-    cancelPanelRelease(PANEL_GROUP_7);
-    SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_GROUP_7, 10, 50);
-}))
-
-////////////////
-
-MARCDUINO_ACTION(FlutterPanelGroup8, :OF08, ({
-    cancelPanelRelease(PANEL_GROUP_8);
-    SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_GROUP_8, 10, 50);
-}))
-
-////////////////
-
-MARCDUINO_ACTION(FlutterPanelGroup9, :OF09, ({
-    cancelPanelRelease(PANEL_GROUP_9);
-    SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_GROUP_9, 10, 50);
-}))
-
-////////////////
-
-MARCDUINO_ACTION(FlutterPanelGroup10, :OF10, ({
-    cancelPanelRelease(PANEL_GROUP_10);
-    SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_GROUP_10, 10, 50);
-}))
-
-////////////////
-
-MARCDUINO_ACTION(FlutterTopPanels, :OF11, ({
-    cancelPanelRelease(PIE_PANEL);
-    SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PIE_PANEL, 10, 50);
-}))
-
-////////////////
-
-MARCDUINO_ACTION(FlutterBottomPanels, :OF12, ({
+MARCDUINO_ACTION(FlutterBottomPanels, :OF15, ({
     cancelPanelRelease(DOME_PANELS_MASK);
     SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, DOME_PANELS_MASK, 10, 50);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(OpenPanel1, :OP01, ({
+    cancelPanelRelease(PANEL_P1);
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_P1);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(OpenPanel2, :OP02, ({
+    cancelPanelRelease(PANEL_P2);
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_P2);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(OpenPanel3, :OP03, ({
+    cancelPanelRelease(PANEL_P3);
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_P3);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(OpenPanel4, :OP04, ({
+    cancelPanelRelease(PANEL_P4);
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_P4);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(OpenPanel5, :OP05, ({
+    /* P5 (Magic Panel/frame) — fixed panel, no servo. Recognized for Marcduino compatibility. */
+}))
+
+////////////////
+
+MARCDUINO_ACTION(OpenPanel6, :OP06, ({
+    /* P6 — fixed panel, no servo. Recognized for Marcduino compatibility. */
+}))
+
+////////////////
+
+MARCDUINO_ACTION(OpenPanel7, :OP07, ({
+    cancelPanelRelease(PANEL_P7);
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_P7);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(OpenPanelPP1, :OP08, ({
+    cancelPanelRelease(PANEL_PP1);
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_PP1);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(OpenPanelPP2, :OP09, ({
+    cancelPanelRelease(PANEL_PP2);
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_PP2);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(OpenPanelPP4, :OP10, ({
+    cancelPanelRelease(PANEL_PP4);
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_PP4);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(OpenPanel11, :OP11, ({
+    cancelPanelRelease(PANEL_P11);
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_P11);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(OpenPanelPP6, :OP12, ({
+    cancelPanelRelease(PANEL_PP6);
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_PP6);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(OpenPanel13, :OP13, ({
+    cancelPanelRelease(PANEL_P13);
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_P13);
+}))
+
+
+MARCDUINO_ACTION(ClosePanel1, :CL01, ({
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_P1);
+    schedulePanelRelease(PANEL_P1);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(ClosePanel2, :CL02, ({
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_P2);
+    schedulePanelRelease(PANEL_P2);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(ClosePanel3, :CL03, ({
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_P3);
+    schedulePanelRelease(PANEL_P3);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(ClosePanel4, :CL04, ({
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_P4);
+    schedulePanelRelease(PANEL_P4);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(ClosePanel5, :CL05, ({
+    /* P5 (Magic Panel/frame) — fixed panel, no servo. Recognized for Marcduino compatibility. */
+}))
+
+////////////////
+
+MARCDUINO_ACTION(ClosePanel6, :CL06, ({
+    /* P6 — fixed panel, no servo. Recognized for Marcduino compatibility. */
+}))
+
+////////////////
+
+MARCDUINO_ACTION(ClosePanel7, :CL07, ({
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_P7);
+    schedulePanelRelease(PANEL_P7);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(ClosePanelPP1, :CL08, ({
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_PP1);
+    schedulePanelRelease(PANEL_PP1);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(ClosePanelPP2, :CL09, ({
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_PP2);
+    schedulePanelRelease(PANEL_PP2);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(ClosePanelPP4, :CL10, ({
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_PP4);
+    schedulePanelRelease(PANEL_PP4);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(ClosePanel11, :CL11, ({
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_P11);
+    schedulePanelRelease(PANEL_P11);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(ClosePanelPP6, :CL12, ({
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_PP6);
+    schedulePanelRelease(PANEL_PP6);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(ClosePanel13, :CL13, ({
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_P13);
+    schedulePanelRelease(PANEL_P13);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(FlutterPanel1, :OF01, ({
+    cancelPanelRelease(PANEL_P1);
+    SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_P1, 10, 50);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(FlutterPanel2, :OF02, ({
+    cancelPanelRelease(PANEL_P2);
+    SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_P2, 10, 50);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(FlutterPanel3, :OF03, ({
+    cancelPanelRelease(PANEL_P3);
+    SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_P3, 10, 50);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(FlutterPanel4, :OF04, ({
+    cancelPanelRelease(PANEL_P4);
+    SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_P4, 10, 50);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(FlutterPanel5, :OF05, ({
+    /* P5 (Magic Panel/frame) — fixed panel, no servo. Recognized for Marcduino compatibility. */
+}))
+
+////////////////
+
+MARCDUINO_ACTION(FlutterPanel6, :OF06, ({
+    /* P6 — fixed panel, no servo. Recognized for Marcduino compatibility. */
+}))
+
+////////////////
+
+MARCDUINO_ACTION(FlutterPanel7, :OF07, ({
+    cancelPanelRelease(PANEL_P7);
+    SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_P7, 10, 50);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(FlutterPanelPP1, :OF08, ({
+    cancelPanelRelease(PANEL_PP1);
+    SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_PP1, 10, 50);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(FlutterPanelPP2, :OF09, ({
+    cancelPanelRelease(PANEL_PP2);
+    SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_PP2, 10, 50);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(FlutterPanelPP4, :OF10, ({
+    cancelPanelRelease(PANEL_PP4);
+    SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_PP4, 10, 50);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(FlutterPanel11, :OF11, ({
+    cancelPanelRelease(PANEL_P11);
+    SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_P11, 10, 50);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(FlutterPanelPP6, :OF12, ({
+    cancelPanelRelease(PANEL_PP6);
+    SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_PP6, 10, 50);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(FlutterPanel13, :OF13, ({
+    cancelPanelRelease(PANEL_P13);
+    SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_P13, 10, 50);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(OpenPiePanel1, :OPP1, ({
+    cancelPanelRelease(PANEL_PP1);
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_PP1);
+}))
+
+MARCDUINO_ACTION(OpenPiePanel2, :OPP2, ({
+    cancelPanelRelease(PANEL_PP2);
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_PP2);
+}))
+
+MARCDUINO_ACTION(OpenPiePanel3, :OPP3, ({
+    cancelPanelRelease(PANEL_PP3);
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_PP3);
+}))
+
+MARCDUINO_ACTION(OpenPiePanel4, :OPP4, ({
+    cancelPanelRelease(PANEL_PP4);
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_PP4);
+}))
+
+MARCDUINO_ACTION(OpenPiePanel5, :OPP5, ({
+    cancelPanelRelease(PANEL_PP5);
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_PP5);
+}))
+
+MARCDUINO_ACTION(OpenPiePanel6, :OPP6, ({
+    cancelPanelRelease(PANEL_PP6);
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_PP6);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(ClosePiePanel1, :CLP1, ({
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_PP1);
+    schedulePanelRelease(PANEL_PP1);
+}))
+
+MARCDUINO_ACTION(ClosePiePanel2, :CLP2, ({
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_PP2);
+    schedulePanelRelease(PANEL_PP2);
+}))
+
+MARCDUINO_ACTION(ClosePiePanel3, :CLP3, ({
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_PP3);
+    schedulePanelRelease(PANEL_PP3);
+}))
+
+MARCDUINO_ACTION(ClosePiePanel4, :CLP4, ({
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_PP4);
+    schedulePanelRelease(PANEL_PP4);
+}))
+
+MARCDUINO_ACTION(ClosePiePanel5, :CLP5, ({
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_PP5);
+    schedulePanelRelease(PANEL_PP5);
+}))
+
+MARCDUINO_ACTION(ClosePiePanel6, :CLP6, ({
+    SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_PP6);
+    schedulePanelRelease(PANEL_PP6);
+}))
+
+////////////////
+
+MARCDUINO_ACTION(FlutterPiePanel1, :OFP1, ({
+    cancelPanelRelease(PANEL_PP1);
+    SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_PP1, 10, 50);
+}))
+
+MARCDUINO_ACTION(FlutterPiePanel2, :OFP2, ({
+    cancelPanelRelease(PANEL_PP2);
+    SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_PP2, 10, 50);
+}))
+
+MARCDUINO_ACTION(FlutterPiePanel3, :OFP3, ({
+    cancelPanelRelease(PANEL_PP3);
+    SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_PP3, 10, 50);
+}))
+
+MARCDUINO_ACTION(FlutterPiePanel4, :OFP4, ({
+    cancelPanelRelease(PANEL_PP4);
+    SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_PP4, 10, 50);
+}))
+
+MARCDUINO_ACTION(FlutterPiePanel5, :OFP5, ({
+    cancelPanelRelease(PANEL_PP5);
+    SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_PP5, 10, 50);
+}))
+
+MARCDUINO_ACTION(FlutterPiePanel6, :OFP6, ({
+    cancelPanelRelease(PANEL_PP6);
+    SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_PP6, 10, 50);
 }))

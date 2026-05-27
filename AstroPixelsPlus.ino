@@ -349,19 +349,28 @@ DataPanel dataPanel(ledChain1);
 #define DOME_PANELS_MASK (SMALL_PANEL | MEDIUM_PANEL | BIG_PANEL)
 #define PIE_PANELS_MASK (PIE_PANEL)
 #define ALL_DOME_PANELS_MASK (MINI_PANEL | DOME_PANELS_MASK | PIE_PANELS_MASK | TOP_PIE_PANEL)
+// PP3 (TOP_PIE_PANEL) is intentionally excluded: PP3 mounts THP/HP3, so
+// dance sequences must not disturb the holo projector. On a standard MK4 it
+// is also unserviced (channel=0 short-circuits _moveServoToPulse).
 #define DOME_DANCE_PANELS_MASK (DOME_PANELS_MASK | PIE_PANELS_MASK)
 #define HOLO_SERVOS_MASK (HOLO_HSERVO | HOLO_VSERVO)
 
-#define PANEL_GROUP_1 (1L << 14)
-#define PANEL_GROUP_2 (1L << 15)
-#define PANEL_GROUP_3 (1L << 16)
-#define PANEL_GROUP_4 (1L << 17)
-#define PANEL_GROUP_5 (1L << 18)
-#define PANEL_GROUP_6 (1L << 19)
-#define PANEL_GROUP_7 (1L << 20)
-#define PANEL_GROUP_8 (1L << 21)
-#define PANEL_GROUP_9 (1L << 22)
-#define PANEL_GROUP_10 (1L << 23)
+// Individual panel address bits — named by builder-facing panel identity (ADR 0006).
+// Bit values are preserved from the retired PANEL_GROUP_N constants; no bitmask
+// changes for existing panels. PANEL_PP5/PP6/PP3 are new (no prior equivalent).
+#define PANEL_P1   (1L << 14)  // ring panel P1   (slot 0)
+#define PANEL_P2   (1L << 15)  // ring panel P2   (slot 1)
+#define PANEL_P3   (1L << 16)  // ring panel P3   (slot 2)
+#define PANEL_P4   (1L << 17)  // ring panel P4   (slot 3)
+#define PANEL_P7   (1L << 18)  // ring panel P7   (slot 4)
+#define PANEL_P11  (1L << 19)  // ring panel P11  (slot 5)
+#define PANEL_P13  (1L << 20)  // ring panel P13  (slot 6)
+#define PANEL_PP1  (1L << 21)  // pie panel  PP1  (slot 8)
+#define PANEL_PP2  (1L << 22)  // pie panel  PP2  (slot 9)
+#define PANEL_PP4  (1L << 23)  // pie panel  PP4  (slot 10)
+#define PANEL_PP5  (1L << 24)  // pie panel  PP5  (slot 7,  unserviced MK4 default — ADR 0008)
+#define PANEL_PP6  (1L << 25)  // pie panel  PP6  (slot 11)
+#define PANEL_PP3  (1L << 26)  // pie panel  PP3  (slot 12, unserviced MK4 default)
 
 ////////////////////////////////
 // Servo panel mapping for Mr. Baddeley MK4 complex dome (printed-droid labels).
@@ -387,19 +396,20 @@ DataPanel dataPanel(ledChain1);
 //   in panelConfigLoad()/holoConfigLoad().
 //
 // PCA9685 @ 0x40 silkscreen channel → printed-droid panel → Marcduino command:
-//   CH 0-3  = P1-P4    :OP01-:OP04   (4 small ring panels)
-//   CH 4    = P7       :OP05          (small upper ring panel)
-//   CH 5    = P11      :OP06          (lower-left ring panel)
-//   CH 6    = P13      :OP07          (lower-front ring panel, near FLD)
-//   CH 7    = unused   —              (PP5 slot exists in firmware but no servo on MK4)
-//   CH 8-10 = PP1/PP2/PP4  :OP08-:OP10  (3 individually-addressed pie panels)
-//   CH 11   = PP6      :OP11 group only  (4th pie panel, opened with all-top cmd)
-//   CH 12   = unused   —              (PP3 slot exists in firmware but no servo on MK4)
+//   CH 0-3  = P1-P4    :OP01-:OP04        (ring panels)
+//   CH 4    = P7       :OP07               (ring panel — :OP05/:OP06 are fixed-panel no-ops)
+//   CH 5    = P11      :OP11               (ring panel)
+//   CH 6    = P13      :OP13               (ring panel)
+//   CH 7    = PP5      :OPP5               (pie panel, unserviced on MK4 — ADR 0008)
+//   CH 8-10 = PP1/PP2/PP4  :OP08-:OP10 / :OPP1/:OPP2/:OPP4  (pie panels)
+//   CH 11   = PP6      :OP12 / :OPP6       (pie panel, individually addressable)
+//   CH 12   = PP3      :OPP3               (pie panel, unserviced on MK4)
 //
-// Group commands (no dedicated channel):
-//   :OP11 = all pie panels (PP1+PP2+PP4+PP6)
-//   :OP12 = all ring panels (P1-P4, P7, P11, P13)
+// Group commands:
 //   :OP00 = all panels
+//   :OP14 = top panels (MarcDuino V3 group shortcut)
+//   :OP15 = bottom panels (MarcDuino V3 group shortcut)
+//   :OP05 / :OP06 = recognized no-ops (P5/P6 are fixed panels with no servo)
 //
 // See docs/HARDWARE_WIRING.md for the full PCA9685 wiring table.
 // Pulse widths (800-2200 µs) are defaults; per-panel calibration stored in NVS via web UI.
@@ -417,19 +427,19 @@ const ServoSettings servoSettings[] PROGMEM = {
     // sensible starting point; builders whose wiring differs override per-slot
     // via the Wiring Config UI (panels.html), saved to NVS namespace "panels",
     // applied at boot by panelConfigLoad().
-    {1,  800, 2200, PANEL_GROUP_1  | SMALL_PANEL}, /* slot 0:  P1  (ring)       CH0   :OP01 */
-    {2,  800, 2200, PANEL_GROUP_2  | SMALL_PANEL}, /* slot 1:  P2  (ring)       CH1   :OP02 */
-    {3,  800, 2200, PANEL_GROUP_3  | SMALL_PANEL}, /* slot 2:  P3  (ring)       CH2   :OP03 */
-    {4,  800, 2200, PANEL_GROUP_4  | SMALL_PANEL}, /* slot 3:  P4  (ring)       CH3   :OP04 */
-    {5,  800, 2200, PANEL_GROUP_5  | SMALL_PANEL}, /* slot 4:  P7  (ring upper) CH4   :OP05 */
-    {6,  800, 2200, PANEL_GROUP_6  | SMALL_PANEL}, /* slot 5:  P11 (ring lower) CH5   :OP06 */
-    {7,  800, 2200, PANEL_GROUP_7  | SMALL_PANEL}, /* slot 6:  P13 (ring front) CH6   :OP07 */
-    {8,  800, 2200, MINI_PANEL},                   /* slot 7:  PP5 (unserviced) CH7   —     panelConfigLoad() zeroes this slot at boot; PROGMEM pin is non-zero only to satisfy the constructor's fLastLength[pin-1] write. */
-    {9,  800, 2200, PANEL_GROUP_8  | PIE_PANEL},   /* slot 8:  PP1 (pie)        CH8   :OP08 */
-    {10, 800, 2200, PANEL_GROUP_9  | PIE_PANEL},   /* slot 9:  PP2 (pie)        CH9   :OP09 */
-    {11, 800, 2200, PANEL_GROUP_10 | PIE_PANEL},   /* slot 10: PP4 (pie)        CH10  :OP10 */
-    {12, 800, 2200, PIE_PANEL},                    /* slot 11: PP6 (pie)        CH11  :OP11 group only */
-    {13, 800, 2200, TOP_PIE_PANEL},                /* slot 12: PP3 (unserviced) CH12  —     panelConfigLoad() zeroes this slot at boot; PROGMEM pin is non-zero only to satisfy the constructor's fLastLength[pin-1] write. */
+    {1,  800, 2200, PANEL_P1  | SMALL_PANEL},       /* slot 0:  P1  (ring)       CH0   :OP01 */
+    {2,  800, 2200, PANEL_P2  | SMALL_PANEL},       /* slot 1:  P2  (ring)       CH1   :OP02 */
+    {3,  800, 2200, PANEL_P3  | SMALL_PANEL},       /* slot 2:  P3  (ring)       CH2   :OP03 */
+    {4,  800, 2200, PANEL_P4  | SMALL_PANEL},       /* slot 3:  P4  (ring)       CH3   :OP04 */
+    {5,  800, 2200, PANEL_P7  | SMALL_PANEL},       /* slot 4:  P7  (ring upper) CH4   :OP07 */
+    {6,  800, 2200, PANEL_P11 | SMALL_PANEL},       /* slot 5:  P11 (ring lower) CH5   :OP11 */
+    {7,  800, 2200, PANEL_P13 | SMALL_PANEL},       /* slot 6:  P13 (ring front) CH6   :OP13 */
+    {8,  800, 2200, PANEL_PP5 | PIE_PANEL},         /* slot 7:  PP5 (unserviced) CH7   :OPP5 — ADR 0008; panelConfigLoad() zeroes at boot */
+    {9,  800, 2200, PANEL_PP1 | PIE_PANEL},         /* slot 8:  PP1 (pie)        CH8   :OP08 / :OPP1 */
+    {10, 800, 2200, PANEL_PP2 | PIE_PANEL},         /* slot 9:  PP2 (pie)        CH9   :OP09 / :OPP2 */
+    {11, 800, 2200, PANEL_PP4 | PIE_PANEL},         /* slot 10: PP4 (pie)        CH10  :OP10 / :OPP4 */
+    {12, 800, 2200, PANEL_PP6 | PIE_PANEL},         /* slot 11: PP6 (pie)        CH11  :OP12 / :OPP6 */
+    {13, 800, 2200, PANEL_PP3 | TOP_PIE_PANEL},     /* slot 12: PP3 (unserviced) CH12  :OPP3 — panelConfigLoad() zeroes at boot */
 
     // Holo Controller (PCA9685 @ 0x41, A0 bridged) — slots 13–18; firmware pin = 16 + silkscreen + 1.
     // Pin 16 still addresses 0x40 CH15 — see ADR 0004. Holo board begins at pin 17.
@@ -1006,10 +1016,14 @@ static void handleBodyLinkHeartbeat()
         }
         else if (transport == BODY_LINK_WIFI)
         {
-            if (bodyLinkWiFiSendUDP("#APHB"))
-            {
-                sBodyLastTxMs = now;
-            }
+            bodyLinkWiFiSendUDP("#APHB");
+            // Also emit on UART TX so the body's periodic 150ms RX-only probe
+            // window can detect the dome and trigger UART transport recovery.
+            if (COMMAND_SERIAL)
+                COMMAND_SERIAL.print("#APHB\r");
+            // Always advance the timestamp so the 1-second gate closes even
+            // when UDP delivery fails — prevents UART spam on network errors.
+            sBodyLastTxMs = now;
         }
     }
 }
