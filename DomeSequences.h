@@ -263,7 +263,9 @@ static void domeOpenCloseLow()
         if (preferences.getBool("dm_happy_sound", true))
             domeSendToBody("HAPPY");
 
-        // close ring panels only — PP5 is a pie, not a ring, excluded intentionally
+        // close ring panels only — PP5 is a pie, not a ring, excluded intentionally.
+        // Order is reverse-of-final-open arc (P4→P2→P1→P3→P13→P7→P11) so the
+        // closing motion appears continuous with the final-open wave reversed.
         domeMove(D_P4,  DOME_PANEL_CLOSE, DOME_MOVE_SPEED, true);
         domeMove(D_P2,  DOME_PANEL_CLOSE, DOME_MOVE_SPEED, true);
         domeMove(D_P1,  DOME_PANEL_CLOSE, DOME_MOVE_SPEED, true);
@@ -273,10 +275,7 @@ static void domeOpenCloseLow()
         domeMove(D_P11, DOME_PANEL_CLOSE, DOME_MOVE_SPEED, true);
 
         domeWaitTime(1000);
-        servoDispatch.disable(D_P1);  servoDispatch.disable(D_P2);
-        servoDispatch.disable(D_P3);  servoDispatch.disable(D_P4);
-        servoDispatch.disable(D_P7);  servoDispatch.disable(D_P11);
-        servoDispatch.disable(D_P13);
+        for (uint8_t i = 0; i < 7; i++) servoDispatch.disable(ringPanels[i]);
     }
     else
     {
@@ -317,10 +316,7 @@ static void domeOpenCloseLow()
         domeMove(D_P7,  DOME_PANEL_OPEN, DOME_MOVE_FASTSPEED, true);
 
         domeWaitTime(1000);
-        servoDispatch.disable(D_P1);  servoDispatch.disable(D_P2);
-        servoDispatch.disable(D_P3);  servoDispatch.disable(D_P4);
-        servoDispatch.disable(D_P7);  servoDispatch.disable(D_P11);
-        servoDispatch.disable(D_P13);
+        for (uint8_t i = 0; i < 7; i++) servoDispatch.disable(ringPanels[i]);
     }
 
     domeEndSequence();
@@ -480,13 +476,8 @@ static void domeScream()
     // burst open — all 6 pies then all 7 ring panels
     for (uint8_t i = 0; i < 6; i++)
         domeMove(piePanels[i], DOME_PIE_PANEL_OPEN, DOME_MOVE_SPEED);
-    domeMove(D_P11, DOME_PANEL_OPEN, DOME_MOVE_FASTSPEED);
-    domeMove(D_P13, DOME_PANEL_OPEN, DOME_MOVE_FASTSPEED);
-    domeMove(D_P1,  DOME_PANEL_OPEN, DOME_MOVE_FASTSPEED);
-    domeMove(D_P2,  DOME_PANEL_OPEN, DOME_MOVE_FASTSPEED);
-    domeMove(D_P3,  DOME_PANEL_OPEN, DOME_MOVE_FASTSPEED);
-    domeMove(D_P4,  DOME_PANEL_OPEN, DOME_MOVE_FASTSPEED);
-    domeMove(D_P7,  DOME_PANEL_OPEN, DOME_MOVE_FASTSPEED);
+    for (uint8_t i = 0; i < 7; i++)
+        domeMove(ringPanels[i], DOME_PANEL_OPEN, DOME_MOVE_FASTSPEED);
     domeWaitTime(DOME_MOVE_FASTSPEED + 100);
 
     // random flutter — all 13 panels via file-scope allPanels[]

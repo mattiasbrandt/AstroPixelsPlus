@@ -498,6 +498,8 @@ static const char *panelSlotLabel(int slot)
 // on a standard MK4 but still carry a command so a builder who wires a servo
 // can activate them. Pie panels use the :OPP* fork namespace (ADR 0007).
 // Ring panels P7, P11, P13 use their identity number, not the old slot index.
+// MUST STAY IN SYNC WITH servoSettings[] in AstroPixelsPlus.ino (ADR 0006 slot
+// order). Slot 0-6 = P1/P2/P3/P4/P7/P11/P13; slot 7-12 = PP5/PP1/PP2/PP4/PP6/PP3.
 static const char *panelSlotCommand(int slot)
 {
     static const char *cmds[NUM_PANEL_SLOTS] = {

@@ -731,6 +731,7 @@ MARCDUINO_ACTION(OpenPanel13, :OP13, ({
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_P13);
 }))
 
+////////////////
 
 MARCDUINO_ACTION(ClosePanel1, :CL01, ({
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_P1);
@@ -915,25 +916,35 @@ MARCDUINO_ACTION(OpenPiePanel1, :OPP1, ({
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_PP1);
 }))
 
+////////////////
+
 MARCDUINO_ACTION(OpenPiePanel2, :OPP2, ({
     cancelPanelRelease(PANEL_PP2);
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_PP2);
 }))
+
+////////////////
 
 MARCDUINO_ACTION(OpenPiePanel3, :OPP3, ({
     cancelPanelRelease(PANEL_PP3);
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_PP3);
 }))
 
+////////////////
+
 MARCDUINO_ACTION(OpenPiePanel4, :OPP4, ({
     cancelPanelRelease(PANEL_PP4);
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_PP4);
 }))
 
+////////////////
+
 MARCDUINO_ACTION(OpenPiePanel5, :OPP5, ({
     cancelPanelRelease(PANEL_PP5);
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllOpen, PANEL_PP5);
 }))
+
+////////////////
 
 MARCDUINO_ACTION(OpenPiePanel6, :OPP6, ({
     cancelPanelRelease(PANEL_PP6);
@@ -947,25 +958,35 @@ MARCDUINO_ACTION(ClosePiePanel1, :CLP1, ({
     schedulePanelRelease(PANEL_PP1);
 }))
 
+////////////////
+
 MARCDUINO_ACTION(ClosePiePanel2, :CLP2, ({
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_PP2);
     schedulePanelRelease(PANEL_PP2);
 }))
+
+////////////////
 
 MARCDUINO_ACTION(ClosePiePanel3, :CLP3, ({
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_PP3);
     schedulePanelRelease(PANEL_PP3);
 }))
 
+////////////////
+
 MARCDUINO_ACTION(ClosePiePanel4, :CLP4, ({
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_PP4);
     schedulePanelRelease(PANEL_PP4);
 }))
 
+////////////////
+
 MARCDUINO_ACTION(ClosePiePanel5, :CLP5, ({
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_PP5);
     schedulePanelRelease(PANEL_PP5);
 }))
+
+////////////////
 
 MARCDUINO_ACTION(ClosePiePanel6, :CLP6, ({
     SEQUENCE_PLAY_ONCE(servoSequencer, SeqPanelAllClose, PANEL_PP6);
@@ -979,25 +1000,35 @@ MARCDUINO_ACTION(FlutterPiePanel1, :OFP1, ({
     SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_PP1, 10, 50);
 }))
 
+////////////////
+
 MARCDUINO_ACTION(FlutterPiePanel2, :OFP2, ({
     cancelPanelRelease(PANEL_PP2);
     SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_PP2, 10, 50);
 }))
+
+////////////////
 
 MARCDUINO_ACTION(FlutterPiePanel3, :OFP3, ({
     cancelPanelRelease(PANEL_PP3);
     SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_PP3, 10, 50);
 }))
 
+////////////////
+
 MARCDUINO_ACTION(FlutterPiePanel4, :OFP4, ({
     cancelPanelRelease(PANEL_PP4);
     SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_PP4, 10, 50);
 }))
 
+////////////////
+
 MARCDUINO_ACTION(FlutterPiePanel5, :OFP5, ({
     cancelPanelRelease(PANEL_PP5);
     SEQUENCE_PLAY_ONCE_VARSPEED(servoSequencer, SeqPanelAllFlutter, PANEL_PP5, 10, 50);
 }))
+
+////////////////
 
 MARCDUINO_ACTION(FlutterPiePanel6, :OFP6, ({
     cancelPanelRelease(PANEL_PP6);
