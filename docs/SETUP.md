@@ -409,7 +409,7 @@ make uploadfs OTA_IP=astropixelsplus.local
 # Or via VS Code: PlatformIO sidebar → astropixelsplus → Platform → Upload Filesystem Image
 ```
 
-> **Note:** Firmware OTA only updates the firmware binary. SPIFFS web assets are updated separately with `uploadfs`, either by PlatformIO espota (`make uploadfs OTA_IP=<host-or-ip>`) or the browser upload page.
+> **Note:** Firmware OTA only updates the firmware binary. SPIFFS web assets are updated separately with `uploadfs`. The Makefile uses `tools/http_ota_upload.py` against the same HTTP upload endpoints as the browser page.
 
 ### Web Pages Overview
 

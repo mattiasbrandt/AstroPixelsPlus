@@ -52,7 +52,7 @@ python3 tools/command_compat_matrix.py --host 10.0.0.21 --group holos --group lo
 
 The runner sends commands through `/api/cmd` and verifies `/api/state` + `/api/health` after each step. Treat failures as regressions that must be investigated before release/upload sign-off.
 
-The Makefile is a PlatformIO wrapper. `make gate` runs the firmware build plus compatibility dry-run, `make ota` uploads firmware via espota, and `make uploadfs` uploads SPIFFS via espota. Firmware and SPIFFS uploads remain separate.
+The Makefile wraps PlatformIO for local builds and uses `tools/http_ota_upload.py` for OTA through the controller's HTTP upload endpoints. `make gate` runs the firmware build plus compatibility dry-run, `make ota` posts `.pio/build/astropixelsplus/firmware.bin` to `/upload/firmware`, and `make uploadfs` builds/posts `.pio/build/astropixelsplus/spiffs.bin` to `/upload/filesystem`. Firmware and SPIFFS uploads remain separate.
 
 Use these verification labels when recording validation status: `software-verified`, `controller-upload-verified`, `full-hardware-verified`, `partial`, `full-hardware-required`.
 
@@ -188,4 +188,4 @@ Rules for `WebPages.h`:
 - **Audio**: DFPlayer Mini on Serial (MP3, 9 banks, 225+ sounds)
 - **Marcduino input**: Serial2 GPIO16/17 @ 2400 baud
 - **WiFi AP**: SSID `AstroPixels`, password `Astromech`, web UI at `http://192.168.4.1`
-- **OTA**: PlatformIO espota and browser upload are supported for both firmware and SPIFFS; default host is `astropixelsplus.local`
+- **OTA**: HTTP multipart upload via `/upload/firmware` and `/upload/filesystem`; default host is `astropixelsplus.local`

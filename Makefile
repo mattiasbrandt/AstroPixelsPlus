@@ -1,13 +1,17 @@
 BUILD_ENV ?= astropixelsplus
 OTA_IP ?= astropixelsplus.local
-OTA_ENV := $(BUILD_ENV)_ota
+FIRMWARE_BIN ?= .pio/build/$(BUILD_ENV)/firmware.bin
+SPIFFS_BIN ?= .pio/build/$(BUILD_ENV)/spiffs.bin
 
 -include user.mk
 
-.PHONY: build gate ota uploadfs smoke
+.PHONY: build buildfs gate ota uploadfs smoke
 
 build:
 	pio run -e $(BUILD_ENV)
+
+buildfs:
+	pio run -e $(BUILD_ENV) -t buildfs
 
 smoke:
 	python3 tools/command_compat_matrix.py --dry-run
@@ -15,7 +19,7 @@ smoke:
 gate: build smoke
 
 ota: gate
-	pio run -e $(OTA_ENV) -t upload --upload-port $(OTA_IP)
+	python3 tools/http_ota_upload.py firmware --host "$(OTA_IP)" --file "$(FIRMWARE_BIN)"
 
-uploadfs: gate
-	pio run -e $(OTA_ENV) -t uploadfs --upload-port $(OTA_IP)
+uploadfs: gate buildfs
+	python3 tools/http_ota_upload.py filesystem --host "$(OTA_IP)" --file "$(SPIFFS_BIN)"
