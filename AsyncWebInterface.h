@@ -391,6 +391,8 @@ static String jsonEscape(const String &in)
 // ---------------------------------------------------------------
 // WebSocket event handler
 // ---------------------------------------------------------------
+static String buildStateJson();
+
 static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
                        AwsEventType type, void *arg, uint8_t *data, size_t len)
 {
@@ -398,6 +400,7 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
     {
         logCapture.printf("[WS] Client #%u connected from %s\n", client->id(),
                          client->remoteIP().toString().c_str());
+        client->text("{\"type\":\"state\",\"data\":" + buildStateJson() + "}");
     }
     else if (type == WS_EVT_DISCONNECT)
     {

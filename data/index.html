@@ -20,22 +20,19 @@
   <div class="card">
     <h3>Quick Actions</h3>
     <div class="btn-grid">
-      <button class="btn accent" onclick="sendCmd(':SE09')" title="Disco showcase: panels + rainbow logic + holo sync">Disco Showcase</button>
+      <button class="btn" onclick="sendCmd(':SE09')" title="Disco showcase: panels + rainbow logic + holo sync">Disco Showcase</button>
       <button class="btn" onclick="sendCmd(':SE07')" title="Cantina choreography with synchronized panel/logic/holo activity">Cantina Sync</button>
       <button class="btn" onclick="sendCmd(':SE08')" title="Leia showcase with synchronized logic and holo message behavior">Leia Sync</button>
-      <button class="btn danger" onclick="sendCmd(':SE06')" title="Electrocute/faint sequence with short-circuit effects across logic, holo, smoke, and panels">Electrocute / Faint</button>
+      <button class="btn" onclick="sendCmd(':SE06')" title="Electrocute/faint sequence with short-circuit effects across logic, holo, smoke, and panels">Electrocute / Faint</button>
       <button class="btn" onclick="sendCmd('$821')" title="Girl On Fire: high-intensity multi-subsystem sequence">Girl On Fire</button>
       <button class="btn" onclick="sendCmd('$815')" title="Harlem Shake: rhythmic dance-style synchronized sequence">Harlem Shake</button>
-      <button class="btn" data-mood=":SE14" onclick="sendCmd(':SE14')" title="Awake+ reset profile with movement and active holo LEDs">Awake+</button>
-      <button class="btn danger" data-mood=":SE10" onclick="sendCmd(':SE10')" title="Quiet reset: stop sound, holos idle, logics normal">Quiet Reset</button>
       <button class="btn danger" onclick="sendCmd(':SE00')" title="Stop active panel choreography and return to idle">Stop Sequence</button>
     </div>
   </div>
 
   <!-- Mood Presets -->
   <div class="card">
-    <h3>Mood Presets</h3>
-    <div class="desc">Set the idle behavior profile for chatter, holo activity, and visual intensity.</div>
+    <h3>Mood</h3>
     <div class="mood-grid mt-8">
       <button class="mood-btn" data-mood=":SE10" onclick="sendCmd(':SE10')" title="Quiet profile: stop sounds, holos idle, logic normal">
         <span class="mood-icon">🤐</span>

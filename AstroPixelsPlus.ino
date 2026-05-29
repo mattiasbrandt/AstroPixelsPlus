@@ -893,6 +893,7 @@ static void setCurrentMoodCommand(const char *cmd)
     if (!isMoodResetCommand(cmd))
         return;
     strlcpy(sCurrentMoodCmd, cmd, sizeof(sCurrentMoodCmd));
+    preferences.putString("cmood", cmd);
 }
 
 static const char *currentMoodName()
@@ -1167,6 +1168,11 @@ void setup()
     if (!preferences.begin("astro", false))
     {
         DEBUG_PRINTLN(F("Failed to init prefs"));
+    }
+    {
+        String savedMood = preferences.getString("cmood", "");
+        if (isMoodResetCommand(savedMood.c_str()))
+            strlcpy(sCurrentMoodCmd, savedMood.c_str(), sizeof(sCurrentMoodCmd));
     }
 #ifdef USE_WIFI
     wifiEnabled = preferences.getBool(PREFERENCE_WIFI_ENABLED, WIFI_ENABLED);
