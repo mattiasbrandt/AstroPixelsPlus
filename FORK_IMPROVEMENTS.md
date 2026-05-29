@@ -515,7 +515,11 @@ Changes to the operator-facing web UI and HTTP/WebSocket API.
 - OTA upload endpoint for firmware updates
 
 ### OTA Scope and UX
-OTA firmware page updates app firmware only. SPIFFS web assets (`data/*`) still require filesystem upload (`uploadfs`). OTA UX improved to handle reconnect/reboot transition cleanly.
+OTA is now the preferred post-initial-USB setup path for both firmware and SPIFFS while keeping the project on SPIFFS. The explicit OTA partition table keeps the 4 MB dual-slot layout (`app0`/`app1` at 0x140000 each, SPIFFS at 0x170000), and `astropixelsplus_ota` uses PlatformIO `espota` with default host `astropixelsplus.local`. Use `make ota OTA_IP=<host-or-ip>` for firmware and `make uploadfs OTA_IP=<host-or-ip>` for SPIFFS; AP fallback is `OTA_IP=192.168.4.1`. Firmware and SPIFFS uploads remain separate.
+
+Browser upload endpoints now support both `/upload/firmware` and `/upload/filesystem` with JSON success/error responses. Firmware upload uses `Update.begin(UPDATE_SIZE_UNKNOWN, U_FLASH)` to avoid multipart content-length rollback risk; filesystem upload uses `U_SPIFFS`. The web UI surfaces returned JSON `error` text.
+
+ArduinoOTA startup moved into the WiFi-connected path via a one-time Core 0 task. ArduinoOTA mDNS ownership is disabled and the Arduino OTA service is registered through the existing `astropixelsplus.local` mDNS setup alongside the Marcduino UDP service.
 
 ### Holo UX Alignment and Naming
 Updated holoprojector naming in the web UI to builder-standard identifiers:
@@ -826,12 +830,18 @@ Changes to build configuration, development workflow, and validation tools.
 
 ### PlatformIO Configuration
 - Default env: `astropixelsplus`
+- OTA env: `astropixelsplus_ota`
+- Partition table: `partitions/partitions_ota_spiffs.csv`
+- Filesystem: SPIFFS
 - `ESP32_ARDUINO_NO_RGB_BUILTIN` defined to prevent FastLED RMT conflicts
 - Optimized for size (`-Os`)
 - Platform: `espressif32@5.2.0`
 
 ### Makefile Documentation
-Added comments explaining that `../Arduino.mk` is a relative path dependency — the Makefile only works if Arduino.mk is checked out adjacent to this repo. PlatformIO is the canonical build system.
+Replaced the old Arduino.mk-relative workflow with PlatformIO targets: `make build`, `make gate`, `make ota`, and `make uploadfs`. `BUILD_ENV` and `OTA_IP` are overridable, and user-specific overrides can live in gitignored `user.mk`.
+
+### Verification Labels
+Use `software-verified`, `controller-upload-verified`, `full-hardware-verified`, `partial`, and `full-hardware-required` when recording implementation validation status.
 
 ### Command Compatibility Matrix Smoke Runner
 Added `tools/command_compat_matrix.py` to validate core Marcduino command families over HTTP API. Runner sends command matrix entries through `/api/cmd` and checks `/api/state` + `/api/health` after each command. Supports grouped runs (`--group panels|holos|logics|sequences|sound`), target host override, optional API token, and dry-run listing. Bench validation completed on this fork: matrix runner executes successfully and reports expected PASS behavior.

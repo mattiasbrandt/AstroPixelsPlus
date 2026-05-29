@@ -49,6 +49,22 @@ After upload, connect to the **AstroPixels** Wi-Fi network (password: `Astromech
 
 > **Note:** Firmware (`upload`) and filesystem (`uploadfs`) are two separate steps. You need **both** for the web UI to work.
 
+After the first USB flash, OTA is the preferred update path:
+
+```bash
+# Firmware OTA, default host astropixelsplus.local
+make ota
+
+# SPIFFS web UI OTA, default host astropixelsplus.local
+make uploadfs
+
+# Override host/IP when mDNS is unavailable or when using AP fallback
+make ota OTA_IP=192.168.4.1
+make uploadfs OTA_IP=192.168.4.1
+```
+
+Firmware and SPIFFS uploads remain separate OTA operations.
+
 ---
 
 ## 2. Prerequisites
@@ -117,6 +133,7 @@ lib_deps =
     mathieucarbou/AsyncTCP@3.3.2
 
 board_build.filesystem = spiffs
+board_build.partitions = partitions/partitions_ota_spiffs.csv
 build_type = release
 
 ; --- Build Flags ---
@@ -386,10 +403,13 @@ The web UI consists of static HTML/CSS/JavaScript files that must be uploaded se
 # Upload web assets (run after every change to data/ files)
 pio run -e astropixelsplus -t uploadfs
 
+# Preferred after initial USB setup
+make uploadfs OTA_IP=astropixelsplus.local
+
 # Or via VS Code: PlatformIO sidebar → astropixelsplus → Platform → Upload Filesystem Image
 ```
 
-> **Note:** OTA (Over-the-Air) firmware updates only update the **firmware binary**, not the SPIFFS filesystem. If you update the web UI files, you must upload the filesystem via USB.
+> **Note:** Firmware OTA only updates the firmware binary. SPIFFS web assets are updated separately with `uploadfs`, either by PlatformIO espota (`make uploadfs OTA_IP=<host-or-ip>`) or the browser upload page.
 
 ### Web Pages Overview
 
@@ -683,12 +703,25 @@ If the page is blank or shows a filesystem error, re-run:
 pio run -e astropixelsplus -t uploadfs
 ```
 
-### 8.11 — OTA Firmware Update (after initial USB setup)
+### 8.11 — OTA Updates (after initial USB setup)
 
 1. Connect to the board's WiFi
-2. In VS Code PlatformIO: change `upload_port = 192.168.4.1` in `platformio.ini`
-3. Run `pio run -e astropixelsplus -t upload`
-4. Or use the web UI → **Firmware** page → upload a `.bin` file directly
+2. Run `make ota OTA_IP=astropixelsplus.local` for firmware
+3. Run `make uploadfs OTA_IP=astropixelsplus.local` for SPIFFS web UI assets
+4. Use `OTA_IP=192.168.4.1` when connected directly to the board fallback AP
+5. Or use the web UI → **Firmware** page to upload firmware or SPIFFS `.bin` files directly
+
+### 8.12 — Verification Labels
+
+Use these labels when recording validation status:
+
+| Label | Meaning |
+|---|---|
+| `software-verified` | Build and dry-run compatibility checks passed |
+| `controller-upload-verified` | Firmware or SPIFFS upload completed on a controller |
+| `full-hardware-verified` | Controller, LEDs, servos, I2C devices, and UI were checked on assembled hardware |
+| `partial` | Only part of the expected hardware/software matrix was checked |
+| `full-hardware-required` | Hardware validation remains required before release/sign-off |
 
 ---
 
@@ -980,9 +1013,11 @@ Then restart the board. The SPIFFS filesystem must be uploaded separately from t
 
 **Checklist:**
 1. Board and computer must be on the same WiFi network
-2. `upload_port` in `platformio.ini` is set to the board's IP address
-3. Sketch binary fits in the OTA partition (~1.4 MB limit)
-4. If OTA is unreliable, fall back to USB upload
+2. Use `make ota OTA_IP=<host-or-ip>` or `make uploadfs OTA_IP=<host-or-ip>`
+3. Default mDNS host is `astropixelsplus.local`; AP fallback is `192.168.4.1`
+4. Sketch binary must fit in the OTA slot (~1.25 MB)
+5. Firmware and SPIFFS uploads are separate; run both when both changed
+6. If OTA is unreliable, fall back to USB upload
 
 ### Boot Crash / Restart Loop
 

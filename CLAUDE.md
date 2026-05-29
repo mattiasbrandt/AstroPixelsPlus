@@ -20,6 +20,14 @@ pio run -e astropixelsplus -t upload
 # Upload SPIFFS filesystem
 pio run -e astropixelsplus -t uploadfs
 
+# Preferred OTA workflow after initial USB setup
+make ota OTA_IP=astropixelsplus.local
+make uploadfs OTA_IP=astropixelsplus.local
+
+# AP fallback address
+make ota OTA_IP=192.168.4.1
+make uploadfs OTA_IP=192.168.4.1
+
 # Monitor serial (115200 baud)
 pio device monitor -p /dev/ttyUSB0 -b 115200
 
@@ -44,7 +52,9 @@ python3 tools/command_compat_matrix.py --host 10.0.0.21 --group holos --group lo
 
 The runner sends commands through `/api/cmd` and verifies `/api/state` + `/api/health` after each step. Treat failures as regressions that must be investigated before release/upload sign-off.
 
-The Makefile (`make TARGET=ESP32`) is an alternative build path using a custom `../Arduino.mk` shim — prefer PlatformIO.
+The Makefile is a PlatformIO wrapper. `make gate` runs the firmware build plus compatibility dry-run, `make ota` uploads firmware via espota, and `make uploadfs` uploads SPIFFS via espota. Firmware and SPIFFS uploads remain separate.
+
+Use these verification labels when recording validation status: `software-verified`, `controller-upload-verified`, `full-hardware-verified`, `partial`, `full-hardware-required`.
 
 ## Web UI Local Testing Workflow (Async Web Server)
 
@@ -172,10 +182,10 @@ Rules for `WebPages.h`:
 
 ## Hardware
 
-- **MCU**: ESP32 (esp32dev), 4MB flash, SPIFFS partition
+- **MCU**: ESP32 (esp32dev), 4MB flash, dual OTA app slots, SPIFFS partition
 - **Servos**: PCA9685 I2C servo controller (SDA GPIO21, SCL GPIO22) — 13 dome panel channels
 - **LEDs**: NeoPixel strips on configurable GPIO pins (Front Logic, Rear Logic, Holos)
 - **Audio**: DFPlayer Mini on Serial (MP3, 9 banks, 225+ sounds)
 - **Marcduino input**: Serial2 GPIO16/17 @ 2400 baud
 - **WiFi AP**: SSID `AstroPixels`, password `Astromech`, web UI at `http://192.168.4.1`
-- **OTA**: Supported via ReelTwo WiFi OTA mechanism
+- **OTA**: PlatformIO espota and browser upload are supported for both firmware and SPIFFS; default host is `astropixelsplus.local`

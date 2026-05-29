@@ -1,19 +1,21 @@
-#TARGET?=Mega2560
-TARGET?=ESP32
-PORT?=/dev/ttyUSB0
-#ESP32_FILESYSTEM=littlefs
-#ESP32_PSRAM=enabled
-ESP32_FILESYSTEM=spiffs
-ESP32_FILESYSTEM_PART=spiffs
-ESP32_PARTSCHEME=min_spiffs
-ESP32_FLASHSIZE=4MB
-GITHUB_REPOS= \
-reeltwo/Reeltwo \
-adafruit/Adafruit_NeoPixel \
-FastLED/FastLED \
-DFRobot/DFRobotDFPlayerMini
+BUILD_ENV ?= astropixelsplus
+OTA_IP ?= astropixelsplus.local
+OTA_ENV := $(BUILD_ENV)_ota
 
-# NOTE: Arduino.mk is resolved relative to this repo's parent directory.
-# This Makefile only works if the Arduino.mk repo is checked out adjacent to this one.
-# PlatformIO (platformio.ini) is the canonical build system for this project.
-include ../Arduino.mk
+-include user.mk
+
+.PHONY: build gate ota uploadfs smoke
+
+build:
+	pio run -e $(BUILD_ENV)
+
+smoke:
+	python3 tools/command_compat_matrix.py --dry-run
+
+gate: build smoke
+
+ota: gate
+	pio run -e $(OTA_ENV) -t upload --upload-port $(OTA_IP)
+
+uploadfs: gate
+	pio run -e $(OTA_ENV) -t uploadfs --upload-port $(OTA_IP)

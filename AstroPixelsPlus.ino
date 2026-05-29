@@ -744,6 +744,41 @@ void reboot()
     ESP.restart();
 }
 
+#if defined(USE_WIFI) && defined(USE_OTA)
+static TaskHandle_t otaTask;
+static bool otaTaskStarted;
+
+static void arduinoOtaTask(void *)
+{
+    vTaskDelay(pdMS_TO_TICKS(500));
+    ArduinoOTA.setHostname("astropixelsplus");
+    ArduinoOTA.setMdnsEnabled(false);
+    ArduinoOTA.begin();
+
+    for (;;)
+    {
+        ArduinoOTA.handle();
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
+
+static void startArduinoOtaTask()
+{
+    if (otaTaskStarted)
+        return;
+
+    otaTaskStarted = true;
+    xTaskCreatePinnedToCore(
+        arduinoOtaTask,
+        "ArduinoOTA",
+        4096,
+        NULL,
+        1,
+        &otaTask,
+        0);
+}
+#endif
+
 ////////////////////////////////
 // This function is called when aborting or ending Marcduino sequences. It should reset all droid devices to Normal
 void resetSequence()
@@ -1177,6 +1212,10 @@ void setup()
 #ifdef USE_WIFI
     wifiEnabled = preferences.getBool(PREFERENCE_WIFI_ENABLED, WIFI_ENABLED);
     wifiActive = false;
+#ifdef USE_OTA
+    otaInProgress = false;
+    otaTaskStarted = false;
+#endif
 #ifdef USE_DROID_REMOTE
     remoteEnabled = remoteActive = preferences.getBool(PREFERENCE_REMOTE_ENABLED, REMOTE_ENABLED);
 #else
@@ -1428,28 +1467,6 @@ void setup()
                 } });
         }
 #endif
-        wifiAccess.notifyWifiConnected([](WifiAccess &wifi)
-                                       {
-                                           wifiActive = true;
-                                           WiFi.setSleep(false);
-                                           Serial.print("Connect to http://");
-                                           Serial.println(wifi.getIPAddress());
-#ifdef USE_WIFI_WEB
-                                           if (!sAsyncWebStarted)
-                                           {
-                                               initAsyncWeb();
-                                               sAsyncWebStarted = true;
-                                           }
-#endif
-                                           bodyLinkWiFiInit();
-                                           bodyLinkSetupMDNS();
-                                       });
-        wifiAccess.notifyWifiDisconnected([](WifiAccess &)
-                                          {
-                                              wifiActive = false;
-                                          });
-        bodyLinkWiFiInit();
-#endif
 #ifdef USE_OTA
         ArduinoOTA.onStart([]()
                            {
@@ -1479,6 +1496,31 @@ void setup()
             else if (error == OTA_END_ERROR) desc = "End Failed";
             else desc = "Error: "+String(error);
             DEBUG_PRINTLN(desc); });
+#endif
+        wifiAccess.notifyWifiConnected([](WifiAccess &wifi)
+                                       {
+                                           wifiActive = true;
+                                           WiFi.setSleep(false);
+                                           Serial.print("Connect to http://");
+                                           Serial.println(wifi.getIPAddress());
+#ifdef USE_WIFI_WEB
+                                           if (!sAsyncWebStarted)
+                                           {
+                                               initAsyncWeb();
+                                               sAsyncWebStarted = true;
+                                           }
+#endif
+                                           bodyLinkWiFiInit();
+                                           bodyLinkSetupMDNS();
+#ifdef USE_OTA
+                                           startArduinoOtaTask();
+#endif
+                                       });
+        wifiAccess.notifyWifiDisconnected([](WifiAccess &)
+                                          {
+                                              wifiActive = false;
+                                          });
+        bodyLinkWiFiInit();
 #endif
     }
 #endif
@@ -2032,9 +2074,6 @@ void eventLoopTask(void *)
     {
         if (wifiActive)
         {
-#ifdef USE_OTA
-            ArduinoOTA.handle();
-#endif
 #ifdef USE_WIFI_WEB
             asyncWebLoop();
 #endif

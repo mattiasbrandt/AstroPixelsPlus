@@ -98,6 +98,8 @@ static uint32_t lastHealthBroadcast = 0;
 static bool rebootScheduled = false;
 static uint32_t rebootAtMs = 0;
 static bool otaUploadFailed = false;
+static int otaUploadHttpStatus = 500;
+static String otaUploadError;
 static uint32_t lastI2CScanMs = 0;
 static bool cachedPanelsOk = false;
 static bool cachedHolosOk = false;
@@ -120,6 +122,20 @@ static uint32_t i2cProbeFailures = 0;
 // Forward declarations
 static void broadcastState();
 static void broadcastOtaProgress(float progress);
+
+static String otaJson(bool ok, const String &error = "")
+{
+    if (ok)
+        return "{\"ok\":true}";
+    return "{\"ok\":false,\"error\":\"" + error + "\"}";
+}
+
+static void markOtaUploadFailed(int status, const char *error)
+{
+    otaUploadFailed = true;
+    otaUploadHttpStatus = status;
+    otaUploadError = error;
+}
 
 static bool isAsciiPrintable(char c)
 {
@@ -1748,7 +1764,9 @@ static void initAsyncWeb()
             otaInProgress = false;
             if (otaUploadFailed || Update.hasError())
             {
-                request->send(500, "text/plain", "Update FAILED");
+                if (otaUploadError.length() == 0)
+                    otaUploadError = "firmware update failed";
+                request->send(otaUploadHttpStatus, "application/json", otaJson(false, otaUploadError));
                 FLD.selectSequence(LogicEngineDefaults::FAILURE);
                 FLD.setTextMessage("Flash Fail");
                 FLD.selectSequence(LogicEngineDefaults::TEXTSCROLLLEFT,
@@ -1756,7 +1774,7 @@ static void initAsyncWeb()
             }
             else
             {
-                request->send(200, "text/plain", "Update OK - Rebooting...");
+                request->send(200, "application/json", otaJson(true));
                 scheduleReboot(1000);
             }
         },
@@ -1769,17 +1787,19 @@ static void initAsyncWeb()
                 // First chunk — start the update
                 otaInProgress = true;
                 otaUploadFailed = false;
+                otaUploadHttpStatus = 500;
+                otaUploadError = "";
                 unmountFileSystems();
                 FLD.selectSequence(LogicEngineDefaults::NORMAL);
                 RLD.selectSequence(LogicEngineDefaults::NORMAL);
                 FLD.setEffectWidthRange(0);
                 RLD.setEffectWidthRange(0);
                 logCapture.printf("Update: %s\n", filename.c_str());
-                if (!Update.begin(request->contentLength()))
+                if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_FLASH))
                 {
                     Update.printError(Serial);
                     logCapture.println("Update begin failed");
-                    otaUploadFailed = true;
+                    markOtaUploadFailed(413, "firmware image rejected or too large for OTA slot");
                     return;
                 }
             }
@@ -1793,7 +1813,7 @@ static void initAsyncWeb()
                 {
                     Update.printError(Serial);
                     logCapture.println("Update write failed");
-                    otaUploadFailed = true;
+                    markOtaUploadFailed(413, "firmware image write failed or exceeded OTA slot");
                     return;
                 }
                 // Show progress on logic displays + broadcast to WS clients
@@ -1820,7 +1840,7 @@ static void initAsyncWeb()
                 else
                 {
                     Update.printError(Serial);
-                    otaUploadFailed = true;
+                    markOtaUploadFailed(500, "firmware update finalize failed");
                 }
             }
         });
@@ -1832,7 +1852,9 @@ static void initAsyncWeb()
             otaInProgress = false;
             if (otaUploadFailed || Update.hasError())
             {
-                request->send(500, "text/plain", "Filesystem update FAILED");
+                if (otaUploadError.length() == 0)
+                    otaUploadError = "filesystem update failed";
+                request->send(otaUploadHttpStatus, "application/json", otaJson(false, otaUploadError));
                 FLD.selectSequence(LogicEngineDefaults::FAILURE);
                 FLD.setTextMessage("FS Flash Fail");
                 FLD.selectSequence(LogicEngineDefaults::TEXTSCROLLLEFT,
@@ -1840,7 +1862,7 @@ static void initAsyncWeb()
             }
             else
             {
-                request->send(200, "text/plain", "Filesystem update OK - Rebooting...");
+                request->send(200, "application/json", otaJson(true));
                 scheduleReboot(1000);
             }
         },
@@ -1851,6 +1873,8 @@ static void initAsyncWeb()
             {
                 otaInProgress = true;
                 otaUploadFailed = false;
+                otaUploadHttpStatus = 500;
+                otaUploadError = "";
                 unmountFileSystems();
                 FLD.selectSequence(LogicEngineDefaults::NORMAL);
                 RLD.selectSequence(LogicEngineDefaults::NORMAL);
@@ -1861,7 +1885,7 @@ static void initAsyncWeb()
                 {
                     Update.printError(Serial);
                     logCapture.println("Filesystem update begin failed");
-                    otaUploadFailed = true;
+                    markOtaUploadFailed(413, "filesystem image rejected or too large for SPIFFS partition");
                     return;
                 }
             }
@@ -1875,7 +1899,7 @@ static void initAsyncWeb()
                 {
                     Update.printError(Serial);
                     logCapture.println("Filesystem update write failed");
-                    otaUploadFailed = true;
+                    markOtaUploadFailed(413, "filesystem image write failed or exceeded SPIFFS partition");
                     return;
                 }
                 if (request->contentLength() > 0)
@@ -1901,7 +1925,7 @@ static void initAsyncWeb()
                 else
                 {
                     Update.printError(Serial);
-                    otaUploadFailed = true;
+                    markOtaUploadFailed(500, "filesystem update finalize failed");
                 }
             }
         });

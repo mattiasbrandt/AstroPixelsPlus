@@ -28,6 +28,7 @@ AGENTS.md
 CODE_REVIEW_*.md
 ESP32_CODE_REVIEW_TEMPLATE.md
 data/AGENTS.md
+user.mk
 
 # Playwright / browser-automation scratch
 .playwright-mcp/

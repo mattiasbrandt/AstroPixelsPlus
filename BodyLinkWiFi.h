@@ -30,6 +30,7 @@ static WiFiUDP sBodyUdp;
 static bool sBodyWiFiEnabled = true;
 static bool sBodyUdpBound = false;
 static bool sBodyMdnsStarted = false;
+static bool sArduinoOtaMdnsStarted = false;
 static uint32_t sBodyLastSeenUartMs = 0;
 static uint32_t sBodyLastSeenWifiMs = 0;
 static uint32_t sBodyWifiHeartbeatRx = 0;
@@ -180,9 +181,6 @@ static void bodyLinkWiFiInit()
 static void bodyLinkSetupMDNS()
 {
 #ifdef USE_MDNS
-    if (!preferences.getBool(PREFERENCE_BODY_LINK_ENABLED, BODY_LINK_ENABLED))
-        return;
-
     if (!sBodyMdnsStarted)
     {
         if (!MDNS.begin("astropixelsplus"))
@@ -193,6 +191,16 @@ static void bodyLinkSetupMDNS()
         sBodyMdnsStarted = true;
         DEBUG_PRINTLN(F("[BodyLink] mDNS hostname: astropixelsplus"));
     }
+
+    if (!sArduinoOtaMdnsStarted)
+    {
+        MDNS.enableArduino(3232, false);
+        sArduinoOtaMdnsStarted = true;
+        DEBUG_PRINTLN(F("[BodyLink] mDNS Arduino OTA service enabled"));
+    }
+
+    if (!preferences.getBool(PREFERENCE_BODY_LINK_ENABLED, BODY_LINK_ENABLED))
+        return;
 
     MDNS.addService("marcduino", "udp", kBodyLinkUdpPort);
 #endif
