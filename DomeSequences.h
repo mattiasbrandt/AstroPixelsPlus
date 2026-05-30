@@ -63,23 +63,19 @@ extern bool dome_AllOpen;
 extern bool dome_LowOpen;
 extern bool dome_seqRunning;
 
+// Non-blocking dispatch target. Set by a DM:* Marcduino handler (which runs as a
+// one-shot animation on `player`), drained once in mainLoop() via
+// player.animateOnce(). Lets the toggle handler pick an open/close animation
+// WITHOUT calling animateOnce() re-entrantly from inside player.animate().
+extern AnimationStep dome_pendingAnim;
+
+// Ring-only group mask — the 7 servoed ring panels (slots 0-6). Used by
+// schedulePanelRelease()/cancelPanelRelease() so DM:LOW only releases ring servos.
+#define RING_PANELS_MASK (PANEL_P1 | PANEL_P2 | PANEL_P3 | PANEL_P4 | PANEL_P7 | PANEL_P11 | PANEL_P13)
+
 // =============================================================================
 // Core helpers
 // =============================================================================
-
-// Pump the full ReelTwo event loop while waiting.
-// This lets PCA9685 servo tweens animate smoothly during blocking sequences.
-// handleBodyLinkHeartbeat() is called each iteration to keep protoR2link alive
-// during long blocking sequences; the function is internally rate-limited to 1 Hz.
-static void domeWaitTime(unsigned long ms)
-{
-    unsigned long end = millis() + ms;
-    while (millis() < end)
-    {
-        AnimatedEvent::process();
-        handleBodyLinkHeartbeat();
-    }
-}
 
 // Send a named body cue to protoArtoo via protoR2link.
 // Routes over UART or WiFi depending on which transport is active.
@@ -106,41 +102,32 @@ static void domeEndSequence()
     dome_seqRunning = false;
 }
 
-static inline void domeMove(uint8_t idx, uint16_t pos, uint32_t moveMs, bool wait = false)
+// Request a timed dome rotation from the body controller.
+// speed_pct: -100 (full reverse) .. +100 (full forward)
+// duration_ms: body auto-stops the motor after this many milliseconds.
+// A caller should keep the sequence running (e.g. DO_WAIT_MILLIS(duration_ms))
+// before domeEndSequence() so dome=seqoff does not arrive mid-rotation.
+static void domeRotate(int speed_pct, uint32_t duration_ms)
 {
-    servoDispatch.moveToPulse(idx, moveMs, pos);
-    if (wait) {
-        while (servoDispatch.isActive(idx))
-            AnimatedEvent::process();
-    }
+    char buf[40];
+    snprintf(buf, sizeof(buf), "dome=rot,%d,%lu", speed_pct, duration_ms);
+    sendBodyCommand(buf);
 }
 
-// =============================================================================
-// Easing helpers — drive multiple servos with ServoDispatch easing methods.
-// =============================================================================
-static void domeEaseSineInOut(const uint8_t* idx, uint8_t count,
-                              int /*from*/, int to, unsigned int durationMs)
+// Non-blocking staggered wave: issues moveToPulse for an ordered index list,
+// each panel offset by stepMs (reproduces the old serialized wait=true timing).
+// Returns the wave envelope in ms so the caller's DO_WAIT can cover it.
+static uint32_t domeStaggerMove(const uint8_t* order, uint8_t count,
+                                uint16_t pos, uint32_t moveMs, uint32_t stepMs)
 {
-    for (uint8_t i = 0; i < count; i++)
-        servoDispatch.setServoEasingMethod(idx[i], Easing::SineEaseInOut);
-    for (uint8_t i = 0; i < count; i++)
-        servoDispatch.moveToPulse(idx[i], durationMs, (uint16_t)to);
-    domeWaitTime(durationMs + 50);
-    for (uint8_t i = 0; i < count; i++)
-        servoDispatch.setServoEasingMethod(idx[i], Easing::LinearInterpolation);
+    for (uint8_t k = 0; k < count; k++)
+        servoDispatch.moveToPulse(order[k], (uint32_t)k * stepMs, moveMs, pos);
+    return (count > 0) ? ((uint32_t)(count - 1) * stepMs + moveMs) : 0;
 }
 
-static void domeEaseOut(const uint8_t* idx, uint8_t count,
-                        int /*from*/, int to, unsigned int durationMs)
-{
-    for (uint8_t i = 0; i < count; i++)
-        servoDispatch.setServoEasingMethod(idx[i], Easing::SineEaseOut);
-    for (uint8_t i = 0; i < count; i++)
-        servoDispatch.moveToPulse(idx[i], durationMs, (uint16_t)to);
-    domeWaitTime(durationMs + 50);
-    for (uint8_t i = 0; i < count; i++)
-        servoDispatch.setServoEasingMethod(idx[i], Easing::LinearInterpolation);
-}
+// Easing for the Bloom sequence is now applied non-blockingly (set method + fire
+// moves in a DO_ONCE, reset method in a later step) — see domePieSetEasing /
+// domePieMoveAll defined after the pie index arrays below.
 
 // =============================================================================
 // File-scope panel index arrays — used by domeRandomPanels() and sequence bodies.
@@ -152,6 +139,19 @@ static const uint8_t ringPanels[] = { D_P1, D_P2, D_P3, D_P4, D_P7, D_P11, D_P13
 static const uint8_t piePanels[]  = { D_PP1, D_PP2, D_PP3, D_PP4, D_PP5, D_PP6 };
 static const uint8_t allPanels[]  = { D_P1, D_P2, D_P3, D_P4, D_P7, D_P11, D_P13,
                                       D_PP1, D_PP2, D_PP3, D_PP4, D_PP5, D_PP6 };
+
+// Non-blocking pie easing helpers (used by Bloom): set the easing method / fire
+// moves in a DO_ONCE; the caller's DO_WAIT covers the move, a later step resets.
+static void domePieSetEasing(float (*method)(float))
+{
+    for (uint8_t i = 0; i < 6; i++)
+        servoDispatch.setServoEasingMethod(piePanels[i], method);
+}
+static void domePieMoveAll(uint16_t pos, uint32_t moveMs)
+{
+    for (uint8_t i = 0; i < 6; i++)
+        servoDispatch.moveToPulse(piePanels[i], moveMs, pos);
+}
 
 // =============================================================================
 // Random panel selection (Fisher-Yates shuffle; indices = servoDispatch indices)
@@ -202,615 +202,674 @@ static void domeResetBody()
 // =============================================================================
 // Open / Close Pie Panels
 // =============================================================================
-static void domeOpenClosePies()
-{
-    domeBeginSequence(12);
+// Pie release mask + wave envelopes + reverse-order pie list (for close waves).
+#define DOME_PIE_RELEASE_MASK  (PANEL_PP1 | PANEL_PP2 | PANEL_PP3 | PANEL_PP4 | PANEL_PP5 | PANEL_PP6)
+#define DOME_PIE_OPEN_WAVE_MS  (6 * DOME_MOVE_FASTSPEED)  /* 6 pies @100 = 600 */
+#define DOME_PIE_CLOSE_WAVE_MS (6 * DOME_MOVE_SPEED)      /* 6 pies @150 = 900 */
+static const uint8_t pieRevPanels[6] = { D_PP6, D_PP5, D_PP4, D_PP3, D_PP2, D_PP1 };
 
-    if (dome_PiesOpen)
-    {
+// Pies open: wave open PP1→PP6, then 2x (close PP6→PP1, reopen PP1→PP6), all @FASTSPEED.
+ANIMATION(domePiesOpen)
+{
+    DO_START()
+    DO_ONCE({ cancelPanelRelease(DOME_PIE_RELEASE_MASK); domeBeginSequence(12); dome_PiesOpen = true; })
+    DO_WAIT_MILLIS(100)
+    DO_ONCE({ if (preferences.getBool("dm_happy_sound", true)) domeSendToBody("HAPPY"); })
+    // iteration 1
+    DO_ONCE({ domeStaggerMove(piePanels,    6, DOME_PIE_PANEL_OPEN, DOME_MOVE_FASTSPEED, DOME_MOVE_FASTSPEED); })
+    DO_WAIT_MILLIS(DOME_PIE_OPEN_WAVE_MS)
+    DO_ONCE({ domeStaggerMove(pieRevPanels, 6, DOME_PANEL_CLOSE,    DOME_MOVE_FASTSPEED, DOME_MOVE_FASTSPEED); })
+    DO_WAIT_MILLIS(DOME_PIE_OPEN_WAVE_MS)
+    DO_ONCE({ domeStaggerMove(piePanels,    6, DOME_PIE_PANEL_OPEN, DOME_MOVE_FASTSPEED, DOME_MOVE_FASTSPEED); })
+    DO_WAIT_MILLIS(DOME_PIE_OPEN_WAVE_MS)
+    // iteration 2
+    DO_ONCE({ domeStaggerMove(piePanels,    6, DOME_PIE_PANEL_OPEN, DOME_MOVE_FASTSPEED, DOME_MOVE_FASTSPEED); })
+    DO_WAIT_MILLIS(DOME_PIE_OPEN_WAVE_MS)
+    DO_ONCE({ domeStaggerMove(pieRevPanels, 6, DOME_PANEL_CLOSE,    DOME_MOVE_FASTSPEED, DOME_MOVE_FASTSPEED); })
+    DO_WAIT_MILLIS(DOME_PIE_OPEN_WAVE_MS)
+    DO_ONCE({ domeStaggerMove(piePanels,    6, DOME_PIE_PANEL_OPEN, DOME_MOVE_FASTSPEED, DOME_MOVE_FASTSPEED); })
+    DO_WAIT_MILLIS(DOME_PIE_OPEN_WAVE_MS + 1000)
+    DO_ONCE({ schedulePanelRelease(DOME_PIE_RELEASE_MASK, 1); })
+    DO_RESET({ domeEndSequence(); })
+    DO_END()
+}
+
+// Pies close: single close wave PP1→PP6 @SPEED, settle, release.
+ANIMATION(domePiesClose)
+{
+    DO_START()
+    DO_ONCE({
+        cancelPanelRelease(DOME_PIE_RELEASE_MASK);
+        domeBeginSequence(12);
         dome_PiesOpen = false;
         domeResetHolos();
         if (preferences.getBool("dm_happy_sound", true))
             domeSendToBody("HAPPY");
-
-        // close all 6 pies in identity order PP1→PP6
-        for (uint8_t i = 0; i < 6; i++)
-            domeMove(piePanels[i], DOME_PANEL_CLOSE, DOME_MOVE_SPEED, true);
-
-        domeWaitTime(800);
-        for (uint8_t i = 0; i < 6; i++)
-            servoDispatch.disable(piePanels[i]);
-    }
-    else
-    {
-        dome_PiesOpen = true;
-        domeWaitTime(100);
-        if (preferences.getBool("dm_happy_sound", true))
-            domeSendToBody("HAPPY");
-
-        for (int i = 0; i < 2; i++)
-        {
-            // wave open — PP1→PP2→PP3→PP4→PP5→PP6
-            for (uint8_t j = 0; j < 6; j++)
-                domeMove(piePanels[j], DOME_PIE_PANEL_OPEN, DOME_MOVE_FASTSPEED, true);
-            // wave close — PP6→PP5→PP4→PP3→PP2→PP1
-            for (int j = 5; j >= 0; j--)
-                domeMove(piePanels[j], DOME_PANEL_CLOSE, DOME_MOVE_FASTSPEED, true);
-            // reopen — PP1→PP2→PP3→PP4→PP5→PP6
-            for (uint8_t j = 0; j < 6; j++)
-                domeMove(piePanels[j], DOME_PIE_PANEL_OPEN, DOME_MOVE_FASTSPEED, true);
-        }
-
-        domeWaitTime(1000);
-        for (uint8_t i = 0; i < 6; i++)
-            servoDispatch.disable(piePanels[i]);
-    }
-
-    domeEndSequence();
+        domeStaggerMove(piePanels, 6, DOME_PANEL_CLOSE, DOME_MOVE_SPEED, DOME_MOVE_SPEED);
+    })
+    DO_WAIT_MILLIS(DOME_PIE_CLOSE_WAVE_MS + 800)
+    DO_ONCE({ schedulePanelRelease(DOME_PIE_RELEASE_MASK, 1); })
+    DO_RESET({ domeEndSequence(); })
+    DO_END()
 }
 
 // =============================================================================
-// Open / Close Low Panels
+// Open / Close Low Panels  (non-blocking — runs on `player` as DO_* animations)
+//
+// Faithful port of the original serialized waves. Each panel previously moved
+// with wait=true (it fully completed before the next started), so panel k began
+// at k*moveMs. We reproduce that exact timing non-blockingly with moveToPulse
+// start-delays (servoDispatch animates them from mainLoop), then a single
+// DO_WAIT_MILLIS covers the wave envelope. No busy-loop, no internal
+// AnimatedEvent::process() pumping — mainLoop stays live for the whole sequence.
 // =============================================================================
-static void domeOpenCloseLow()
-{
-    domeBeginSequence(15);
 
-    if (dome_LowOpen)
-    {
+// Wave envelope helpers (durations chosen to match the original serialized timing).
+#define DOME_LOW_WAVE_MS   (6 * DOME_MOVE_SPEED + DOME_MOVE_SPEED)   /* 7 panels @150 = 1050 */
+#define DOME_LOW_CLOSE_MS  (1000 + DOME_MOVE_SPEED)                  /* last start 1000 + 150 = 1150 */
+#define DOME_LOW_FINAL_MS  (400 + DOME_MOVE_FASTSPEED)              /* last start 400 + 100 = 500  */
+
+// open wave order: P1, P13, P11, P2, P3, P4, P7 (each 150ms, staggered 150ms)
+static void domeLowWaveOpen()
+{
+    static const uint8_t order[7] = { D_P1, D_P13, D_P11, D_P2, D_P3, D_P4, D_P7 };
+    for (uint8_t k = 0; k < 7; k++)
+        servoDispatch.moveToPulse(order[k], k * DOME_MOVE_SPEED, DOME_MOVE_SPEED, DOME_PANEL_OPEN);
+}
+
+// close wave: P7,P4,P3,P2,P1 at 150ms steps, then +50ms gaps before P13 and P11
+// (original domeWaitTime(50) between them).
+static void domeLowWaveClose()
+{
+    servoDispatch.moveToPulse(D_P7,  0,    DOME_MOVE_SPEED, DOME_PANEL_CLOSE);
+    servoDispatch.moveToPulse(D_P4,  150,  DOME_MOVE_SPEED, DOME_PANEL_CLOSE);
+    servoDispatch.moveToPulse(D_P3,  300,  DOME_MOVE_SPEED, DOME_PANEL_CLOSE);
+    servoDispatch.moveToPulse(D_P2,  450,  DOME_MOVE_SPEED, DOME_PANEL_CLOSE);
+    servoDispatch.moveToPulse(D_P1,  600,  DOME_MOVE_SPEED, DOME_PANEL_CLOSE);
+    servoDispatch.moveToPulse(D_P13, 800,  DOME_MOVE_SPEED, DOME_PANEL_CLOSE);
+    servoDispatch.moveToPulse(D_P11, 1000, DOME_MOVE_SPEED, DOME_PANEL_CLOSE);
+}
+
+// final open: P11/P13/P1 together, then P2..P7 stepped, all at FASTSPEED.
+static void domeLowFinalOpen()
+{
+    servoDispatch.moveToPulse(D_P11, 0,   DOME_MOVE_FASTSPEED, DOME_PANEL_OPEN);
+    servoDispatch.moveToPulse(D_P13, 0,   DOME_MOVE_FASTSPEED, DOME_PANEL_OPEN);
+    servoDispatch.moveToPulse(D_P1,  0,   DOME_MOVE_FASTSPEED, DOME_PANEL_OPEN);
+    servoDispatch.moveToPulse(D_P2,  100, DOME_MOVE_FASTSPEED, DOME_PANEL_OPEN);
+    servoDispatch.moveToPulse(D_P3,  200, DOME_MOVE_FASTSPEED, DOME_PANEL_OPEN);
+    servoDispatch.moveToPulse(D_P4,  300, DOME_MOVE_FASTSPEED, DOME_PANEL_OPEN);
+    servoDispatch.moveToPulse(D_P7,  400, DOME_MOVE_FASTSPEED, DOME_PANEL_OPEN);
+}
+
+// close branch order (reverse-of-final-open arc): P4,P2,P1,P3,P13,P7,P11 @150ms steps.
+static void domeLowCloseAll()
+{
+    static const uint8_t order[7] = { D_P4, D_P2, D_P1, D_P3, D_P13, D_P7, D_P11 };
+    for (uint8_t k = 0; k < 7; k++)
+        servoDispatch.moveToPulse(order[k], k * DOME_MOVE_SPEED, DOME_MOVE_SPEED, DOME_PANEL_CLOSE);
+}
+
+// Open animation: two open/close waves, then a final open; panels left open,
+// PWM released after a 1s settle. domeEndSequence() runs from DO_RESET on
+// completion (or if interrupted by a new animation).
+ANIMATION(domeLowOpen)
+{
+    DO_START()
+    DO_ONCE({
+        cancelPanelRelease(RING_PANELS_MASK);
+        domeBeginSequence(15);
+        dome_LowOpen = true;
+        if (preferences.getBool("dm_happy_sound", true))
+            domeSendToBody("HAPPY");
+    })
+    // iteration 1
+    DO_ONCE({ domeLowWaveOpen(); })
+    DO_WAIT_MILLIS(DOME_LOW_WAVE_MS)
+    DO_ONCE({ domeLowWaveClose(); })
+    DO_WAIT_MILLIS(DOME_LOW_CLOSE_MS)
+    // iteration 2
+    DO_ONCE({ domeLowWaveOpen(); })
+    DO_WAIT_MILLIS(DOME_LOW_WAVE_MS)
+    DO_ONCE({ domeLowWaveClose(); })
+    DO_WAIT_MILLIS(DOME_LOW_CLOSE_MS)
+    // final open + settle, then cut PWM (panels hold open by friction)
+    DO_ONCE({ domeLowFinalOpen(); })
+    DO_WAIT_MILLIS(DOME_LOW_FINAL_MS + 1000)
+    DO_ONCE({ schedulePanelRelease(RING_PANELS_MASK, 1); })
+    DO_RESET({ domeEndSequence(); })
+    DO_END()
+}
+
+// Close animation: single close wave, settle, release.
+ANIMATION(domeLowClose)
+{
+    DO_START()
+    DO_ONCE({
+        cancelPanelRelease(RING_PANELS_MASK);
+        domeBeginSequence(15);
         dome_LowOpen = false;
         domeResetHolos();
         if (preferences.getBool("dm_happy_sound", true))
             domeSendToBody("HAPPY");
-
-        // close ring panels only — PP5 is a pie, not a ring, excluded intentionally.
-        // Order is reverse-of-final-open arc (P4→P2→P1→P3→P13→P7→P11) so the
-        // closing motion appears continuous with the final-open wave reversed.
-        domeMove(D_P4,  DOME_PANEL_CLOSE, DOME_MOVE_SPEED, true);
-        domeMove(D_P2,  DOME_PANEL_CLOSE, DOME_MOVE_SPEED, true);
-        domeMove(D_P1,  DOME_PANEL_CLOSE, DOME_MOVE_SPEED, true);
-        domeMove(D_P3,  DOME_PANEL_CLOSE, DOME_MOVE_SPEED, true);
-        domeMove(D_P13, DOME_PANEL_CLOSE, DOME_MOVE_SPEED, true);
-        domeMove(D_P7,  DOME_PANEL_CLOSE, DOME_MOVE_SPEED, true);
-        domeMove(D_P11, DOME_PANEL_CLOSE, DOME_MOVE_SPEED, true);
-
-        domeWaitTime(1000);
-        for (uint8_t i = 0; i < 7; i++) servoDispatch.disable(ringPanels[i]);
-    }
-    else
-    {
-        dome_LowOpen = true;
-        if (preferences.getBool("dm_happy_sound", true))
-            domeSendToBody("HAPPY");
-
-        for (int i = 0; i < 2; i++)
-        {
-            // wave open — D_P13/D_P11 non-blocking so they move with D_P1
-            domeMove(D_P1,  DOME_PANEL_OPEN, DOME_MOVE_SPEED, true);
-            domeMove(D_P13, DOME_PANEL_OPEN, DOME_MOVE_SPEED, true);
-            domeMove(D_P11, DOME_PANEL_OPEN, DOME_MOVE_SPEED, true);
-            domeMove(D_P2,  DOME_PANEL_OPEN, DOME_MOVE_SPEED, true);
-            domeMove(D_P3,  DOME_PANEL_OPEN, DOME_MOVE_SPEED, true);
-            domeMove(D_P4,  DOME_PANEL_OPEN, DOME_MOVE_SPEED, true);
-            domeMove(D_P7,  DOME_PANEL_OPEN, DOME_MOVE_SPEED, true);
-
-            // wave close
-            domeMove(D_P7,  DOME_PANEL_CLOSE, DOME_MOVE_SPEED, true);
-            domeMove(D_P4,  DOME_PANEL_CLOSE, DOME_MOVE_SPEED, true);
-            domeMove(D_P3,  DOME_PANEL_CLOSE, DOME_MOVE_SPEED, true);
-            domeMove(D_P2,  DOME_PANEL_CLOSE, DOME_MOVE_SPEED, true);
-            domeMove(D_P1,  DOME_PANEL_CLOSE, DOME_MOVE_SPEED, true);
-            domeWaitTime(50);
-            domeMove(D_P13, DOME_PANEL_CLOSE, DOME_MOVE_SPEED, true);
-            domeWaitTime(50);
-            domeMove(D_P11, DOME_PANEL_CLOSE, DOME_MOVE_SPEED, true);
-        }
-
-        // final open
-        domeMove(D_P11, DOME_PANEL_OPEN, DOME_MOVE_FASTSPEED);
-        domeMove(D_P13, DOME_PANEL_OPEN, DOME_MOVE_FASTSPEED);
-        domeMove(D_P1,  DOME_PANEL_OPEN, DOME_MOVE_FASTSPEED, true);
-        domeMove(D_P2,  DOME_PANEL_OPEN, DOME_MOVE_FASTSPEED, true);
-        domeMove(D_P3,  DOME_PANEL_OPEN, DOME_MOVE_FASTSPEED, true);
-        domeMove(D_P4,  DOME_PANEL_OPEN, DOME_MOVE_FASTSPEED, true);
-        domeMove(D_P7,  DOME_PANEL_OPEN, DOME_MOVE_FASTSPEED, true);
-
-        domeWaitTime(1000);
-        for (uint8_t i = 0; i < 7; i++) servoDispatch.disable(ringPanels[i]);
-    }
-
-    domeEndSequence();
+    })
+    DO_ONCE({ domeLowCloseAll(); })
+    DO_WAIT_MILLIS(DOME_LOW_WAVE_MS + 1000)
+    DO_ONCE({ schedulePanelRelease(RING_PANELS_MASK, 1); })
+    DO_RESET({ domeEndSequence(); })
+    DO_END()
 }
 
 // =============================================================================
 // Open / Close All Panels
 // =============================================================================
-static void domeOpenCloseAll()
+// Close all: single staggered close wave over all 13 slots @SPEED, settle, release.
+ANIMATION(domeAllClose)
 {
-    domeBeginSequence(10);
-
-    if (dome_AllOpen)
-    {
+    DO_START()
+    DO_ONCE({
+        cancelPanelRelease(ALL_DOME_PANELS_MASK);
+        domeBeginSequence(10);
         dome_AllOpen = false;
         if (preferences.getBool("dm_happy_sound", true))
             domeSendToBody("HAPPY");
+        domeStaggerMove(allPanels, 13, DOME_PANEL_CLOSE, DOME_MOVE_SPEED, DOME_MOVE_SPEED);
+    })
+    DO_WAIT_MILLIS(13 * DOME_MOVE_SPEED + 500)
+    DO_ONCE({ schedulePanelRelease(ALL_DOME_PANELS_MASK, 1); })
+    DO_RESET({ domeEndSequence(); })
+    DO_END()
+}
 
-        // close all 13 panels — ring first, then pies PP1→PP6
-        for (uint8_t i = 0; i < 13; i++)
-            domeMove(allPanels[i], DOME_PANEL_CLOSE, DOME_MOVE_SPEED, true);
+// Open all: pies wave open, ring snap open together, then a 2x P1/P2/PP2/PP4
+// twinkle. The twinkle is sequential same-servo moves, so it loops via a
+// backward DO_WHILE on sDomeAllTwinkle (label declared before the jump).
+// Ring snaps open together (kept in a helper so the array literal's commas
+// are not parsed as DO_ONCE macro-argument separators).
+static void domeAllRingOpen()
+{
+    static const uint8_t ringOrder[7] = { D_P11, D_P13, D_P1, D_P2, D_P3, D_P4, D_P7 };
+    for (uint8_t k = 0; k < 7; k++)
+        servoDispatch.moveToPulse(ringOrder[k], 0, DOME_MOVE_FASTSPEED, DOME_PANEL_OPEN);
+}
 
-        domeWaitTime(500);
-        for (uint8_t i = 0; i < 13; i++)
-            servoDispatch.disable(allPanels[i]);
-    }
-    else
-    {
+static uint8_t sDomeAllTwinkle = 0;
+ANIMATION(domeAllOpen)
+{
+    DO_START()
+    DO_ONCE({
+        cancelPanelRelease(ALL_DOME_PANELS_MASK);
+        domeBeginSequence(10);
         dome_AllOpen = true;
         if (preferences.getBool("dm_happy_sound", true))
             domeSendToBody("HAPPY");
-
-        // open all 6 pies — PP1→PP2→PP3→PP4→PP5→PP6
-        for (uint8_t i = 0; i < 6; i++)
-            domeMove(piePanels[i], DOME_PIE_PANEL_OPEN, DOME_MOVE_SPEED, true);
-
-        // open ring panels (non-blocking except last)
-        domeMove(D_P11, DOME_PANEL_OPEN, DOME_MOVE_FASTSPEED);
-        domeMove(D_P13, DOME_PANEL_OPEN, DOME_MOVE_FASTSPEED);
-        domeMove(D_P1,  DOME_PANEL_OPEN, DOME_MOVE_FASTSPEED);
-        domeMove(D_P2,  DOME_PANEL_OPEN, DOME_MOVE_FASTSPEED);
-        domeMove(D_P3,  DOME_PANEL_OPEN, DOME_MOVE_FASTSPEED);
-        domeMove(D_P4,  DOME_PANEL_OPEN, DOME_MOVE_FASTSPEED);
-        domeMove(D_P7,  DOME_PANEL_OPEN, DOME_MOVE_FASTSPEED, true);
-
-        // twinkle D_P1/D_P2 and D_PP2/D_PP4
-        for (int i = 0; i < 2; i++)
-        {
-            domeMove(D_P1,  DOME_PANEL_75_OPEN, DOME_MOVE_FASTSPEED, true);
-            domeMove(D_P1,  DOME_PANEL_OPEN, DOME_MOVE_FASTSPEED);
-            domeWaitTime(80);
-            domeMove(D_P2,  DOME_PANEL_OPEN, DOME_MOVE_FASTSPEED, true);
-            domeMove(D_P2,  DOME_PANEL_75_OPEN, DOME_MOVE_FASTSPEED);
-            domeWaitTime(80);
-            domeMove(D_P2,  DOME_PANEL_OPEN, DOME_MOVE_FASTSPEED);
-            domeWaitTime(100);
-
-            domeMove(D_PP2, DOME_PANEL_75_OPEN, DOME_MOVE_FASTSPEED, true);
-            domeMove(D_PP2, DOME_PIE_PANEL_OPEN, DOME_MOVE_FASTSPEED, true);
-            domeWaitTime(80);
-            domeMove(D_PP4, DOME_PANEL_75_OPEN, DOME_MOVE_FASTSPEED, true);
-            domeMove(D_PP4, DOME_PIE_PANEL_OPEN, DOME_MOVE_FASTSPEED, true);
-        }
-
-        domeWaitTime(800);
-        for (uint8_t i = 0; i < 13; i++)
-            servoDispatch.disable(allPanels[i]);
-    }
-
-    domeEndSequence();
+        domeStaggerMove(piePanels, 6, DOME_PIE_PANEL_OPEN, DOME_MOVE_SPEED, DOME_MOVE_SPEED);
+    })
+    DO_WAIT_MILLIS(6 * DOME_MOVE_SPEED)
+    DO_ONCE({ domeAllRingOpen(); sDomeAllTwinkle = 0; })
+    DO_WAIT_MILLIS(DOME_MOVE_FASTSPEED)
+    // ---- twinkle pass (repeats 2x via DO_WHILE below) ----
+    DO_ONCE_LABEL(kAllTwinkle, { servoDispatch.moveToPulse(D_P1, DOME_MOVE_FASTSPEED, DOME_PANEL_75_OPEN); })
+    DO_WAIT_MILLIS(DOME_MOVE_FASTSPEED)
+    DO_ONCE({ servoDispatch.moveToPulse(D_P1, DOME_MOVE_FASTSPEED, DOME_PANEL_OPEN); })
+    DO_WAIT_MILLIS(80)
+    DO_ONCE({ servoDispatch.moveToPulse(D_P2, DOME_MOVE_FASTSPEED, DOME_PANEL_OPEN); })
+    DO_WAIT_MILLIS(DOME_MOVE_FASTSPEED)
+    DO_ONCE({ servoDispatch.moveToPulse(D_P2, DOME_MOVE_FASTSPEED, DOME_PANEL_75_OPEN); })
+    DO_WAIT_MILLIS(80)
+    DO_ONCE({ servoDispatch.moveToPulse(D_P2, DOME_MOVE_FASTSPEED, DOME_PANEL_OPEN); })
+    DO_WAIT_MILLIS(100)
+    DO_ONCE({ servoDispatch.moveToPulse(D_PP2, DOME_MOVE_FASTSPEED, DOME_PANEL_75_OPEN); })
+    DO_WAIT_MILLIS(DOME_MOVE_FASTSPEED)
+    DO_ONCE({ servoDispatch.moveToPulse(D_PP2, DOME_MOVE_FASTSPEED, DOME_PIE_PANEL_OPEN); })
+    DO_WAIT_MILLIS(DOME_MOVE_FASTSPEED + 80)
+    DO_ONCE({ servoDispatch.moveToPulse(D_PP4, DOME_MOVE_FASTSPEED, DOME_PANEL_75_OPEN); })
+    DO_WAIT_MILLIS(DOME_MOVE_FASTSPEED)
+    DO_ONCE({ servoDispatch.moveToPulse(D_PP4, DOME_MOVE_FASTSPEED, DOME_PIE_PANEL_OPEN); })
+    DO_WAIT_MILLIS(DOME_MOVE_FASTSPEED)
+    DO_WHILE(++sDomeAllTwinkle < 2, kAllTwinkle)
+    // ---- end twinkle ----
+    DO_WAIT_MILLIS(800)
+    DO_ONCE({ schedulePanelRelease(ALL_DOME_PANELS_MASK, 1); })
+    DO_RESET({ domeEndSequence(); })
+    DO_END()
 }
 
 // =============================================================================
 // Flutter — quick open-close flap, all panels end closed
 // =============================================================================
-static void domeFlutter()
+ANIMATION(domeFlutter)
 {
-    domeBeginSequence(10);
-
-    // phase 1 — ring sweep P1→P2→P3→P4→P7→P11→P13
-    for (uint8_t i = 0; i < 7; i++)
-        domeMove(ringPanels[i], DOME_PANEL_75_OPEN, DOME_MOVE_SPEED, true);
-
-    // phase 2 — pie sweep PP1→PP2→PP3→PP4→PP5→PP6
-    for (uint8_t i = 0; i < 6; i++)
-        domeMove(piePanels[i], DOME_PANEL_75_OPEN, DOME_MOVE_SPEED, true);
-
+    DO_START()
+    // phase 1 — ring sweep P1→P2→P3→P4→P7→P11→P13 (75% open)
+    DO_ONCE({ domeBeginSequence(10);
+              domeStaggerMove(ringPanels, 7, DOME_PANEL_75_OPEN, DOME_MOVE_SPEED, DOME_MOVE_SPEED); })
+    DO_WAIT_MILLIS(7 * DOME_MOVE_SPEED)
+    // phase 2 — pie sweep PP1→PP6 (75% open)
+    DO_ONCE({ domeStaggerMove(piePanels, 6, DOME_PANEL_75_OPEN, DOME_MOVE_SPEED, DOME_MOVE_SPEED); })
+    DO_WAIT_MILLIS(6 * DOME_MOVE_SPEED)
     // close ring
-    for (uint8_t i = 0; i < 7; i++)
-        domeMove(ringPanels[i], DOME_PANEL_CLOSE, DOME_MOVE_SPEED, true);
-
+    DO_ONCE({ domeStaggerMove(ringPanels, 7, DOME_PANEL_CLOSE, DOME_MOVE_SPEED, DOME_MOVE_SPEED); })
+    DO_WAIT_MILLIS(7 * DOME_MOVE_SPEED)
     // close pies
-    for (uint8_t i = 0; i < 6; i++)
-        domeMove(piePanels[i], DOME_PANEL_CLOSE, DOME_MOVE_SPEED, true);
-
-    domeWaitTime(500);
-
-    for (uint8_t i = 0; i < 13; i++)
-        servoDispatch.disable(allPanels[i]);
-
-    dome_PiesOpen = false;
-    dome_AllOpen  = false;
-    dome_LowOpen  = false;
-
-    domeEndSequence();
+    DO_ONCE({ domeStaggerMove(piePanels, 6, DOME_PANEL_CLOSE, DOME_MOVE_SPEED, DOME_MOVE_SPEED); })
+    DO_WAIT_MILLIS(6 * DOME_MOVE_SPEED + 500)
+    DO_ONCE({
+        schedulePanelRelease(ALL_DOME_PANELS_MASK, 1);
+        dome_PiesOpen = false;
+        dome_AllOpen  = false;
+        dome_LowOpen  = false;
+    })
+    DO_RESET({ domeEndSequence(); })
+    DO_END()
 }
 
 // =============================================================================
 // Bloom — pie panels ease open, wiggle, close
 // =============================================================================
-static void domeBloom()
+static uint8_t sDomeBloomWiggle = 0;
+ANIMATION(domeBloom)
 {
-    domeBeginSequence(8);
-
-    // all 6 pies bloom together — PP3 (top centre) and PP5 included
-    domeEaseOut(piePanels, 6, DOME_PANEL_CLOSE, DOME_PANEL_OPEN, 1200);
-    domeWaitTime(2000);
-
-    for (uint8_t i = 0; i < 3; i++)
-    {
-        domeEaseSineInOut(piePanels, 6, DOME_PIE_PANEL_OPEN, 1900, 130);
-        domeEaseSineInOut(piePanels, 6, 1900, DOME_PIE_PANEL_OPEN, 130);
-    }
-
-    domeWaitTime(1000);
-
-    for (uint8_t i = 0; i < 6; i++)
-        domeMove(piePanels[i], DOME_PANEL_CLOSE, DOME_MOVE_FASTSPEED);
-
-    domeWaitTime(500);
-    for (uint8_t i = 0; i < 6; i++)
-        servoDispatch.disable(piePanels[i]);
-
-    dome_PiesOpen = false;
-    domeEndSequence();
+    DO_START()
+    DO_ONCE({
+        cancelPanelRelease(DOME_PIE_RELEASE_MASK);
+        domeBeginSequence(8);
+        // all 6 pies bloom open together with a sine ease-out
+        domePieSetEasing(Easing::SineEaseOut);
+        domePieMoveAll(DOME_PANEL_OPEN, 1200);
+    })
+    DO_WAIT_MILLIS(1250)
+    DO_ONCE({ domePieSetEasing(Easing::LinearInterpolation); sDomeBloomWiggle = 0; })
+    DO_WAIT_MILLIS(2000)
+    // wiggle 3x between 1900 and full open, sine ease-in-out, 130ms each leg
+    DO_ONCE_LABEL(kBloomWiggle, { domePieSetEasing(Easing::SineEaseInOut); domePieMoveAll(1900, 130); })
+    DO_WAIT_MILLIS(180)
+    DO_ONCE({ domePieMoveAll(DOME_PIE_PANEL_OPEN, 130); })
+    DO_WAIT_MILLIS(180)
+    DO_WHILE(++sDomeBloomWiggle < 3, kBloomWiggle)
+    DO_ONCE({ domePieSetEasing(Easing::LinearInterpolation); })
+    DO_WAIT_MILLIS(1000)
+    DO_ONCE({ domePieMoveAll(DOME_PANEL_CLOSE, DOME_MOVE_FASTSPEED); })
+    DO_WAIT_MILLIS(500)
+    DO_ONCE({ schedulePanelRelease(DOME_PIE_RELEASE_MASK, 1); dome_PiesOpen = false; })
+    DO_RESET({ domeEndSequence(); })
+    DO_END()
 }
 
 // =============================================================================
 // Scream — all panels burst open with random fluttering, then close
 // =============================================================================
-static void domeScream()
+// Scream: burst all panels open, then 10 random single-panel flutters, then
+// close all. The per-flutter panel is random, so it is captured in a static and
+// the 10-iteration loop runs via a backward DO_WHILE.
+static uint8_t sScreamIter  = 0;
+static uint8_t sScreamPanel = 0;
+ANIMATION(domeScream)
 {
-    domeBeginSequence(15);
-
-    CommandEvent::process(F("HPA0070")); // all holos short circuit random color
-    CommandEvent::process(F("HPA105|5")); // all holos wag 5 times
-
-    FLD.selectSequence(LogicEngineRenderer::REDALERT, FLD.kDefault, 0, 15);
-    RLD.selectSequence(LogicEngineRenderer::REDALERT, RLD.kDefault, 0, 15);
-    frontPSI.selectSequence(LogicEngineRenderer::REDALERT, frontPSI.kDefault, 0, 15);
-    rearPSI.selectSequence(LogicEngineRenderer::REDALERT, rearPSI.kDefault, 0, 15);
-
-    domeSendToBody("SCREAM");
-
-    dome_AllOpen = true;
-
-    // burst open — all 6 pies then all 7 ring panels
-    for (uint8_t i = 0; i < 6; i++)
-        domeMove(piePanels[i], DOME_PIE_PANEL_OPEN, DOME_MOVE_SPEED);
-    for (uint8_t i = 0; i < 7; i++)
-        domeMove(ringPanels[i], DOME_PANEL_OPEN, DOME_MOVE_FASTSPEED);
-    domeWaitTime(DOME_MOVE_FASTSPEED + 100);
-
-    // random flutter — all 13 panels via file-scope allPanels[]
-    randomSeed(analogRead(0));
-    for (int i = 0; i < 10; i++)
-    {
-        uint8_t idx = allPanels[random(13)];
-        domeMove(idx, DOME_PANEL_50_OPEN, DOME_MOVE_FASTSPEED, true);
-        domeMove(idx, DOME_PIE_PANEL_OPEN, DOME_MOVE_FASTSPEED);
-        domeWaitTime(80);
-        domeMove(idx, DOME_PANEL_50_OPEN, DOME_MOVE_FASTSPEED, true);
-        domeMove(idx, DOME_PIE_PANEL_OPEN, DOME_MOVE_FASTSPEED);
-        domeWaitTime(100);
-    }
-
-    domeWaitTime(2800); // settle after flutter
-
-    // close all 13
-    dome_AllOpen = false;
-    if (preferences.getBool("dm_happy_sound", true))
-        domeSendToBody("HAPPY");
-
-    for (uint8_t i = 0; i < 13; i++)
-        domeMove(allPanels[i], DOME_PANEL_CLOSE, DOME_MOVE_SPEED);
-    domeWaitTime(DOME_MOVE_SPEED + 500);
-
-    for (uint8_t i = 0; i < 13; i++)
-        servoDispatch.disable(allPanels[i]);
-
-    domeResetHolos();
-    domeEndSequence();
+    DO_START()
+    DO_ONCE({
+        cancelPanelRelease(ALL_DOME_PANELS_MASK);
+        domeBeginSequence(15);
+        CommandEvent::process(F("HPA0070")); // all holos short circuit random color
+        CommandEvent::process(F("HPA105|5")); // all holos wag 5 times
+        FLD.selectSequence(LogicEngineRenderer::REDALERT, FLD.kDefault, 0, 15);
+        RLD.selectSequence(LogicEngineRenderer::REDALERT, RLD.kDefault, 0, 15);
+        frontPSI.selectSequence(LogicEngineRenderer::REDALERT, frontPSI.kDefault, 0, 15);
+        rearPSI.selectSequence(LogicEngineRenderer::REDALERT, rearPSI.kDefault, 0, 15);
+        domeSendToBody("SCREAM");
+        dome_AllOpen = true;
+        // burst open — pies together @SPEED, ring together @FASTSPEED
+        domeStaggerMove(piePanels, 6, DOME_PIE_PANEL_OPEN, DOME_MOVE_SPEED, 0);
+        domeStaggerMove(ringPanels, 7, DOME_PANEL_OPEN, DOME_MOVE_FASTSPEED, 0);
+        randomSeed(analogRead(0));
+        sScreamIter = 0;
+    })
+    DO_WAIT_MILLIS(DOME_MOVE_FASTSPEED + 100)
+    // ---- random flutter pass (repeats 10x) ----
+    DO_ONCE_LABEL(kScream, {
+        sScreamPanel = allPanels[random(13)];
+        servoDispatch.moveToPulse(sScreamPanel, DOME_MOVE_FASTSPEED, DOME_PANEL_50_OPEN);
+    })
+    DO_WAIT_MILLIS(DOME_MOVE_FASTSPEED)
+    DO_ONCE({ servoDispatch.moveToPulse(sScreamPanel, DOME_MOVE_FASTSPEED, DOME_PIE_PANEL_OPEN); })
+    DO_WAIT_MILLIS(80)
+    DO_ONCE({ servoDispatch.moveToPulse(sScreamPanel, DOME_MOVE_FASTSPEED, DOME_PANEL_50_OPEN); })
+    DO_WAIT_MILLIS(DOME_MOVE_FASTSPEED)
+    DO_ONCE({ servoDispatch.moveToPulse(sScreamPanel, DOME_MOVE_FASTSPEED, DOME_PIE_PANEL_OPEN); })
+    DO_WAIT_MILLIS(100)
+    DO_WHILE(++sScreamIter < 10, kScream)
+    // ---- end flutter ----
+    DO_WAIT_MILLIS(2800)
+    DO_ONCE({
+        dome_AllOpen = false;
+        if (preferences.getBool("dm_happy_sound", true))
+            domeSendToBody("HAPPY");
+        domeStaggerMove(allPanels, 13, DOME_PANEL_CLOSE, DOME_MOVE_SPEED, 0);
+    })
+    DO_WAIT_MILLIS(DOME_MOVE_SPEED + 500)
+    DO_ONCE({ schedulePanelRelease(ALL_DOME_PANELS_MASK, 1); domeResetHolos(); })
+    DO_RESET({ domeEndSequence(); })
+    DO_END()
 }
 
 // =============================================================================
 // Overload — random panels sluggishly drift open, then snap closed
 // =============================================================================
-static void domeOverload()
+// Overload: random panels drift open one at a time with random gaps, hold, snap
+// closed. Random selection/gap persist in statics across the DO_WHILE loop.
+static uint8_t  sOverloadPanels[6];
+static uint8_t  sOverloadCount = 0;
+static uint8_t  sOverloadIdx   = 0;
+static uint32_t sOverloadGapMs = 0;
+ANIMATION(domeOverload)
 {
-    domeBeginSequence(12);
-
-    FLD.selectSequence(LogicEngineRenderer::FAILURE);
-    RLD.selectSequence(LogicEngineRenderer::FAILURE);
-
-    CommandEvent::process(F("HPA0070")); // all holos short circuit random color
-    frontPSI.selectSequence(LogicEngineRenderer::FAILURE, frontPSI.kDefault, 0, 12);
-    rearPSI.selectSequence(LogicEngineRenderer::FAILURE, rearPSI.kDefault, 0, 12);
-
-    domeSendToBody("OVERLOAD");
-
-    uint8_t panels[6];
-    uint8_t count = domeRandomPanels(4, 2, panels);
-
-    for (uint8_t i = 0; i < count; i++)
-    {
+    DO_START()
+    DO_ONCE({
+        cancelPanelRelease(ALL_DOME_PANELS_MASK);
+        domeBeginSequence(12);
+        FLD.selectSequence(LogicEngineRenderer::FAILURE);
+        RLD.selectSequence(LogicEngineRenderer::FAILURE);
+        CommandEvent::process(F("HPA0070")); // all holos short circuit random color
+        frontPSI.selectSequence(LogicEngineRenderer::FAILURE, frontPSI.kDefault, 0, 12);
+        rearPSI.selectSequence(LogicEngineRenderer::FAILURE, rearPSI.kDefault, 0, 12);
+        domeSendToBody("OVERLOAD");
+        sOverloadCount = domeRandomPanels(4, 2, sOverloadPanels);
+        sOverloadIdx = 0;
+    })
+    // ---- drift one panel open with a random gap, repeat for each chosen panel ----
+    DO_ONCE_LABEL(kOverload, {
         int pos = random(DOME_PANEL_25_OPEN, DOME_PANEL_50_OPEN + 1);
-        domeMove(panels[i], (uint16_t)pos, DOME_MOVE_OVERLOAD);
-        domeWaitTime(random(400, 900));
-    }
-
-    domeWaitTime(2500);
-
-    for (uint8_t i = 0; i < count; i++)
-        domeMove(panels[i], DOME_PANEL_CLOSE, DOME_MOVE_FASTSPEED);
-    domeWaitTime(800);
-    for (uint8_t i = 0; i < count; i++)
-        servoDispatch.disable(panels[i]);
-
-    domeResetHolos();
-    domeResetLogics();
-    domeResetPSIs();
-
-    domeEndSequence();
+        servoDispatch.moveToPulse(sOverloadPanels[sOverloadIdx], DOME_MOVE_OVERLOAD, (uint16_t)pos);
+        sOverloadGapMs = random(400, 900);
+    })
+    DO_WAIT_MILLIS(sOverloadGapMs)
+    DO_ONCE({ sOverloadIdx++; })
+    DO_WHILE(sOverloadIdx < sOverloadCount, kOverload)
+    // ---- hold, then snap all chosen panels closed ----
+    DO_WAIT_MILLIS(2500)
+    DO_ONCE({
+        for (uint8_t i = 0; i < sOverloadCount; i++)
+            servoDispatch.moveToPulse(sOverloadPanels[i], DOME_MOVE_FASTSPEED, DOME_PANEL_CLOSE);
+    })
+    DO_WAIT_MILLIS(800)
+    DO_ONCE({
+        schedulePanelRelease(ALL_DOME_PANELS_MASK, 1);
+        domeResetHolos();
+        domeResetLogics();
+        domeResetPSIs();
+    })
+    DO_RESET({ domeEndSequence(); })
+    DO_END()
 }
 
 // =============================================================================
 // Heart — rainbow holos, sweet message on logics
 // =============================================================================
-static void domeHeart()
+ANIMATION(domeHeart)
 {
-    domeBeginSequence(10);
-
-    CommandEvent::process(F("HPF006|10"));
-    CommandEvent::process(F("HPR006|10"));
-    CommandEvent::process(F("HPT006|10"));
-    FLD.selectScrollTextLeft("You're\nWonderful", FLD.kDefault, 0, 10);
-    frontPSI.selectSequence(LogicEngineRenderer::FLASHCOLOR, frontPSI.kDefault, 0, 10);
-    domeSendToBody("HEART");
-    domeWaitTime(10000);
-    domeEndSequence();
+    DO_START()
+    DO_ONCE({
+        domeBeginSequence(10);
+        CommandEvent::process(F("HPF006|10"));
+        CommandEvent::process(F("HPR006|10"));
+        CommandEvent::process(F("HPT006|10"));
+        FLD.selectScrollTextLeft("You're\nWonderful", FLD.kDefault, 0, 10);
+        frontPSI.selectSequence(LogicEngineRenderer::FLASHCOLOR, frontPSI.kDefault, 0, 10);
+        domeSendToBody("HEART");
+    })
+    DO_WAIT_SEC(10)
+    DO_RESET({ domeEndSequence(); })
+    DO_END()
 }
 
 // =============================================================================
 // Alarm — pulsing red holos and logics
 // =============================================================================
-static void domeAlarm()
+ANIMATION(domeAlarm)
 {
-    domeBeginSequence(10);
-
-    CommandEvent::process(F("HPA0021|10")); // all holos red flashes
-
-    FLD.selectSequence(LogicEngineRenderer::ALARM, FLD.kDefault, 0, 10);
-    RLD.selectSequence(LogicEngineRenderer::ALARM, RLD.kDefault, 0, 10);
-    frontPSI.selectSequence(LogicEngineRenderer::ALARM, frontPSI.kDefault, 0, 10);
-    rearPSI.selectSequence(LogicEngineRenderer::ALARM, rearPSI.kDefault, 0, 10);
-
-    domeSendToBody("ALARM");
-    domeWaitTime(10000);
-    domeEndSequence();
+    DO_START()
+    DO_ONCE({
+        domeBeginSequence(10);
+        CommandEvent::process(F("HPA0021|10")); // all holos red flashes
+        FLD.selectSequence(LogicEngineRenderer::ALARM, FLD.kDefault, 0, 10);
+        RLD.selectSequence(LogicEngineRenderer::ALARM, RLD.kDefault, 0, 10);
+        frontPSI.selectSequence(LogicEngineRenderer::ALARM, frontPSI.kDefault, 0, 10);
+        rearPSI.selectSequence(LogicEngineRenderer::ALARM, rearPSI.kDefault, 0, 10);
+        domeSendToBody("ALARM");
+    })
+    DO_WAIT_SEC(10)
+    DO_RESET({ domeEndSequence(); })
+    DO_END()
 }
 
 // =============================================================================
 // Disco — delegates to :SE09 (DiscoSequence), which owns the body sound cue
 // =============================================================================
-static void domeDisco()
+// Disco: hand :SE09 to the command queue (drained on the main loop, not
+// re-entrantly here), bracketed by body coordination for the run.
+ANIMATION(domeDisco)
 {
-    domeBeginSequence(46);
-    Marcduino::processCommand(player, ":SE09");
-    domeEndSequence();
+    DO_START()
+    DO_ONCE({ domeBeginSequence(46); enqueueMarcduinoCommand("dome-disco", ":SE09"); })
+    DO_WAIT_SEC(46)
+    DO_RESET({ domeEndSequence(); })
+    DO_END()
 }
 
 // =============================================================================
 // Vader — imperial march
 // =============================================================================
-static void domeVader()
+ANIMATION(domeVader)
 {
-    domeBeginSequence(47);
-
-    CommandEvent::process(F("HPA0021|47")); // all holos red flashes
-
-    FLD.selectSequence(LogicEngineRenderer::MARCH, FLD.kRed, 0, 47);
-    RLD.selectSequence(LogicEngineRenderer::MARCH, RLD.kRed, 0, 47);
-    frontPSI.selectSequence(LogicEngineRenderer::MARCH, frontPSI.kDefault, 0, 47);
-    rearPSI.selectSequence(LogicEngineRenderer::MARCH, rearPSI.kDefault, 0, 47);
-
-    domeSendToBody("VADER");
-    domeWaitTime(47000);
-    domeEndSequence();
+    DO_START()
+    DO_ONCE({
+        domeBeginSequence(47);
+        CommandEvent::process(F("HPA0021|47")); // all holos red flashes
+        FLD.selectSequence(LogicEngineRenderer::MARCH, FLD.kRed, 0, 47);
+        RLD.selectSequence(LogicEngineRenderer::MARCH, RLD.kRed, 0, 47);
+        frontPSI.selectSequence(LogicEngineRenderer::MARCH, frontPSI.kDefault, 0, 47);
+        rearPSI.selectSequence(LogicEngineRenderer::MARCH, rearPSI.kDefault, 0, 47);
+        domeSendToBody("VADER");
+    })
+    DO_WAIT_SEC(47)
+    DO_RESET({ domeEndSequence(); })
+    DO_END()
 }
 
 // =============================================================================
 // Rock March — alt imperial march
 // =============================================================================
-static void domeRockMarch()
+// Rock March: step ring panels open/closed on the beat for 45s (130 BPM).
+// Ring-only, so hardware-testable. Loops via DO_WHILE on a millis deadline.
+static uint8_t  sRockIdx   = 0;
+static uint32_t sRockStart = 0;
+ANIMATION(domeRockMarch)
 {
-    domeBeginSequence(47);
-
-    CommandEvent::process(F("HPA0021|47")); // all holos red flashes
-
-    FLD.selectSequence(LogicEngineRenderer::MARCH, FLD.kRed, 0, 47);
-    RLD.selectSequence(LogicEngineRenderer::MARCH, RLD.kRed, 0, 47);
-    frontPSI.selectSequence(LogicEngineRenderer::MARCH, frontPSI.kDefault, 0, 47);
-    rearPSI.selectSequence(LogicEngineRenderer::MARCH, rearPSI.kDefault, 0, 47);
-
-    domeSendToBody("ROCKMARCH");
-
-    // step through ring panels P1→P2→P3→P4→P7→P11→P13 at 130 BPM (923 ms/beat)
-    const unsigned long BEAT_MS  = 923;
-    const unsigned long DURATION = 45000;
-    unsigned long endTime = millis() + DURATION;
-    uint8_t idx = 0;
-
-    while (millis() < endTime)
-    {
-        uint8_t panel = ringPanels[idx % 7];
-        domeMove(panel, DOME_PANEL_OPEN, DOME_MOVE_SPEED, true);
-        domeWaitTime(BEAT_MS - DOME_MOVE_SPEED * 2);
-        domeMove(panel, DOME_PANEL_CLOSE, DOME_MOVE_SPEED, true);
-        idx++;
-    }
-
-    for (uint8_t i = 0; i < 7; i++)
-        servoDispatch.disable(ringPanels[i]);
-
-    domeWaitTime(2000);
-    domeEndSequence();
+    DO_START()
+    DO_ONCE({
+        domeBeginSequence(47);
+        CommandEvent::process(F("HPA0021|47")); // all holos red flashes
+        FLD.selectSequence(LogicEngineRenderer::MARCH, FLD.kRed, 0, 47);
+        RLD.selectSequence(LogicEngineRenderer::MARCH, RLD.kRed, 0, 47);
+        frontPSI.selectSequence(LogicEngineRenderer::MARCH, frontPSI.kDefault, 0, 47);
+        rearPSI.selectSequence(LogicEngineRenderer::MARCH, rearPSI.kDefault, 0, 47);
+        domeSendToBody("ROCKMARCH");
+        sRockIdx = 0;
+        sRockStart = millis();
+    })
+    // ---- one beat: open ring[idx], hold to the beat, close ----
+    DO_ONCE_LABEL(kRock, { servoDispatch.moveToPulse(ringPanels[sRockIdx % 7], DOME_MOVE_SPEED, DOME_PANEL_OPEN); })
+    DO_WAIT_MILLIS(DOME_MOVE_SPEED)
+    DO_WAIT_MILLIS(923 - DOME_MOVE_SPEED * 2)
+    DO_ONCE({ servoDispatch.moveToPulse(ringPanels[sRockIdx % 7], DOME_MOVE_SPEED, DOME_PANEL_CLOSE); sRockIdx++; })
+    DO_WAIT_MILLIS(DOME_MOVE_SPEED)
+    DO_WHILE(millis() - sRockStart < 45000UL, kRock)
+    // ---- end ----
+    DO_ONCE({ schedulePanelRelease(RING_PANELS_MASK, 1); })
+    DO_WAIT_MILLIS(2000)
+    DO_RESET({ domeEndSequence(); })
+    DO_END()
 }
 
 // =============================================================================
 // Hello There — P1 waves a greeting
 // =============================================================================
-static void domeHelloThere()
+// Wave P1 only — sequential moves on ONE servo, so each is its own step (a
+// staggered batch can't queue multiple future moves for the same servo).
+ANIMATION(domeHelloThere)
 {
-    domeBeginSequence(4);
-
-    // Wave P1 only — intentional single-panel greeting gesture, not a port stub.
-    FLD.selectScrollTextLeft("Hello\nThere", FLD.kDefault, 0, 10);
-    RLD.selectScrollTextLeft("General Kenobi", RLD.randomColor());
-
-    domeSendToBody("HELLO");
-
-    domeMove(D_P1, DOME_PANEL_OPEN,    DOME_MOVE_SPEED, true);
-    domeWaitTime(10);
-    domeMove(D_P1, DOME_PANEL_50_OPEN, DOME_MOVE_SPEED, true);
-    domeWaitTime(10);
-    domeMove(D_P1, DOME_PANEL_OPEN,    DOME_MOVE_SPEED, true);
-    domeWaitTime(10);
-    domeMove(D_P1, DOME_PANEL_50_OPEN, DOME_MOVE_SPEED, true);
-    domeWaitTime(10);
-    domeMove(D_P1, DOME_PANEL_OPEN,    DOME_MOVE_SPEED, true);
-    domeWaitTime(10);
-    domeMove(D_P1, DOME_PANEL_CLOSE,   DOME_MOVE_SPEED, true);
-    servoDispatch.disable(D_P1);
-
-    domeEndSequence();
+    DO_START()
+    DO_ONCE({
+        domeBeginSequence(4);
+        FLD.selectScrollTextLeft("Hello\nThere", FLD.kDefault, 0, 10);
+        RLD.selectScrollTextLeft("General Kenobi", RLD.randomColor());
+        domeSendToBody("HELLO");
+    })
+    DO_ONCE({ servoDispatch.moveToPulse(D_P1, DOME_MOVE_SPEED, DOME_PANEL_OPEN); })
+    DO_WAIT_MILLIS(DOME_MOVE_SPEED + 10)
+    DO_ONCE({ servoDispatch.moveToPulse(D_P1, DOME_MOVE_SPEED, DOME_PANEL_50_OPEN); })
+    DO_WAIT_MILLIS(DOME_MOVE_SPEED + 10)
+    DO_ONCE({ servoDispatch.moveToPulse(D_P1, DOME_MOVE_SPEED, DOME_PANEL_OPEN); })
+    DO_WAIT_MILLIS(DOME_MOVE_SPEED + 10)
+    DO_ONCE({ servoDispatch.moveToPulse(D_P1, DOME_MOVE_SPEED, DOME_PANEL_50_OPEN); })
+    DO_WAIT_MILLIS(DOME_MOVE_SPEED + 10)
+    DO_ONCE({ servoDispatch.moveToPulse(D_P1, DOME_MOVE_SPEED, DOME_PANEL_OPEN); })
+    DO_WAIT_MILLIS(DOME_MOVE_SPEED + 10)
+    DO_ONCE({ servoDispatch.moveToPulse(D_P1, DOME_MOVE_SPEED, DOME_PANEL_CLOSE); })
+    DO_WAIT_MILLIS(DOME_MOVE_SPEED)
+    DO_ONCE({ schedulePanelRelease(PANEL_P1, 1); })
+    DO_RESET({ domeEndSequence(); })
+    DO_END()
 }
 
 // =============================================================================
 // Leia — front HP runs Leia LED sequence, all other HPs off, logics Leia mode
 // =============================================================================
-static void domeLeiaMode()
+ANIMATION(domeLeiaMode)
 {
-    domeBeginSequence(36);
-
-    CommandEvent::process(F("HPS101|36")); // front holo leia sequence
-    CommandEvent::process(F("HPR02|36"));  // rear holo off
-    CommandEvent::process(F("HPT02|36"));  // top holo off
-
-    FLD.selectSequence(LogicEngineRenderer::LEIA, FLD.kDefault, 0, 36);
-    RLD.selectSequence(LogicEngineRenderer::LEIA, RLD.kDefault, 0, 36);
-    frontPSI.selectSequence(LogicEngineRenderer::LEIA, frontPSI.kDefault, 0, 36);
-    rearPSI.selectSequence(LogicEngineRenderer::LEIA, rearPSI.kDefault, 0, 36);
-
-    domeSendToBody("LEIA");
-    domeWaitTime(36000);
-    domeEndSequence();
+    DO_START()
+    DO_ONCE({
+        domeBeginSequence(36);
+        CommandEvent::process(F("HPS101|36")); // front holo leia sequence
+        CommandEvent::process(F("HPR02|36"));  // rear holo off
+        CommandEvent::process(F("HPT02|36"));  // top holo off
+        FLD.selectSequence(LogicEngineRenderer::LEIA, FLD.kDefault, 0, 36);
+        RLD.selectSequence(LogicEngineRenderer::LEIA, RLD.kDefault, 0, 36);
+        frontPSI.selectSequence(LogicEngineRenderer::LEIA, frontPSI.kDefault, 0, 36);
+        rearPSI.selectSequence(LogicEngineRenderer::LEIA, rearPSI.kDefault, 0, 36);
+        domeSendToBody("LEIA");
+    })
+    DO_WAIT_SEC(36)
+    DO_RESET({ domeEndSequence(); })
+    DO_END()
 }
 
 // =============================================================================
 // Reset All — close every panel, reset holos / logics / PSIs / body
 // =============================================================================
-static void domeResetAll()
+ANIMATION(domeResetAll)
 {
-    domeBeginSequence(4);
-
-    // close all 13 panels — PP3 included so :OPP3 doesn't leave it stranded
-    for (uint8_t i = 0; i < 13; i++)
-        domeMove(allPanels[i], DOME_PANEL_CLOSE, DOME_MOVE_SPEED);
-    domeWaitTime(DOME_MOVE_SPEED + 1000);
-
-    for (uint8_t i = 0; i < 13; i++)
-        servoDispatch.disable(allPanels[i]);
-
-    dome_PiesOpen = false;
-    dome_AllOpen  = false;
-    dome_LowOpen  = false;
-
-    domeResetHolos();
-    domeResetLogics();
-    domeResetPSIs();
-    domeResetBody();
-
-    domeEndSequence();
+    DO_START()
+    DO_ONCE({
+        domeBeginSequence(4);
+        // close all 13 panels — PP3 included so :OPP3 doesn't leave it stranded.
+        // Original fired them simultaneously (no wait), so no stagger here.
+        for (uint8_t i = 0; i < 13; i++)
+            servoDispatch.moveToPulse(allPanels[i], DOME_MOVE_SPEED, DOME_PANEL_CLOSE);
+    })
+    DO_WAIT_MILLIS(DOME_MOVE_SPEED + 1000)
+    DO_ONCE({
+        schedulePanelRelease(ALL_DOME_PANELS_MASK, 1);
+        dome_PiesOpen = false;
+        dome_AllOpen  = false;
+        dome_LowOpen  = false;
+        domeResetHolos();
+        domeResetLogics();
+        domeResetPSIs();
+        domeResetBody();
+    })
+    DO_RESET({ domeEndSequence(); })
+    DO_END()
 }
 
 // =============================================================================
 // Cantina — 15-second alternating panel dance at 130 BPM
 // =============================================================================
-static void domeCantina()
+// Cantina beat halves (all moves fire together, no per-move wait).
+static void domeCantinaBeatA()
 {
-    domeBeginSequence(17);
-    domeSendToBody("CANTINA");
+    // pie group A opens (PP1, PP3, PP4); group B closes (PP2, PP5, PP6)
+    servoDispatch.moveToPulse(D_PP1, DOME_MOVE_SPEED, DOME_PIE_PANEL_OPEN);
+    servoDispatch.moveToPulse(D_PP4, DOME_MOVE_SPEED, DOME_PIE_PANEL_OPEN);
+    servoDispatch.moveToPulse(D_PP3, DOME_MOVE_SPEED, DOME_PIE_PANEL_OPEN); // top wedge pairs with PP4
+    servoDispatch.moveToPulse(D_PP2, DOME_MOVE_SPEED, DOME_PANEL_CLOSE);
+    servoDispatch.moveToPulse(D_PP5, DOME_MOVE_SPEED, DOME_PANEL_CLOSE);
+    servoDispatch.moveToPulse(D_PP6, DOME_MOVE_SPEED, DOME_PANEL_CLOSE);
+    servoDispatch.moveToPulse(D_P1,  DOME_MOVE_SPEED, DOME_PANEL_OPEN);
+    servoDispatch.moveToPulse(D_P3,  DOME_MOVE_SPEED, DOME_PANEL_OPEN);
+    servoDispatch.moveToPulse(D_P7,  DOME_MOVE_SPEED, DOME_PANEL_OPEN);
+    servoDispatch.moveToPulse(D_P13, DOME_MOVE_SPEED, DOME_PANEL_OPEN);
+    servoDispatch.moveToPulse(D_P2,  DOME_MOVE_SPEED, DOME_PANEL_CLOSE);
+    servoDispatch.moveToPulse(D_P4,  DOME_MOVE_SPEED, DOME_PANEL_CLOSE);
+    servoDispatch.moveToPulse(D_P11, DOME_MOVE_SPEED, DOME_PANEL_CLOSE);
+}
+static void domeCantinaBeatB()
+{
+    // pie group A closes (PP1, PP3, PP4); group B opens (PP2, PP5, PP6)
+    servoDispatch.moveToPulse(D_PP1, DOME_MOVE_SPEED, DOME_PANEL_CLOSE);
+    servoDispatch.moveToPulse(D_PP4, DOME_MOVE_SPEED, DOME_PANEL_CLOSE);
+    servoDispatch.moveToPulse(D_PP3, DOME_MOVE_SPEED, DOME_PANEL_CLOSE);    // top wedge pairs with PP4
+    servoDispatch.moveToPulse(D_PP2, DOME_MOVE_SPEED, DOME_PIE_PANEL_OPEN);
+    servoDispatch.moveToPulse(D_PP5, DOME_MOVE_SPEED, DOME_PIE_PANEL_OPEN);
+    servoDispatch.moveToPulse(D_PP6, DOME_MOVE_SPEED, DOME_PIE_PANEL_OPEN);
+    servoDispatch.moveToPulse(D_P1,  DOME_MOVE_SPEED, DOME_PANEL_CLOSE);
+    servoDispatch.moveToPulse(D_P3,  DOME_MOVE_SPEED, DOME_PANEL_CLOSE);
+    servoDispatch.moveToPulse(D_P7,  DOME_MOVE_SPEED, DOME_PANEL_CLOSE);
+    servoDispatch.moveToPulse(D_P13, DOME_MOVE_SPEED, DOME_PANEL_CLOSE);
+    servoDispatch.moveToPulse(D_P2,  DOME_MOVE_SPEED, DOME_PANEL_OPEN);
+    servoDispatch.moveToPulse(D_P4,  DOME_MOVE_SPEED, DOME_PANEL_OPEN);
+    servoDispatch.moveToPulse(D_P11, DOME_MOVE_SPEED, DOME_PANEL_OPEN);
+}
 
-    CommandEvent::process(F("HPA0029|15")); // all holos white flashes
-
-    FLD.selectSequence(LogicEngineRenderer::FLASHCOLOR, FLD.kBlue, 0, 15);
-    RLD.selectSequence(LogicEngineRenderer::FLASHCOLOR, RLD.kBlue, 0, 15);
-    frontPSI.selectSequence(LogicEngineRenderer::FLASHCOLOR, frontPSI.kDefault, 0, 15);
-    rearPSI.selectSequence(LogicEngineRenderer::FLASHCOLOR, rearPSI.kDefault, 0, 15);
-
-    // 130 BPM ≈ 923 ms per beat
-    const unsigned long BEAT_MS  = 923;
-    const unsigned long DURATION = 15000;
-    domeWaitTime(100);
-
-    bool evenOpen = true;
-    unsigned long endTime = millis() + DURATION;
-
-    while (millis() < endTime)
-    {
-        if (evenOpen)
-        {
-            // pie group A opens (PP1, PP3, PP4); group B closes (PP2, PP5, PP6)
-            domeMove(D_PP1, DOME_PIE_PANEL_OPEN, DOME_MOVE_SPEED);
-            domeMove(D_PP4, DOME_PIE_PANEL_OPEN, DOME_MOVE_SPEED);
-            domeMove(D_PP3, DOME_PIE_PANEL_OPEN, DOME_MOVE_SPEED); // top wedge: always pairs with PP4
-            domeMove(D_PP2, DOME_PANEL_CLOSE, DOME_MOVE_SPEED);
-            domeMove(D_PP5, DOME_PANEL_CLOSE, DOME_MOVE_SPEED);
-            domeMove(D_PP6, DOME_PANEL_CLOSE, DOME_MOVE_SPEED);
-            domeMove(D_P1,  DOME_PANEL_OPEN, DOME_MOVE_SPEED);
-            domeMove(D_P3,  DOME_PANEL_OPEN, DOME_MOVE_SPEED);
-            domeMove(D_P7,  DOME_PANEL_OPEN, DOME_MOVE_SPEED);
-            domeMove(D_P13, DOME_PANEL_OPEN, DOME_MOVE_SPEED);
-            domeMove(D_P2,  DOME_PANEL_CLOSE, DOME_MOVE_SPEED);
-            domeMove(D_P4,  DOME_PANEL_CLOSE, DOME_MOVE_SPEED);
-            domeMove(D_P11, DOME_PANEL_CLOSE, DOME_MOVE_SPEED);
-        }
-        else
-        {
-            // pie group A closes (PP1, PP3, PP4); group B opens (PP2, PP5, PP6)
-            domeMove(D_PP1, DOME_PANEL_CLOSE, DOME_MOVE_SPEED);
-            domeMove(D_PP4, DOME_PANEL_CLOSE, DOME_MOVE_SPEED);
-            domeMove(D_PP3, DOME_PANEL_CLOSE, DOME_MOVE_SPEED);    // top wedge: always pairs with PP4
-            domeMove(D_PP2, DOME_PIE_PANEL_OPEN, DOME_MOVE_SPEED);
-            domeMove(D_PP5, DOME_PIE_PANEL_OPEN, DOME_MOVE_SPEED);
-            domeMove(D_PP6, DOME_PIE_PANEL_OPEN, DOME_MOVE_SPEED);
-            domeMove(D_P1,  DOME_PANEL_CLOSE, DOME_MOVE_SPEED);
-            domeMove(D_P3,  DOME_PANEL_CLOSE, DOME_MOVE_SPEED);
-            domeMove(D_P7,  DOME_PANEL_CLOSE, DOME_MOVE_SPEED);
-            domeMove(D_P13, DOME_PANEL_CLOSE, DOME_MOVE_SPEED);
-            domeMove(D_P2,  DOME_PANEL_OPEN, DOME_MOVE_SPEED);
-            domeMove(D_P4,  DOME_PANEL_OPEN, DOME_MOVE_SPEED);
-            domeMove(D_P11, DOME_PANEL_OPEN, DOME_MOVE_SPEED);
-        }
-        evenOpen = !evenOpen;
-        domeWaitTime(BEAT_MS);
-    }
-
-    for (uint8_t i = 0; i < 13; i++)
-        domeMove(allPanels[i], DOME_PANEL_CLOSE, DOME_MOVE_FASTSPEED);
-    domeWaitTime(500);
-
-    for (uint8_t i = 0; i < 13; i++)
-        servoDispatch.disable(allPanels[i]);
-
-    dome_PiesOpen = false;
-    dome_AllOpen  = false;
-    dome_LowOpen  = false;
-
-    domeResetPSIs();
-    domeResetLogics();
-    domeResetHolos();
-
-    domeEndSequence();
+static bool     sCantinaEven  = true;
+static uint32_t sCantinaStart = 0;
+ANIMATION(domeCantina)
+{
+    DO_START()
+    DO_ONCE({
+        cancelPanelRelease(ALL_DOME_PANELS_MASK);
+        domeBeginSequence(17);
+        domeSendToBody("CANTINA");
+        CommandEvent::process(F("HPA0029|15")); // all holos white flashes
+        FLD.selectSequence(LogicEngineRenderer::FLASHCOLOR, FLD.kBlue, 0, 15);
+        RLD.selectSequence(LogicEngineRenderer::FLASHCOLOR, RLD.kBlue, 0, 15);
+        frontPSI.selectSequence(LogicEngineRenderer::FLASHCOLOR, frontPSI.kDefault, 0, 15);
+        rearPSI.selectSequence(LogicEngineRenderer::FLASHCOLOR, rearPSI.kDefault, 0, 15);
+        sCantinaEven = true;
+    })
+    DO_WAIT_MILLIS(100)
+    DO_ONCE({ sCantinaStart = millis(); })
+    // ---- one beat (130 BPM ≈ 923ms), alternating halves, for 15s ----
+    DO_ONCE_LABEL(kCantina, {
+        if (sCantinaEven) domeCantinaBeatA(); else domeCantinaBeatB();
+        sCantinaEven = !sCantinaEven;
+    })
+    DO_WAIT_MILLIS(923)
+    DO_WHILE(millis() - sCantinaStart < 15000UL, kCantina)
+    // ---- close everything, reset ----
+    DO_ONCE({ domeStaggerMove(allPanels, 13, DOME_PANEL_CLOSE, DOME_MOVE_FASTSPEED, 0); })
+    DO_WAIT_MILLIS(500)
+    DO_ONCE({
+        schedulePanelRelease(ALL_DOME_PANELS_MASK, 1);
+        dome_PiesOpen = false;
+        dome_AllOpen  = false;
+        dome_LowOpen  = false;
+        domeResetPSIs();
+        domeResetLogics();
+        domeResetHolos();
+    })
+    DO_RESET({ domeEndSequence(); })
+    DO_END()
 }
 
 // =============================================================================
@@ -818,7 +877,11 @@ static void domeCantina()
 // Each underlying :SE sequence routes its own body sound via sendBodyCommand().
 // Do NOT wrap this in domeBeginSequence() — that would double-coordinate the body.
 // =============================================================================
-static void domeRandom()
+// Random — picks one sequence from the standard pool and QUEUES it (drained on
+// the main loop) rather than calling processCommand() re-entrantly. Each
+// underlying :SE routes its own body sound, so this is NOT wrapped in
+// domeBeginSequence(). Called directly from the DM:RANDOM handler.
+static void domeRandomDispatch()
 {
     static const char* const sequences[] = {
         ":SE02",  // Wave
@@ -838,7 +901,7 @@ static void domeRandom()
         "$720",   // YodaClearMind
     };
     static const uint8_t count = sizeof(sequences) / sizeof(sequences[0]);
-    Marcduino::processCommand(player, sequences[random(count)]);
+    enqueueMarcduinoCommand("dome-random", sequences[random(count)]);
 }
 
 // =============================================================================
@@ -847,23 +910,35 @@ static void domeRandom()
 // Send from any Marcduino-compatible device as:   DM:PIES\r
 // =============================================================================
 
-MARCDUINO_ACTION(DomeReset,     DM:RESET,       ({ if (!dome_seqRunning) domeResetAll();      }))
-MARCDUINO_ACTION(DomePies,      DM:PIES,        ({ if (!dome_seqRunning) domeOpenClosePies(); }))
-MARCDUINO_ACTION(DomeLow,       DM:LOW,         ({ if (!dome_seqRunning) domeOpenCloseLow();  }))
-MARCDUINO_ACTION(DomeOpenAll,   DM:OPENALL,     ({ if (!dome_seqRunning) domeOpenCloseAll();  }))
-MARCDUINO_ACTION(DomeLeia,      DM:LEIA,        ({ if (!dome_seqRunning) domeLeiaMode();      }))
-MARCDUINO_ACTION(DomeHeart,     DM:HEART,       ({ if (!dome_seqRunning) domeHeart();         }))
-MARCDUINO_ACTION(DomeHello,     DM:HELLO,       ({ if (!dome_seqRunning) domeHelloThere();    }))
-MARCDUINO_ACTION(DomeScream,    DM:SCREAM,      ({ if (!dome_seqRunning) domeScream();        }))
-MARCDUINO_ACTION(DomeFlutter,   DM:FLUTTER,     ({ if (!dome_seqRunning) domeFlutter();       }))
-MARCDUINO_ACTION(DomeOverload,  DM:OVERLOAD,    ({ if (!dome_seqRunning) domeOverload();      }))
-MARCDUINO_ACTION(DomeBloom,     DM:BLOOM,       ({ if (!dome_seqRunning) domeBloom();         }))
-MARCDUINO_ACTION(DomeCantina,   DM:CANTINA,     ({ if (!dome_seqRunning) domeCantina();       }))
-MARCDUINO_ACTION(DomeAlarm,     DM:ALARM,       ({ if (!dome_seqRunning) domeAlarm();         }))
-MARCDUINO_ACTION(DomeSeqDisco,  DM:DISCO,       ({ if (!dome_seqRunning) domeDisco();         }))
-MARCDUINO_ACTION(DomeRockMarch, DM:ROCKMARCH,   ({ if (!dome_seqRunning) domeRockMarch();     }))
-MARCDUINO_ACTION(DomeRandom,    DM:RANDOM,      ({ if (!dome_seqRunning) domeRandom();        }))
-MARCDUINO_ACTION(DomeVader,     DM:VADER,       ({ if (!dome_seqRunning) domeVader();         }))
+MARCDUINO_ACTION(DomeReset,     DM:RESET,       ({ if (!dome_seqRunning) dome_pendingAnim = Animation_domeResetAll; }))
+MARCDUINO_ACTION(DomePies,      DM:PIES,        ({ if (!dome_seqRunning) dome_pendingAnim = dome_PiesOpen ? Animation_domePiesClose : Animation_domePiesOpen; }))
+// DM:LOW stays MARCDUINO_ANIMATION (not MARCDUINO_ACTION) so the bare token LOW is
+// not macro-expanded to 0x0 in the command string. The one-shot body picks the
+// open or close animation by toggle and hands it to mainLoop via dome_pendingAnim
+// (dispatched outside player.animate() to avoid re-entrant animateOnce()).
+MARCDUINO_ANIMATION(DomeLow, DM:LOW)
+{
+    DO_START()
+    DO_ONCE({
+        if (!dome_seqRunning)
+            dome_pendingAnim = dome_LowOpen ? Animation_domeLowClose : Animation_domeLowOpen;
+    })
+    DO_END()
+}
+MARCDUINO_ACTION(DomeOpenAll,   DM:OPENALL,     ({ if (!dome_seqRunning) dome_pendingAnim = dome_AllOpen ? Animation_domeAllClose : Animation_domeAllOpen; }))
+MARCDUINO_ACTION(DomeLeia,      DM:LEIA,        ({ if (!dome_seqRunning) dome_pendingAnim = Animation_domeLeiaMode;   }))
+MARCDUINO_ACTION(DomeHeart,     DM:HEART,       ({ if (!dome_seqRunning) dome_pendingAnim = Animation_domeHeart;      }))
+MARCDUINO_ACTION(DomeHello,     DM:HELLO,       ({ if (!dome_seqRunning) dome_pendingAnim = Animation_domeHelloThere; }))
+MARCDUINO_ACTION(DomeScream,    DM:SCREAM,      ({ if (!dome_seqRunning) dome_pendingAnim = Animation_domeScream;     }))
+MARCDUINO_ACTION(DomeFlutter,   DM:FLUTTER,     ({ if (!dome_seqRunning) dome_pendingAnim = Animation_domeFlutter;    }))
+MARCDUINO_ACTION(DomeOverload,  DM:OVERLOAD,    ({ if (!dome_seqRunning) dome_pendingAnim = Animation_domeOverload;   }))
+MARCDUINO_ACTION(DomeBloom,     DM:BLOOM,       ({ if (!dome_seqRunning) dome_pendingAnim = Animation_domeBloom;      }))
+MARCDUINO_ACTION(DomeCantina,   DM:CANTINA,     ({ if (!dome_seqRunning) dome_pendingAnim = Animation_domeCantina;    }))
+MARCDUINO_ACTION(DomeAlarm,     DM:ALARM,       ({ if (!dome_seqRunning) dome_pendingAnim = Animation_domeAlarm;      }))
+MARCDUINO_ACTION(DomeSeqDisco,  DM:DISCO,       ({ if (!dome_seqRunning) dome_pendingAnim = Animation_domeDisco;      }))
+MARCDUINO_ACTION(DomeRockMarch, DM:ROCKMARCH,   ({ if (!dome_seqRunning) dome_pendingAnim = Animation_domeRockMarch;  }))
+MARCDUINO_ACTION(DomeRandom,    DM:RANDOM,      ({ domeRandomDispatch(); }))
+MARCDUINO_ACTION(DomeVader,     DM:VADER,       ({ if (!dome_seqRunning) dome_pendingAnim = Animation_domeVader;      }))
 
 // =============================================================================
 // MarcduinoSequence.h aliases — expose predefined SE sequences via DM: names

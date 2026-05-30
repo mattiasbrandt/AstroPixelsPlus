@@ -765,6 +765,21 @@ Her Teeces `4Tx|N` serial calls (body-PSI-addressed) were replaced with direct d
 #### Happy sound gate
 `DM:PIES`, `DM:LOW`, and `DM:OPENALL` call `BD:HAPPY` on each toggle (random happy bank sound on the body). Gated by the `dm_happy_sound` NVS preference (default `true`) so it can be disabled for quieter operation without reflashing.
 
+#### Non-blocking execution model (this fork)
+The ported sequences were originally written in a **blocking** style (a `domeMove(..., wait=true)` busy-loop that spun on `servoDispatch.isActive()` while internally calling `AnimatedEvent::process()`, plus a `domeWaitTime()` busy-wait). On this ESP32 build that ran on the loop core (`mainLoop`) and could **stall core 1 until reboot** — the async web server (core 0) kept answering, so a command returned `ok` but no panels moved and subsequent commands were never drained.
+
+They are now rewritten as **non-blocking ReelTwo `DO_*` animation scripts** that run on the shared `player` and are advanced one step per `AnimatedEvent::process()` — the same pattern as `MarcduinoSequence.h` (`:SE*`):
+
+- Wave choreography uses **staggered `moveToPulse(idx, startDelay, moveTime, pos)`** start-delays (faithful to the old serialized timing) plus a single `DO_WAIT_MILLIS` for the envelope — no busy-loop.
+- Timed holds use `DO_WAIT_MILLIS` / `DO_WAIT_SEC`; servo PWM cutoff uses the existing `schedulePanelRelease(mask, delayMs)` instead of `disable()` loops.
+- Toggle sequences (`DM:LOW`, `DM:PIES`, `DM:OPENALL`) are an open/close animation pair; the handler picks one by toggle state.
+- Loop/random sequences (Scream, Overload, Cantina, RockMarch, Bloom) loop via a backward `DO_WHILE` on a millis-deadline or iteration counter, with random selections held in file-scope statics.
+- Delegating sequences (`DM:DISCO`, `DM:RANDOM`) **queue** their target `:SE`/`$` command via `enqueueMarcduinoCommand()` (drained on the main loop) rather than calling `processCommand()` re-entrantly from inside `player.animate()`.
+
+Dispatch path: a `DM:*` handler sets `dome_pendingAnim` (an `AnimationStep`); `mainLoop()` drains it once via `player.animateOnce()` **outside** `player.animate()`, avoiding re-entrant `animateOnce()`. The old blocking helpers (`domeMove`, `domeWaitTime`) and the `dome_pendingSeq` function-pointer path were removed. `DM:LOW` stays a `MARCDUINO_ANIMATION` (not `MARCDUINO_ACTION`) so the bare token `LOW` is not macro-expanded to `0x0` in the registered command string.
+
+Consequence: a direct panel command (`:OP01`) now **preempts** a running dome sequence (they share `player`) instead of being blocked behind it. `DM:LOW` open/close + a following `:OP01`/`:CL01` is hardware-verified to work without a reboot.
+
 #### Command reference
 
 | Command | Effect |

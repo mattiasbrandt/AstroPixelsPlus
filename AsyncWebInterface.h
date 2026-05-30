@@ -293,7 +293,7 @@ static void processMarcduinoCommandWithSource(const char *source, const char *cm
         return;
     }
 
-    Marcduino::processCommand(player, cmd);
+    enqueueMarcduinoCommand(source, cmd);
 }
 
 static bool isSensitivePrefKey(const String &key)

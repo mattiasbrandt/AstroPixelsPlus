@@ -59,7 +59,6 @@
 #define USE_DROID_REMOTE // Define for droid remote support
 #endif
 #define USE_MDNS
-#define USE_OTA
 #define USE_WIFI_WEB
 #define USE_WIFI_MARCDUINO
 // #define LIVE_STREAM
@@ -217,9 +216,6 @@
 #endif
 #ifdef USE_WIFI_MARCDUINO
 #include "wifi/WifiMarcduinoReceiver.h"
-#endif
-#ifdef USE_OTA
-#include <ArduinoOTA.h>
 #endif
 #ifdef USE_SPIFFS
 #include "SPIFFS.h"
@@ -661,6 +657,10 @@ static uint32_t sPanelReleaseAtMs   = 0;
 static uint32_t sPanelReleaseMask   = 0;
 static void schedulePanelRelease(uint32_t mask, uint32_t delayMs = 1500);
 static void cancelPanelRelease(uint32_t mask = ALL_DOME_PANELS_MASK);
+// Forward-declared so dome sequences (DomeSequences.h, included below) can queue
+// a Marcduino command for the main loop instead of calling processCommand()
+// re-entrantly from inside player.animate(). Default arg lives here only.
+static bool enqueueMarcduinoCommand(const char *source, const char *cmd, bool suppressBodyLinkEgress = false);
 MarcduinoSerial<> marcduinoSerial(player);
 
 /////////////////////////////////////////////////////////////////////////
@@ -743,41 +743,6 @@ void reboot()
     preferences.end();
     ESP.restart();
 }
-
-#if defined(USE_WIFI) && defined(USE_OTA)
-static TaskHandle_t otaTask;
-static bool otaTaskStarted;
-
-static void arduinoOtaTask(void *)
-{
-    vTaskDelay(pdMS_TO_TICKS(500));
-    ArduinoOTA.setHostname("astropixelsplus");
-    ArduinoOTA.setMdnsEnabled(false);
-    ArduinoOTA.begin();
-
-    for (;;)
-    {
-        ArduinoOTA.handle();
-        vTaskDelay(pdMS_TO_TICKS(10));
-    }
-}
-
-static void startArduinoOtaTask()
-{
-    if (otaTaskStarted)
-        return;
-
-    otaTaskStarted = true;
-    xTaskCreatePinnedToCore(
-        arduinoOtaTask,
-        "ArduinoOTA",
-        4096,
-        NULL,
-        1,
-        &otaTask,
-        0);
-}
-#endif
 
 ////////////////////////////////
 // This function is called when aborting or ending Marcduino sequences. It should reset all droid devices to Normal
@@ -889,6 +854,9 @@ bool dome_PiesOpen   = false;
 bool dome_AllOpen    = false;
 bool dome_LowOpen    = false;
 bool dome_seqRunning = false;
+// Non-blocking dome-sequence dispatch (see DomeSequences.h). Set by a DM:* handler,
+// drained once per mainLoop() via player.animateOnce() outside player.animate().
+AnimationStep dome_pendingAnim = nullptr;
 
 static bool bodyLinkConnected()
 {
@@ -1070,6 +1038,77 @@ WifiMarcduinoReceiver wifiMarcduinoReceiver(wifiAccess);
 
 ////////////////////////////////
 
+struct PendingMarcduinoCommand
+{
+    char source[24];
+    char cmd[CONSOLE_BUFFER_SIZE];
+    bool suppressBodyLinkEgress;
+};
+
+static portMUX_TYPE sMarcduinoQueueMux = portMUX_INITIALIZER_UNLOCKED;
+static PendingMarcduinoCommand sMarcduinoQueue[8];
+static volatile uint8_t sMarcduinoQueueHead = 0;
+static volatile uint8_t sMarcduinoQueueTail = 0;
+static volatile uint8_t sMarcduinoQueueCount = 0;
+
+static bool enqueueMarcduinoCommand(const char *source, const char *cmd, bool suppressBodyLinkEgress)
+{
+    if (cmd == nullptr || cmd[0] == '\0') return false;
+
+    bool queued = false;
+    portENTER_CRITICAL(&sMarcduinoQueueMux);
+    if (sMarcduinoQueueCount < SizeOfArray(sMarcduinoQueue))
+    {
+        PendingMarcduinoCommand &entry = sMarcduinoQueue[sMarcduinoQueueTail];
+        strlcpy(entry.source, source ? source : "unknown", sizeof(entry.source));
+        strlcpy(entry.cmd, cmd, sizeof(entry.cmd));
+        entry.suppressBodyLinkEgress = suppressBodyLinkEgress;
+        sMarcduinoQueueTail = (sMarcduinoQueueTail + 1) % SizeOfArray(sMarcduinoQueue);
+        sMarcduinoQueueCount++;
+        queued = true;
+    }
+    portEXIT_CRITICAL(&sMarcduinoQueueMux);
+
+    if (!queued)
+        logCapture.printf("[CMD][%s][queue-full] %s\n", source ? source : "unknown", cmd);
+    return queued;
+}
+
+static bool dequeueMarcduinoCommand(char *source, size_t sourceSize, char *cmd, size_t cmdSize, bool *suppressBodyLinkEgress)
+{
+    bool found = false;
+    portENTER_CRITICAL(&sMarcduinoQueueMux);
+    if (sMarcduinoQueueCount > 0)
+    {
+        PendingMarcduinoCommand &entry = sMarcduinoQueue[sMarcduinoQueueHead];
+        strlcpy(source, entry.source, sourceSize);
+        strlcpy(cmd, entry.cmd, cmdSize);
+        *suppressBodyLinkEgress = entry.suppressBodyLinkEgress;
+        sMarcduinoQueueHead = (sMarcduinoQueueHead + 1) % SizeOfArray(sMarcduinoQueue);
+        sMarcduinoQueueCount--;
+        found = true;
+    }
+    portEXIT_CRITICAL(&sMarcduinoQueueMux);
+    return found;
+}
+
+static void drainMarcduinoCommandQueue()
+{
+    char source[24];
+    char cmd[CONSOLE_BUFFER_SIZE];
+    bool suppressBodyLinkEgress = false;
+    while (dequeueMarcduinoCommand(source, sizeof(source), cmd, sizeof(cmd), &suppressBodyLinkEgress))
+    {
+        bool previousSuppressBodyLinkEgress = sSuppressBodyLinkEgress;
+        if (suppressBodyLinkEgress)
+            sSuppressBodyLinkEgress = true;
+        Marcduino::processCommand(player, cmd);
+        sSuppressBodyLinkEgress = previousSuppressBodyLinkEgress;
+    }
+}
+
+////////////////////////////////
+
 #ifdef USE_MENUS
 
 #include "Screens.h"
@@ -1212,10 +1251,7 @@ void setup()
 #ifdef USE_WIFI
     wifiEnabled = preferences.getBool(PREFERENCE_WIFI_ENABLED, WIFI_ENABLED);
     wifiActive = false;
-#ifdef USE_OTA
     otaInProgress = false;
-    otaTaskStarted = false;
-#endif
 #ifdef USE_DROID_REMOTE
     remoteEnabled = remoteActive = preferences.getBool(PREFERENCE_REMOTE_ENABLED, REMOTE_ENABLED);
 #else
@@ -1467,36 +1503,6 @@ void setup()
                 } });
         }
 #endif
-#ifdef USE_OTA
-        ArduinoOTA.onStart([]()
-                           {
-            String type;
-            if (ArduinoOTA.getCommand() == U_FLASH)
-            {
-                type = "sketch";
-            }
-            else // U_SPIFFS
-            {
-                type = "filesystem";
-            }
-            DEBUG_PRINTLN(F("OTA START")); })
-            .onEnd([]()
-                   { DEBUG_PRINTLN(F("OTA END")); })
-            .onProgress([](unsigned int progress, unsigned int total)
-                        {
-                            // float range = (float)progress / (float)total;
-                        })
-            .onError([](ota_error_t error)
-                     {
-            String desc;
-            if (error == OTA_AUTH_ERROR) desc = "Auth Failed";
-            else if (error == OTA_BEGIN_ERROR) desc = "Begin Failed";
-            else if (error == OTA_CONNECT_ERROR) desc = "Connect Failed";
-            else if (error == OTA_RECEIVE_ERROR) desc = "Receive Failed";
-            else if (error == OTA_END_ERROR) desc = "End Failed";
-            else desc = "Error: "+String(error);
-            DEBUG_PRINTLN(desc); });
-#endif
         wifiAccess.notifyWifiConnected([](WifiAccess &wifi)
                                        {
                                            wifiActive = true;
@@ -1512,9 +1518,6 @@ void setup()
 #endif
                                            bodyLinkWiFiInit();
                                            bodyLinkSetupMDNS();
-#ifdef USE_OTA
-                                           startArduinoOtaTask();
-#endif
                                        });
         wifiAccess.notifyWifiDisconnected([](WifiAccess &)
                                           {
@@ -1912,12 +1915,7 @@ static void processMarcduinoCommandWithSourceMain(const char *source, const char
         return;
     }
     Serial.printf("[CMD][%s] %s\n", source, cmd);
-    bool fromBodyLink = isBodyLinkSource(source);
-    bool previousSuppressBodyLinkEgress = sSuppressBodyLinkEgress;
-    if (fromBodyLink)
-        sSuppressBodyLinkEgress = true;
-    Marcduino::processCommand(player, cmd);
-    sSuppressBodyLinkEgress = previousSuppressBodyLinkEgress;
+    enqueueMarcduinoCommand(source, cmd, isBodyLinkSource(source));
 }
 
 ////////////////
@@ -1974,7 +1972,19 @@ static void cancelPanelRelease(uint32_t mask)
 
 void mainLoop()
 {
+    drainMarcduinoCommandQueue();
     AnimatedEvent::process();
+
+    // Hand a pending dome sequence to `player` here, outside player.animate(),
+    // so it runs as DO_* steps driven by future AnimatedEvent::process() calls
+    // without blocking mainLoop (and without re-entrant animateOnce()).
+    if (dome_pendingAnim != nullptr && !dome_seqRunning)
+    {
+        logCapture.printf("[DOME] dispatching pendingAnim\n");
+        AnimationStep anim = dome_pendingAnim;
+        dome_pendingAnim = nullptr;
+        player.animateOnce(anim);
+    }
 
     handleBodySerial();
     bodyLinkWiFiRx();
