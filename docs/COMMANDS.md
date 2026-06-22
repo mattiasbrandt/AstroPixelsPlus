@@ -1239,6 +1239,133 @@ full pattern list. Calls `dataPanel.setPattern()`.
 compiled out. Sending it has no effect and produces no error response.
 
 ---
+## Dome Visual Presets (`DV:`)
+
+### `DV:<NAME>` — Apply Dome-Native Visual Preset
+
+**Syntax:** `DV:<NAME>\r`
+
+Applies a named dome visual preset without starting a full dome choreography.
+This command is intended for body-owned sequences that need the dome-native
+logic/PSI/holo look while the body owns audio, timing, and panel intent.
+
+`DV:` commands are visual-only:
+
+- affect FLD/RLD logic displays, PSI, and holo LEDs
+- do not move panels
+- do not play body audio
+- do not forward or trigger `DM:*`
+- do not emit `dome=seqon` / `dome=seqoff`
+
+Recognized names:
+
+| Command | Effect |
+|---|---|
+| `DV:ROCKMARCH` | Red MARCH logics/PSI with red holo flashes |
+| `DV:VADER` | Red MARCH logics/PSI with red holo flashes |
+| `DV:ALARM` | Alarm logics/PSI with red holo flashes |
+| `DV:LEIA` | Leia logics/PSI with front Leia holo effect |
+| `DV:HEART` | Heart message with rainbow holos and PSI flash |
+| `DV:CANTINA` | Blue flash-color logics/PSI with white holo flashes |
+| `DV:SCREAM` | Red-alert logics/PSI with short-circuit holos |
+| `DV:OVERLOAD` | Failure logics/PSI with short-circuit holos |
+| `DV:HELLO` | Hello There / General Kenobi logic text |
+| `DV:RESET_VISUALS` | Reset holos/logics/PSI |
+
+Unknown `DV:` names are logged and ignored safely.
+
+`/api/health` includes `visual_preset` telemetry with the current preset, last
+command, apply count, unknown count, and age since the last applied preset. It
+also includes `cmd_queue.depth`, `cmd_queue.capacity`, and
+`cmd_queue.queue_full_count` for command-overflow verification.
+
+---
+## Structured Visual Authoring (`DL:` / `DT:` / `DH:`)
+
+These commands are intended for body sequence-editor generated visual steps.
+They provide typed visual intent for AstroPixelsPlus features that raw
+Marcduino `@` / `*` commands cannot express cleanly in a user-facing editor.
+
+All structured visual-authoring commands are visual-only:
+
+- no panel movement
+- no sound playback
+- no `DM:*` forwarding
+- no dome sequence ownership or `dome=seqon` / `dome=seqoff`
+
+Commands must be no more than 63 characters. Unknown or unsupported typed
+visual commands are logged and consumed safely; they do not fall through into
+legacy Marcduino handlers.
+
+### `DL:<target>:<mode>[:<color>[:<durationSec>]]`
+
+Applies a logic/PSI mode.
+
+Targets: `FLD`, `RLD`, `LOGIC`, `FPSI`, `RPSI`, `PSI`, `ALL`
+
+Modes: `NORMAL`, `ALARM`, `FAILURE`, `LEIA`, `MARCH`, `FLASHCOLOR`,
+`REDALERT`, `RAINBOW`, `LIGHTSOUT`
+
+Colors: `DEFAULT`, `RED`, `BLUE`, `GREEN`, `WHITE`, `YELLOW`, `ORANGE`,
+`PURPLE`. `WHITE` maps to the renderer default because ReelTwo logics do not
+have a dedicated white `ColorVal`.
+
+Examples:
+
+```text
+DL:LOGIC:MARCH:RED:47
+DL:PSI:ALARM:DEFAULT:10
+DL:FLD:NORMAL
+```
+
+### `DT:<target>:<color>:<durationSec>:<speed>:<encodedText>`
+
+Applies scroll-left logic text.
+
+Targets: `FLD`, `RLD`, `LOGIC`
+
+Text uses percent-encoding. Required escapes include newline `%0A`, percent
+`%25`, and colon `%3A`. Encoded text is capped at 40 characters; decoded text
+is capped at 32 characters with at most one newline.
+
+Examples:
+
+```text
+DT:FLD:DEFAULT:10:0:You're%0AWonderful
+DT:RLD:BLUE:8:0:General%20Kenobi
+```
+
+### `DH:<target>:<effect>[:<color>[:<durationOrCount>]]`
+
+Applies a holo projector effect.
+
+Targets: `F`, `R`, `T`, `A`
+
+Effects: `OFF`, `ON`, `RESET`, `RANDOM`, `WAG`, `NOD`, `PULSE`, `RAINBOW`,
+`FLASH`, `SHORTCIRCUIT`, `SOLID`
+
+Colors: `DEFAULT`, `RED`, `BLUE`, `GREEN`, `WHITE`, `YELLOW`, `ORANGE`,
+`PURPLE`, `RANDOM`
+
+Effect/color support is intentionally strict. Examples of supported forms:
+
+```text
+DH:A:FLASH:RED:10
+DH:A:FLASH:WHITE:10
+DH:F:RAINBOW
+DH:A:WAG:DEFAULT:5
+DH:A:RESET
+DH:F:SOLID:BLUE
+```
+
+Unsupported combinations, such as `RAINBOW:RED` or `SHORTCIRCUIT:BLUE`, are
+rejected and counted.
+
+`/api/health` includes `visual_authoring.logic`, `visual_authoring.text`, and
+`visual_authoring.holo` telemetry with last command, parsed fields, apply
+counts, reject counts, and age since the last applied command.
+
+---
 ## ReelTwo Command Structure Reference
 
 

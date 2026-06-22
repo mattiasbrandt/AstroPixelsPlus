@@ -181,6 +181,8 @@
 #include "core/Marcduino.h"
 
 #include <Preferences.h>
+#include "esp_system.h"
+extern "C" esp_err_t esp_core_dump_image_check(void) __attribute__((weak));
 
 ////////////////////////////////
 
@@ -486,6 +488,31 @@ AnimationPlayer player(servoSequencer);
 // the buffer; raw Serial.print() bypasses the buffer and won't reach the web UI.
 #include "LogCapture.h"
 static LogCapture logCapture(Serial);
+static esp_reset_reason_t sBootResetReason = ESP_RST_UNKNOWN;
+static bool sBootCoreDumpPresent = false;
+
+static const char *resetReasonName(esp_reset_reason_t reason)
+{
+    switch (reason)
+    {
+        case ESP_RST_POWERON:  return "POWERON";
+        case ESP_RST_EXT:      return "EXT";
+        case ESP_RST_SW:       return "SW";
+        case ESP_RST_PANIC:    return "PANIC";
+        case ESP_RST_INT_WDT:  return "INT_WDT";
+        case ESP_RST_TASK_WDT: return "TASK_WDT";
+        case ESP_RST_WDT:      return "WDT";
+        case ESP_RST_DEEPSLEEP:return "DEEPSLEEP";
+        case ESP_RST_BROWNOUT: return "BROWNOUT";
+        case ESP_RST_SDIO:     return "SDIO";
+        default:               return "UNKNOWN";
+    }
+}
+
+static bool coreDumpImagePresent()
+{
+    return esp_core_dump_image_check != nullptr && esp_core_dump_image_check() == ESP_OK;
+}
 
 #ifndef USE_I2C_ADDRESS
 static void panelConfigLoad()
@@ -799,6 +826,61 @@ bool numberparams(const char *cmd, uint8_t &argcount, int32_t *args, uint8_t max
     return true;
 }
 
+static bool handleImmediateServoMoveCommand(const char *source, const char *cmd)
+{
+    if (cmd == nullptr || strncmp(cmd, ":SM", 3) != 0)
+        return false;
+
+    int32_t args[5] = { 0, 0, 0, 0, 0 };
+    uint8_t argcount = 0;
+    const char *argstr = cmd + 3;
+    if (!numberparams(argstr, argcount, args, SizeOfArray(args)) || argcount < 2)
+    {
+        logCapture.printf("[CMD][%s][SM-invalid] %s\n", source ? source : "unknown", cmd);
+        return true;
+    }
+
+    if (args[0] < 0 || args[0] >= (int32_t)servoDispatch.getNumServos())
+    {
+        logCapture.printf("[CMD][%s][SM-bad-slot] %s\n", source ? source : "unknown", cmd);
+        return true;
+    }
+
+    uint16_t slot = (uint16_t)args[0];
+    uint32_t group = servoDispatch.getGroup(slot);
+    if (group != 0)
+        cancelPanelRelease(group);
+
+    if (argcount == 2)
+    {
+        logCapture.printf("[CMD][%s][SM-exec] slot=%u pos=%ld\n",
+                          source ? source : "unknown", slot, (long)args[1]);
+        servoDispatch.moveToPulse(slot, (uint16_t)args[1]);
+    }
+    else if (argcount == 3)
+    {
+        logCapture.printf("[CMD][%s][SM-exec] slot=%u move=%ld pos=%ld\n",
+                          source ? source : "unknown", slot, (long)args[1], (long)args[2]);
+        servoDispatch.moveToPulse(slot, (uint32_t)args[1], (uint16_t)args[2]);
+    }
+    else if (argcount == 4)
+    {
+        logCapture.printf("[CMD][%s][SM-exec] slot=%u delay=%ld move=%ld pos=%ld\n",
+                          source ? source : "unknown", slot, (long)args[1], (long)args[2], (long)args[3]);
+        servoDispatch.moveToPulse(slot, (uint32_t)args[1], (uint32_t)args[2], (uint16_t)args[3]);
+    }
+    else
+    {
+        logCapture.printf("[CMD][%s][SM-exec] slot=%u delay=%ld move=%ld start=%ld pos=%ld\n",
+                          source ? source : "unknown", slot, (long)args[1], (long)args[2],
+                          (long)args[3], (long)args[4]);
+        servoDispatch.moveToPulse(slot, (uint32_t)args[1], (uint32_t)args[2],
+                                  (uint16_t)args[3], (uint16_t)args[4]);
+    }
+
+    return true;
+}
+
 ////////////////////////////////
 
 #include "MarcduinoHolo.h"
@@ -848,6 +930,48 @@ static bool sSuppressBodyLinkEgress = false;
 static uint32_t sLastMoodResetMs = 0;
 static char sLastMoodResetCmd[6] = "";
 static char sCurrentMoodCmd[6] = "";
+static char sCurrentVisualPreset[24] = "";
+static char sLastVisualPresetCmd[32] = "";
+static uint32_t sVisualPresetApplyCount = 0;
+static uint32_t sVisualPresetUnknownCount = 0;
+static uint32_t sVisualPresetLastAppliedMs = 0;
+struct VisualAuthoringLogicTelemetry
+{
+    char lastCmd[64] = "";
+    char target[8] = "";
+    char mode[16] = "";
+    char color[10] = "";
+    uint8_t duration = 0;
+    uint32_t applyCount = 0;
+    uint32_t rejectCount = 0;
+    uint32_t lastAppliedMs = 0;
+};
+struct VisualAuthoringTextTelemetry
+{
+    char lastCmd[64] = "";
+    char target[8] = "";
+    char color[10] = "";
+    uint8_t duration = 0;
+    uint8_t speed = 0;
+    uint8_t decodedLength = 0;
+    uint32_t applyCount = 0;
+    uint32_t rejectCount = 0;
+    uint32_t lastAppliedMs = 0;
+};
+struct VisualAuthoringHoloTelemetry
+{
+    char lastCmd[64] = "";
+    char target[4] = "";
+    char effect[16] = "";
+    char color[10] = "";
+    uint8_t durationOrCount = 0;
+    uint32_t applyCount = 0;
+    uint32_t rejectCount = 0;
+    uint32_t lastAppliedMs = 0;
+};
+static VisualAuthoringLogicTelemetry sVisualAuthoringLogic;
+static VisualAuthoringTextTelemetry sVisualAuthoringText;
+static VisualAuthoringHoloTelemetry sVisualAuthoringHolo;
 #include "BodyLinkWiFi.h"
 #include "DomeSequences.h"
 bool dome_PiesOpen   = false;
@@ -1050,6 +1174,7 @@ static PendingMarcduinoCommand sMarcduinoQueue[8];
 static volatile uint8_t sMarcduinoQueueHead = 0;
 static volatile uint8_t sMarcduinoQueueTail = 0;
 static volatile uint8_t sMarcduinoQueueCount = 0;
+static uint32_t sMarcduinoQueueFullCount = 0;
 
 static bool enqueueMarcduinoCommand(const char *source, const char *cmd, bool suppressBodyLinkEgress)
 {
@@ -1070,7 +1195,10 @@ static bool enqueueMarcduinoCommand(const char *source, const char *cmd, bool su
     portEXIT_CRITICAL(&sMarcduinoQueueMux);
 
     if (!queued)
+    {
+        sMarcduinoQueueFullCount++;
         logCapture.printf("[CMD][%s][queue-full] %s\n", source ? source : "unknown", cmd);
+    }
     return queued;
 }
 
@@ -1099,6 +1227,7 @@ static void drainMarcduinoCommandQueue()
     bool suppressBodyLinkEgress = false;
     while (dequeueMarcduinoCommand(source, sizeof(source), cmd, sizeof(cmd), &suppressBodyLinkEgress))
     {
+        logCapture.printf("[CMD][%s][dispatch] %s\n", source, cmd);
         bool previousSuppressBodyLinkEgress = sSuppressBodyLinkEgress;
         if (suppressBodyLinkEgress)
             sSuppressBodyLinkEgress = true;
@@ -1238,6 +1367,12 @@ void scan_i2c()
 void setup()
 {
     REELTWO_READY();
+    sBootResetReason = esp_reset_reason();
+    sBootCoreDumpPresent = coreDumpImagePresent();
+    logCapture.printf("[Boot] reset_reason=%s (%d), coredump_present=%s\n",
+        resetReasonName(sBootResetReason),
+        (int)sBootResetReason,
+        sBootCoreDumpPresent ? "true" : "false");
 
     if (!preferences.begin("astro", false))
     {
@@ -1906,15 +2041,21 @@ static void processMarcduinoCommandWithSourceMain(const char *source, const char
     if (cmd == nullptr || cmd[0] == '\0') return;
     if (shouldBlockCommandDuringSleep(cmd))
     {
-        Serial.printf("[CMD][%s][sleep-blocked] %s\n", source, cmd);
+        logCapture.printf("[CMD][%s][sleep-blocked] %s\n", source, cmd);
         return;
     }
     if (shouldDropDuplicateMoodReset(cmd))
     {
-        Serial.printf("[CMD][%s][mood-duplicate-dropped] %s\n", source, cmd);
+        logCapture.printf("[CMD][%s][mood-duplicate-dropped] %s\n", source, cmd);
         return;
     }
-    Serial.printf("[CMD][%s] %s\n", source, cmd);
+    logCapture.printf("[CMD][%s] %s\n", source, cmd);
+    if (handleImmediateServoMoveCommand(source, cmd))
+        return;
+    if (applyDomeVisualPresetCommand(source, cmd))
+        return;
+    if (applyDomeVisualAuthoringCommand(source, cmd))
+        return;
     enqueueMarcduinoCommand(source, cmd, isBodyLinkSource(source));
 }
 

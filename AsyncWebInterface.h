@@ -227,6 +227,12 @@ static void processMarcduinoCommandWithSource(const char *source, const char *cm
         return;
     }
     logCapture.printf("[CMD][%s] %s\n", source, cmd);
+    if (handleImmediateServoMoveCommand(source, cmd))
+        return;
+    if (applyDomeVisualPresetCommand(source, cmd))
+        return;
+    if (applyDomeVisualAuthoringCommand(source, cmd))
+        return;
 
     // Panel calibration commands are handled here synchronously rather than
     // via MARCDUINO_ACTION. The reason: MARCDUINO_ACTION wraps the body in
@@ -946,7 +952,7 @@ static void scheduleReboot(uint32_t delayMs)
 static String buildHealthJson()
 {
     String json = "{";
-    json.reserve(768);
+    json.reserve(1024);
 
     // I2C device probes
     refreshI2CHealthCache();
@@ -990,10 +996,60 @@ static String buildHealthJson()
     // Free heap
     json += ",\"freeHeap\":" + String(ESP.getFreeHeap());
     json += ",\"uptime\":" + String(millis() / 1000);
+    json += ",\"reset_reason\":\"" + String(resetReasonName(sBootResetReason)) + "\"";
+    json += ",\"reset_reason_code\":" + String((int)sBootResetReason);
+    json += ",\"coredump_present\":" + String(sBootCoreDumpPresent ? "true" : "false");
+    json += ",\"visual_preset\":{";
+    json += "\"current\":\"" + jsonEscape(String(sCurrentVisualPreset)) + "\"";
+    json += ",\"last_cmd\":\"" + jsonEscape(String(sLastVisualPresetCmd)) + "\"";
+    json += ",\"apply_count\":" + String(sVisualPresetApplyCount);
+    json += ",\"unknown_count\":" + String(sVisualPresetUnknownCount);
+    json += ",\"last_applied_ms\":" + String(sVisualPresetLastAppliedMs);
+    json += ",\"age_ms\":" + String(sVisualPresetLastAppliedMs > 0 ? (uint32_t)(nowMs - sVisualPresetLastAppliedMs) : 0);
+    json += "}";
+
+    json += ",\"visual_authoring\":{";
+    json += "\"logic\":{";
+    json += "\"last_cmd\":\"" + jsonEscape(String(sVisualAuthoringLogic.lastCmd)) + "\"";
+    json += ",\"target\":\"" + jsonEscape(String(sVisualAuthoringLogic.target)) + "\"";
+    json += ",\"mode\":\"" + jsonEscape(String(sVisualAuthoringLogic.mode)) + "\"";
+    json += ",\"color\":\"" + jsonEscape(String(sVisualAuthoringLogic.color)) + "\"";
+    json += ",\"duration\":" + String(sVisualAuthoringLogic.duration);
+    json += ",\"apply_count\":" + String(sVisualAuthoringLogic.applyCount);
+    json += ",\"reject_count\":" + String(sVisualAuthoringLogic.rejectCount);
+    json += ",\"last_applied_ms\":" + String(sVisualAuthoringLogic.lastAppliedMs);
+    json += ",\"age_ms\":" + String(sVisualAuthoringLogic.lastAppliedMs > 0 ? (uint32_t)(nowMs - sVisualAuthoringLogic.lastAppliedMs) : 0);
+    json += "},\"text\":{";
+    json += "\"last_cmd\":\"" + jsonEscape(String(sVisualAuthoringText.lastCmd)) + "\"";
+    json += ",\"target\":\"" + jsonEscape(String(sVisualAuthoringText.target)) + "\"";
+    json += ",\"color\":\"" + jsonEscape(String(sVisualAuthoringText.color)) + "\"";
+    json += ",\"duration\":" + String(sVisualAuthoringText.duration);
+    json += ",\"speed\":" + String(sVisualAuthoringText.speed);
+    json += ",\"decoded_length\":" + String(sVisualAuthoringText.decodedLength);
+    json += ",\"apply_count\":" + String(sVisualAuthoringText.applyCount);
+    json += ",\"reject_count\":" + String(sVisualAuthoringText.rejectCount);
+    json += ",\"last_applied_ms\":" + String(sVisualAuthoringText.lastAppliedMs);
+    json += ",\"age_ms\":" + String(sVisualAuthoringText.lastAppliedMs > 0 ? (uint32_t)(nowMs - sVisualAuthoringText.lastAppliedMs) : 0);
+    json += "},\"holo\":{";
+    json += "\"last_cmd\":\"" + jsonEscape(String(sVisualAuthoringHolo.lastCmd)) + "\"";
+    json += ",\"target\":\"" + jsonEscape(String(sVisualAuthoringHolo.target)) + "\"";
+    json += ",\"effect\":\"" + jsonEscape(String(sVisualAuthoringHolo.effect)) + "\"";
+    json += ",\"color\":\"" + jsonEscape(String(sVisualAuthoringHolo.color)) + "\"";
+    json += ",\"duration_or_count\":" + String(sVisualAuthoringHolo.durationOrCount);
+    json += ",\"apply_count\":" + String(sVisualAuthoringHolo.applyCount);
+    json += ",\"reject_count\":" + String(sVisualAuthoringHolo.rejectCount);
+    json += ",\"last_applied_ms\":" + String(sVisualAuthoringHolo.lastAppliedMs);
+    json += ",\"age_ms\":" + String(sVisualAuthoringHolo.lastAppliedMs > 0 ? (uint32_t)(nowMs - sVisualAuthoringHolo.lastAppliedMs) : 0);
+    json += "}}";
 
     json += ",\"i2c_devices\":" + cachedI2CDevicesJson;
     json += ",\"min_free_heap\":" + String(sMinFreeHeap);
     json += ",\"i2c_probe_failures\":" + String(i2cProbeFailures);
+    json += ",\"cmd_queue\":{";
+    json += "\"depth\":" + String(sMarcduinoQueueCount);
+    json += ",\"capacity\":" + String(SizeOfArray(sMarcduinoQueue));
+    json += ",\"queue_full_count\":" + String(sMarcduinoQueueFullCount);
+    json += "}";
     // Body link status
     bool bodyLinkPrefEnabled = preferences.getBool("mbodylink", BODY_LINK_ENABLED);
     json += ",\"body_link\":{";

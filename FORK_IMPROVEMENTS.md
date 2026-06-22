@@ -566,6 +566,8 @@ Fixed a silent failure in `:MV`, `#SO`, `#SC`, `#SW` where the servo never moved
 
 **Limitation:** Commands sent over physical Serial2 (Marcduino serial path) still go through `Marcduino::processCommand()` directly and will hit the empty stubs — calibration is a web UI workflow and is not expected to be driven over serial.
 
+Follow-up: raw `:SM` servo move commands hit the same deferred `getCommand()` trap when arriving through queued web/body/serial ingress. Dome-owned sequences worked because they call `servoDispatch.moveToPulse(...)` directly and never parse a Marcduino suffix. `:SM` is now intercepted synchronously for all ingress paths before queueing, logs `[SM-exec]` with the parsed slot/timing/pulse, and cancels pending panel-release state for the target slot group before moving.
+
 ### Panel Naming Clarity & Dome Diagram (MK4 Remap)
 
 Resolved systematic mislabeling and incorrect servo-to-panel mapping for the **Mr. Baddeley MK4 Complex Dome** — the dominant dome design in 2026 builds.
@@ -780,6 +782,9 @@ Dispatch path: a `DM:*` handler sets `dome_pendingAnim` (an `AnimationStep`); `m
 
 Consequence: a direct panel command (`:OP01`) now **preempts** a running dome sequence (they share `player`) instead of being blocked behind it. `DM:LOW` open/close + a following `:OP01`/`:CL01` is hardware-verified to work without a reboot.
 
+#### Command logging
+All command ingress paths now write through `logCapture`, not raw `Serial.printf`, so the web console and `/api/logs` show commands received over USB serial, WiFi Marcduino, body-link UART/WiFi, WebSocket, and REST. The main-loop queue drain also logs `[CMD][source][dispatch] ...` immediately before `Marcduino::processCommand(...)`, making it visible when an accepted command actually reaches the Marcduino action layer.
+
 #### Command reference
 
 | Command | Effect |
@@ -966,6 +971,66 @@ PP5 was previously classified as `MINI_PANEL` (a body-panel type). It has been r
 All 17 `DM:*` dome sequences (`domeOpenClosePies`, `domeOpenCloseLow`, `domeOpenCloseAll`, `domeFlutter`, `domeBloom`, `domeScream`, `domeResetAll`, `domeCantina`, `domeRockMarch`, and others) were audited and updated to use identity-based slot constants (`D_P1`–`D_P13`, `D_PP1`–`D_PP6`) and to include PP3 and PP5 in sequences where the entire pie ring participates. On a standard MK4, PP3/PP5 slots are inactive no-ops; on a fully-wired dome, all 6 pie wedges will animate.
 
 Sequences that are pure logic/holo/sound with no panel movement (`domeHeart`, `domeAlarm`, `domeDisco`, `domeVader`, `domeLeiaMode`) were not changed.
+
+---
+
+## Boot Reset Telemetry (2026-06-17)
+
+The dome now captures `esp_reset_reason()` at the start of `setup()` and exposes it in both operator-visible telemetry paths:
+
+- `/api/health` includes `reset_reason`, `reset_reason_code`, and `coredump_present`.
+- The web/serial log ring records `[Boot] reset_reason=...` before heavier hardware initialization.
+
+This is intended for hardware fault isolation after a reboot, especially distinguishing brownout/load resets from watchdog or panic resets during panel and holo choreography tests. `coredump_present` is reported with a weak optional coredump check; it is `false` when the firmware/platform does not link ESP-IDF coredump support.
+
+---
+
+## Dome Visual Preset Command (`DV:`) (2026-06-18)
+
+The dome now accepts visual preset commands for body-owned sequences:
+
+```text
+DV:<NAME>
+```
+
+This gives the body controller a simple way to ask the dome for the same named light show that a dome-native sequence would use, without handing over panel or audio control. For example, `DV:ROCKMARCH` applies the red MARCH logic/PSI/holo look used by the dome's native Imperial March sequences.
+
+Operator-facing behavior:
+
+- Affects only dome visuals: front/rear logics, PSI, and holo LEDs.
+- Does not move panels.
+- Does not play sounds.
+- Does not start a full `DM:*` dome sequence.
+- Unknown preset names are logged and safely ignored.
+
+Initial presets:
+
+| Command | Visual preset source |
+|---|---|
+| `DV:ROCKMARCH` | Native Rock March / Vader red MARCH visuals |
+| `DV:VADER` | Native Vader red MARCH visuals |
+| `DV:ALARM` | Native Alarm visuals |
+| `DV:LEIA` | Native Leia visuals |
+| `DV:HEART` | Native Heart visuals |
+| `DV:CANTINA` | Native Cantina visuals |
+| `DV:SCREAM` | Native Scream visual-only portion |
+| `DV:OVERLOAD` | Native Overload visual-only portion |
+| `DV:HELLO` | Native Hello visual-only portion |
+| `DV:RESET_VISUALS` | Reset holos/logics/PSI to normal/default loop |
+
+`/api/health` now reports the last/current visual preset and command queue pressure. This helps sequence testing confirm what the dome applied without making the operator visually compare every detail by memory.
+
+### Structured Visual Authoring Commands (`DL:` / `DT:` / `DH:`) (2026-06-21)
+
+Added typed visual commands for the body sequence editor so operators can create custom light, text, and holo steps without typing raw Marcduino command strings:
+
+- `DL:` sets logic/PSI modes with target, mode, color, and optional duration.
+- `DT:` displays short FLD/RLD text, including one encoded newline for two-line messages.
+- `DH:` applies holo effects such as flash, rainbow, wag, nod, solid color, and reset.
+
+These commands are visual-only: they do not move panels, play audio, forward `DM:*`, or start dome-owned sequence state. Invalid combinations are logged and ignored safely. `/api/health` reports the last applied logic/text/holo authoring command plus apply/reject counters, giving the body/editor a machine-readable way to confirm what the dome accepted.
+
+Hardware verification: a body-authored test sequence successfully drove red MARCH logics, a two-line FLD text message, and red holo flashes over the normal body-to-dome link, then restored normal visuals with `DV:RESET_VISUALS`. The dome stayed healthy with no command queue overflow or rejected visual commands.
 
 ---
 

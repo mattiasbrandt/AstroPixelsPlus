@@ -194,6 +194,539 @@ static void domeResetPSIs()
     rearPSI.selectSequence(LogicEngineRenderer::NORMAL);
 }
 
+static void domeMarkVisualPreset(const char *cmd, const char *name)
+{
+    strlcpy(sLastVisualPresetCmd, cmd ? cmd : "", sizeof(sLastVisualPresetCmd));
+    strlcpy(sCurrentVisualPreset, name ? name : "", sizeof(sCurrentVisualPreset));
+    sVisualPresetApplyCount++;
+    sVisualPresetLastAppliedMs = millis();
+}
+
+static void domeApplyMarchVisuals()
+{
+    CommandEvent::process(F("HPA0021|47")); // all holos red flashes
+    FLD.selectSequence(LogicEngineRenderer::MARCH, FLD.kRed, 0, 47);
+    RLD.selectSequence(LogicEngineRenderer::MARCH, RLD.kRed, 0, 47);
+    frontPSI.selectSequence(LogicEngineRenderer::MARCH, frontPSI.kDefault, 0, 47);
+    rearPSI.selectSequence(LogicEngineRenderer::MARCH, rearPSI.kDefault, 0, 47);
+}
+
+static void domeApplyAlarmVisuals()
+{
+    CommandEvent::process(F("HPA0021|10")); // all holos red flashes
+    FLD.selectSequence(LogicEngineRenderer::ALARM, FLD.kDefault, 0, 10);
+    RLD.selectSequence(LogicEngineRenderer::ALARM, RLD.kDefault, 0, 10);
+    frontPSI.selectSequence(LogicEngineRenderer::ALARM, frontPSI.kDefault, 0, 10);
+    rearPSI.selectSequence(LogicEngineRenderer::ALARM, rearPSI.kDefault, 0, 10);
+}
+
+static void domeApplyLeiaVisuals()
+{
+    CommandEvent::process(F("HPS101|36")); // front holo leia sequence
+    CommandEvent::process(F("HPR02|36"));  // rear holo off
+    CommandEvent::process(F("HPT02|36"));  // top holo off
+    FLD.selectSequence(LogicEngineRenderer::LEIA, FLD.kDefault, 0, 36);
+    RLD.selectSequence(LogicEngineRenderer::LEIA, RLD.kDefault, 0, 36);
+    frontPSI.selectSequence(LogicEngineRenderer::LEIA, frontPSI.kDefault, 0, 36);
+    rearPSI.selectSequence(LogicEngineRenderer::LEIA, rearPSI.kDefault, 0, 36);
+}
+
+static void domeApplyHeartVisuals()
+{
+    CommandEvent::process(F("HPF006|10"));
+    CommandEvent::process(F("HPR006|10"));
+    CommandEvent::process(F("HPT006|10"));
+    FLD.selectScrollTextLeft("You're\nWonderful", FLD.kDefault, 0, 10);
+    frontPSI.selectSequence(LogicEngineRenderer::FLASHCOLOR, frontPSI.kDefault, 0, 10);
+}
+
+static void domeApplyCantinaVisuals()
+{
+    CommandEvent::process(F("HPA0029|15")); // all holos white flashes
+    FLD.selectSequence(LogicEngineRenderer::FLASHCOLOR, FLD.kBlue, 0, 15);
+    RLD.selectSequence(LogicEngineRenderer::FLASHCOLOR, RLD.kBlue, 0, 15);
+    frontPSI.selectSequence(LogicEngineRenderer::FLASHCOLOR, frontPSI.kDefault, 0, 15);
+    rearPSI.selectSequence(LogicEngineRenderer::FLASHCOLOR, rearPSI.kDefault, 0, 15);
+}
+
+static void domeApplyScreamVisuals()
+{
+    CommandEvent::process(F("HPA0070"));  // all holos short circuit random color
+    CommandEvent::process(F("HPA105|5")); // all holos wag 5 times
+    FLD.selectSequence(LogicEngineRenderer::REDALERT, FLD.kDefault, 0, 15);
+    RLD.selectSequence(LogicEngineRenderer::REDALERT, RLD.kDefault, 0, 15);
+    frontPSI.selectSequence(LogicEngineRenderer::REDALERT, frontPSI.kDefault, 0, 15);
+    rearPSI.selectSequence(LogicEngineRenderer::REDALERT, rearPSI.kDefault, 0, 15);
+}
+
+static void domeApplyOverloadVisuals()
+{
+    FLD.selectSequence(LogicEngineRenderer::FAILURE);
+    RLD.selectSequence(LogicEngineRenderer::FAILURE);
+    CommandEvent::process(F("HPA0070")); // all holos short circuit random color
+    frontPSI.selectSequence(LogicEngineRenderer::FAILURE, frontPSI.kDefault, 0, 12);
+    rearPSI.selectSequence(LogicEngineRenderer::FAILURE, rearPSI.kDefault, 0, 12);
+}
+
+static void domeApplyHelloVisuals()
+{
+    FLD.selectScrollTextLeft("Hello\nThere", FLD.kDefault, 0, 10);
+    RLD.selectScrollTextLeft("General Kenobi", RLD.randomColor());
+}
+
+static void domeApplyResetVisuals()
+{
+    domeResetHolos();
+    domeResetLogics();
+    domeResetPSIs();
+    sCurrentVisualPreset[0] = '\0';
+}
+
+static bool applyDomeVisualPresetCommand(const char *source, const char *cmd)
+{
+    if (cmd == nullptr || strncmp(cmd, "DV:", 3) != 0)
+        return false;
+
+    const char *name = cmd + 3;
+    logCapture.printf("[CMD][%s][dispatch] %s\n", source ? source : "unknown", cmd);
+
+    if (strcmp(name, "ROCKMARCH") == 0 || strcmp(name, "VADER") == 0)
+    {
+        domeApplyMarchVisuals();
+        domeMarkVisualPreset(cmd, name);
+    }
+    else if (strcmp(name, "ALARM") == 0)
+    {
+        domeApplyAlarmVisuals();
+        domeMarkVisualPreset(cmd, name);
+    }
+    else if (strcmp(name, "LEIA") == 0)
+    {
+        domeApplyLeiaVisuals();
+        domeMarkVisualPreset(cmd, name);
+    }
+    else if (strcmp(name, "HEART") == 0)
+    {
+        domeApplyHeartVisuals();
+        domeMarkVisualPreset(cmd, name);
+    }
+    else if (strcmp(name, "CANTINA") == 0)
+    {
+        domeApplyCantinaVisuals();
+        domeMarkVisualPreset(cmd, name);
+    }
+    else if (strcmp(name, "SCREAM") == 0)
+    {
+        domeApplyScreamVisuals();
+        domeMarkVisualPreset(cmd, name);
+    }
+    else if (strcmp(name, "OVERLOAD") == 0)
+    {
+        domeApplyOverloadVisuals();
+        domeMarkVisualPreset(cmd, name);
+    }
+    else if (strcmp(name, "HELLO") == 0)
+    {
+        domeApplyHelloVisuals();
+        domeMarkVisualPreset(cmd, name);
+    }
+    else if (strcmp(name, "RESET_VISUALS") == 0)
+    {
+        domeApplyResetVisuals();
+        domeMarkVisualPreset(cmd, name);
+    }
+    else
+    {
+        sVisualPresetUnknownCount++;
+        strlcpy(sLastVisualPresetCmd, cmd, sizeof(sLastVisualPresetCmd));
+        logCapture.printf("[DV][unknown] %s\n", name);
+        return true;
+    }
+
+    logCapture.printf("[DV] applied %s\n", name);
+    return true;
+}
+
+static uint8_t splitVisualFields(char *buf, char *fields[], uint8_t maxFields)
+{
+    if (buf == nullptr || fields == nullptr || maxFields == 0) return 0;
+    uint8_t count = 0;
+    fields[count++] = buf;
+    for (char *p = buf; *p != '\0'; ++p)
+    {
+        if (*p == ':')
+        {
+            *p = '\0';
+            if (count >= maxFields) return 0;
+            fields[count++] = p + 1;
+        }
+    }
+    return count;
+}
+
+static bool isVisualEnumToken(const char *token)
+{
+    if (token == nullptr || token[0] == '\0') return false;
+    for (const char *p = token; *p != '\0'; ++p)
+    {
+        if ((*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9') || *p == '_') continue;
+        return false;
+    }
+    return true;
+}
+
+static bool parseVisualByte(const char *token, uint8_t maxValue, uint8_t &out)
+{
+    if (token == nullptr || token[0] == '\0') return false;
+    uint16_t value = 0;
+    for (const char *p = token; *p != '\0'; ++p)
+    {
+        if (*p < '0' || *p > '9') return false;
+        value = uint16_t(value * 10 + (*p - '0'));
+        if (value > maxValue) return false;
+    }
+    out = uint8_t(value);
+    return true;
+}
+
+static bool parseVisualLogicColor(const char *token, LogicEngineRenderer::ColorVal &out)
+{
+    if (token == nullptr || token[0] == '\0' || strcmp(token, "DEFAULT") == 0) { out = LogicEngineRenderer::kDefault; return true; }
+    if (strcmp(token, "RED") == 0)    { out = LogicEngineRenderer::kRed; return true; }
+    if (strcmp(token, "BLUE") == 0)   { out = LogicEngineRenderer::kBlue; return true; }
+    if (strcmp(token, "GREEN") == 0)  { out = LogicEngineRenderer::kGreen; return true; }
+    if (strcmp(token, "YELLOW") == 0) { out = LogicEngineRenderer::kYellow; return true; }
+    if (strcmp(token, "ORANGE") == 0) { out = LogicEngineRenderer::kOrange; return true; }
+    if (strcmp(token, "PURPLE") == 0) { out = LogicEngineRenderer::kPurple; return true; }
+    if (strcmp(token, "WHITE") == 0)  { out = LogicEngineRenderer::kDefault; return true; } // ReelTwo logics have no white ColorVal.
+    return false;
+}
+
+static bool parseVisualLogicMode(const char *token, uint8_t &out)
+{
+    if (strcmp(token, "NORMAL") == 0)     { out = LogicEngineRenderer::NORMAL; return true; }
+    if (strcmp(token, "ALARM") == 0)      { out = LogicEngineRenderer::ALARM; return true; }
+    if (strcmp(token, "FAILURE") == 0)    { out = LogicEngineRenderer::FAILURE; return true; }
+    if (strcmp(token, "LEIA") == 0)       { out = LogicEngineRenderer::LEIA; return true; }
+    if (strcmp(token, "MARCH") == 0)      { out = LogicEngineRenderer::MARCH; return true; }
+    if (strcmp(token, "FLASHCOLOR") == 0) { out = LogicEngineRenderer::FLASHCOLOR; return true; }
+    if (strcmp(token, "REDALERT") == 0)   { out = LogicEngineRenderer::REDALERT; return true; }
+    if (strcmp(token, "RAINBOW") == 0)    { out = LogicEngineRenderer::RAINBOW; return true; }
+    if (strcmp(token, "LIGHTSOUT") == 0)  { out = LogicEngineRenderer::LIGHTSOUT; return true; }
+    return false;
+}
+
+static void selectVisualLogicTarget(const char *target, uint8_t mode, LogicEngineRenderer::ColorVal color, uint8_t duration)
+{
+    if (strcmp(target, "FLD") == 0 || strcmp(target, "LOGIC") == 0 || strcmp(target, "ALL") == 0)
+        FLD.selectSequence(mode, color, 0, duration);
+    if (strcmp(target, "RLD") == 0 || strcmp(target, "LOGIC") == 0 || strcmp(target, "ALL") == 0)
+        RLD.selectSequence(mode, color, 0, duration);
+    if (strcmp(target, "FPSI") == 0 || strcmp(target, "PSI") == 0 || strcmp(target, "ALL") == 0)
+        frontPSI.selectSequence(mode, color, 0, duration);
+    if (strcmp(target, "RPSI") == 0 || strcmp(target, "PSI") == 0 || strcmp(target, "ALL") == 0)
+        rearPSI.selectSequence(mode, color, 0, duration);
+}
+
+static bool validVisualLogicTarget(const char *target)
+{
+    return strcmp(target, "FLD") == 0 || strcmp(target, "RLD") == 0 || strcmp(target, "LOGIC") == 0 ||
+           strcmp(target, "FPSI") == 0 || strcmp(target, "RPSI") == 0 || strcmp(target, "PSI") == 0 ||
+           strcmp(target, "ALL") == 0;
+}
+
+static void rejectVisualAuthoringCommand(const char *family, const char *cmd, const char *reason)
+{
+    if (strcmp(family, "DL") == 0) sVisualAuthoringLogic.rejectCount++;
+    else if (strcmp(family, "DT") == 0) sVisualAuthoringText.rejectCount++;
+    else if (strcmp(family, "DH") == 0) sVisualAuthoringHolo.rejectCount++;
+    logCapture.printf("[%s][reject] %s cmd=%s\n", family, reason ? reason : "invalid", cmd ? cmd : "");
+}
+
+static bool applyVisualLogicCommand(const char *cmd)
+{
+    char buf[64];
+    strlcpy(buf, cmd, sizeof(buf));
+    char *fields[6] = {};
+    uint8_t count = splitVisualFields(buf, fields, SizeOfArray(fields));
+    if (count < 3 || count > 5) { rejectVisualAuthoringCommand("DL", cmd, "field-count"); return true; }
+    const char *target = fields[1];
+    const char *modeName = fields[2];
+    const char *colorName = (count >= 4 && fields[3][0] != '\0') ? fields[3] : "DEFAULT";
+    if (!isVisualEnumToken(target) || !isVisualEnumToken(modeName) || !isVisualEnumToken(colorName))
+    {
+        rejectVisualAuthoringCommand("DL", cmd, "bad-enum-token");
+        return true;
+    }
+    if (!validVisualLogicTarget(target)) { rejectVisualAuthoringCommand("DL", cmd, "bad-target"); return true; }
+    uint8_t mode = 0;
+    if (!parseVisualLogicMode(modeName, mode)) { rejectVisualAuthoringCommand("DL", cmd, "bad-mode"); return true; }
+    LogicEngineRenderer::ColorVal color;
+    if (!parseVisualLogicColor(colorName, color)) { rejectVisualAuthoringCommand("DL", cmd, "bad-color"); return true; }
+    uint8_t duration = 0;
+    if (count == 5 && !parseVisualByte(fields[4], 99, duration)) { rejectVisualAuthoringCommand("DL", cmd, "bad-duration"); return true; }
+
+    selectVisualLogicTarget(target, mode, color, duration);
+    strlcpy(sVisualAuthoringLogic.lastCmd, cmd, sizeof(sVisualAuthoringLogic.lastCmd));
+    strlcpy(sVisualAuthoringLogic.target, target, sizeof(sVisualAuthoringLogic.target));
+    strlcpy(sVisualAuthoringLogic.mode, modeName, sizeof(sVisualAuthoringLogic.mode));
+    strlcpy(sVisualAuthoringLogic.color, colorName, sizeof(sVisualAuthoringLogic.color));
+    sVisualAuthoringLogic.duration = duration;
+    sVisualAuthoringLogic.applyCount++;
+    sVisualAuthoringLogic.lastAppliedMs = millis();
+    logCapture.printf("[DL] applied target=%s mode=%s color=%s duration=%u\n", target, modeName, colorName, duration);
+    return true;
+}
+
+static int8_t hexValue(char c)
+{
+    if (c >= '0' && c <= '9') return int8_t(c - '0');
+    if (c >= 'A' && c <= 'F') return int8_t(c - 'A' + 10);
+    if (c >= 'a' && c <= 'f') return int8_t(c - 'a' + 10);
+    return -1;
+}
+
+static bool decodeVisualText(const char *encoded, char *decoded, size_t decodedSize, uint8_t &decodedLen)
+{
+    if (encoded == nullptr || decoded == nullptr || decodedSize == 0) return false;
+    if (strlen(encoded) == 0 || strlen(encoded) > 40) return false;
+    size_t out = 0;
+    uint8_t newlineCount = 0;
+    for (size_t i = 0; encoded[i] != '\0'; ++i)
+    {
+        unsigned char c = encoded[i];
+        if (c == '%')
+        {
+            int8_t hi = hexValue(encoded[i + 1]);
+            int8_t lo = hexValue(encoded[i + 2]);
+            if (hi < 0 || lo < 0) return false;
+            c = uint8_t((hi << 4) | lo);
+            i += 2;
+        }
+        if (c == '\r' || c == '\0') return false;
+        if (c == '\n')
+        {
+            newlineCount++;
+            if (newlineCount > 1) return false;
+        }
+        else if (c < 0x20 || c > 0x7E)
+        {
+            return false;
+        }
+        if (out + 1 >= decodedSize || out >= 32) return false;
+        decoded[out++] = char(c);
+    }
+    if (out == 0) return false;
+    decoded[out] = '\0';
+    decodedLen = uint8_t(out);
+    return true;
+}
+
+static bool validVisualTextTarget(const char *target)
+{
+    return strcmp(target, "FLD") == 0 || strcmp(target, "RLD") == 0 || strcmp(target, "LOGIC") == 0;
+}
+
+static void selectVisualTextTarget(const char *target, const char *text, LogicEngineRenderer::ColorVal color, uint8_t speed, uint8_t duration)
+{
+    if (strcmp(target, "FLD") == 0 || strcmp(target, "LOGIC") == 0)
+        FLD.selectScrollTextLeft(text, color, speed, duration);
+    if (strcmp(target, "RLD") == 0 || strcmp(target, "LOGIC") == 0)
+        RLD.selectScrollTextLeft(text, color, speed, duration);
+}
+
+static bool applyVisualTextCommand(const char *cmd)
+{
+    char buf[64];
+    strlcpy(buf, cmd, sizeof(buf));
+    char *fields[6] = {};
+    uint8_t count = splitVisualFields(buf, fields, SizeOfArray(fields));
+    if (count != 6) { rejectVisualAuthoringCommand("DT", cmd, "field-count"); return true; }
+    const char *target = fields[1];
+    const char *colorName = fields[2];
+    if (!isVisualEnumToken(target) || !isVisualEnumToken(colorName))
+    {
+        rejectVisualAuthoringCommand("DT", cmd, "bad-enum-token");
+        return true;
+    }
+    if (!validVisualTextTarget(target)) { rejectVisualAuthoringCommand("DT", cmd, "bad-target"); return true; }
+    LogicEngineRenderer::ColorVal color;
+    if (!parseVisualLogicColor(colorName, color)) { rejectVisualAuthoringCommand("DT", cmd, "bad-color"); return true; }
+    uint8_t duration = 0;
+    uint8_t speed = 0;
+    if (!parseVisualByte(fields[3], 99, duration)) { rejectVisualAuthoringCommand("DT", cmd, "bad-duration"); return true; }
+    if (!parseVisualByte(fields[4], 9, speed)) { rejectVisualAuthoringCommand("DT", cmd, "bad-speed"); return true; }
+    char decoded[33];
+    uint8_t decodedLen = 0;
+    if (!decodeVisualText(fields[5], decoded, sizeof(decoded), decodedLen)) { rejectVisualAuthoringCommand("DT", cmd, "bad-text"); return true; }
+
+    selectVisualTextTarget(target, decoded, color, speed, duration);
+    strlcpy(sVisualAuthoringText.lastCmd, cmd, sizeof(sVisualAuthoringText.lastCmd));
+    strlcpy(sVisualAuthoringText.target, target, sizeof(sVisualAuthoringText.target));
+    strlcpy(sVisualAuthoringText.color, colorName, sizeof(sVisualAuthoringText.color));
+    sVisualAuthoringText.duration = duration;
+    sVisualAuthoringText.speed = speed;
+    sVisualAuthoringText.decodedLength = decodedLen;
+    sVisualAuthoringText.applyCount++;
+    sVisualAuthoringText.lastAppliedMs = millis();
+    logCapture.printf("[DT] applied target=%s color=%s duration=%u speed=%u len=%u\n", target, colorName, duration, speed, decodedLen);
+    return true;
+}
+
+static bool parseVisualHoloTarget(const char *target, char &code, uint8_t &projector)
+{
+    if (strcmp(target, "A") == 0) { code = 'A'; projector = 0; return true; }
+    if (strcmp(target, "F") == 0) { code = 'F'; projector = 1; return true; }
+    if (strcmp(target, "R") == 0) { code = 'R'; projector = 2; return true; }
+    if (strcmp(target, "T") == 0) { code = 'T'; projector = 3; return true; }
+    return false;
+}
+
+static bool parseVisualHoloColor(const char *token, uint8_t &colorIndex, bool &isRandom)
+{
+    isRandom = false;
+    if (token == nullptr || token[0] == '\0' || strcmp(token, "DEFAULT") == 0) { colorIndex = 0; return true; }
+    if (strcmp(token, "RANDOM") == 0) { colorIndex = 0; isRandom = true; return true; }
+    if (strcmp(token, "RED") == 0)    { colorIndex = 1; return true; }
+    if (strcmp(token, "ORANGE") == 0) { colorIndex = 2; return true; }
+    if (strcmp(token, "YELLOW") == 0) { colorIndex = 7; return true; }
+    if (strcmp(token, "GREEN") == 0)  { colorIndex = 3; return true; }
+    if (strcmp(token, "BLUE") == 0)   { colorIndex = 5; return true; }
+    if (strcmp(token, "PURPLE") == 0) { colorIndex = 6; return true; }
+    if (strcmp(token, "WHITE") == 0)  { colorIndex = 9; return true; }
+    return false;
+}
+
+static void processVisualHoloCommand(char targetCode, const char *verb, uint8_t value = 0, bool withPipe = false)
+{
+    char out[18];
+    if (withPipe) snprintf(out, sizeof(out), "HP%c%s|%u", targetCode, verb, value);
+    else if (value > 0) snprintf(out, sizeof(out), "HP%c%s%u", targetCode, verb, value);
+    else snprintf(out, sizeof(out), "HP%c%s", targetCode, verb);
+    CommandEvent::process(out);
+}
+
+static bool applyVisualHoloEffect(char targetCode, uint8_t projector, const char *effect, const char *colorName, uint8_t colorIndex, bool randomColor, uint8_t durationOrCount)
+{
+    if (strcmp(effect, "RESET") == 0)
+    {
+        if (strcmp(colorName, "DEFAULT") != 0 || durationOrCount != 0) return false;
+        if (targetCode == 'A') CommandEvent::process(F("HPS9"));
+        else processVisualHoloCommand(targetCode, "0972");
+        return true;
+    }
+    if (strcmp(effect, "OFF") == 0)
+    {
+        if (strcmp(colorName, "DEFAULT") != 0 || durationOrCount != 0) return false;
+        processVisualHoloCommand(targetCode, "096");
+        return true;
+    }
+    if (strcmp(effect, "ON") == 0 || strcmp(effect, "SOLID") == 0)
+    {
+        if (randomColor) { processVisualHoloCommand(targetCode, "005"); return true; }
+        if (colorIndex == 0) { processVisualHoloCommand(targetCode, "005"); return true; }
+        sendHoloLedSetColor(projector, colorIndex);
+        return true;
+    }
+    if (strcmp(effect, "RANDOM") == 0)
+    {
+        if (strcmp(colorName, "DEFAULT") != 0 || durationOrCount != 0) return false;
+        processVisualHoloCommand(targetCode, "104");
+        return true;
+    }
+    if (strcmp(effect, "WAG") == 0 || strcmp(effect, "NOD") == 0)
+    {
+        if (strcmp(colorName, "DEFAULT") != 0) return false;
+        uint8_t count = durationOrCount == 0 ? 5 : durationOrCount;
+        processVisualHoloCommand(targetCode, strcmp(effect, "WAG") == 0 ? "105" : "106", count, true);
+        return true;
+    }
+    if (strcmp(effect, "PULSE") == 0)
+    {
+        if (!(randomColor || strcmp(colorName, "DEFAULT") == 0)) return false;
+        processVisualHoloCommand(targetCode, "0030");
+        return true;
+    }
+    if (strcmp(effect, "RAINBOW") == 0)
+    {
+        if (strcmp(colorName, "DEFAULT") != 0 || durationOrCount != 0) return false;
+        processVisualHoloCommand(targetCode, "006");
+        return true;
+    }
+    if (strcmp(effect, "FLASH") == 0)
+    {
+        uint8_t duration = durationOrCount == 0 ? 5 : durationOrCount;
+        if (strcmp(colorName, "RED") == 0) { processVisualHoloCommand(targetCode, "0021", duration, true); return true; }
+        if (strcmp(colorName, "WHITE") == 0 || strcmp(colorName, "DEFAULT") == 0) { processVisualHoloCommand(targetCode, "0029", duration, true); return true; }
+        return false;
+    }
+    if (strcmp(effect, "SHORTCIRCUIT") == 0)
+    {
+        if (!(randomColor || strcmp(colorName, "DEFAULT") == 0) || durationOrCount != 0) return false;
+        processVisualHoloCommand(targetCode, "0070");
+        return true;
+    }
+    return false;
+}
+
+static bool applyVisualHoloCommand(const char *cmd)
+{
+    char buf[64];
+    strlcpy(buf, cmd, sizeof(buf));
+    char *fields[6] = {};
+    uint8_t count = splitVisualFields(buf, fields, SizeOfArray(fields));
+    if (count < 3 || count > 5) { rejectVisualAuthoringCommand("DH", cmd, "field-count"); return true; }
+    const char *target = fields[1];
+    const char *effect = fields[2];
+    const char *colorName = (count >= 4 && fields[3][0] != '\0') ? fields[3] : "DEFAULT";
+    if (!isVisualEnumToken(target) || !isVisualEnumToken(effect) || !isVisualEnumToken(colorName))
+    {
+        rejectVisualAuthoringCommand("DH", cmd, "bad-enum-token");
+        return true;
+    }
+    char targetCode = 'A';
+    uint8_t projector = 0;
+    if (!parseVisualHoloTarget(target, targetCode, projector)) { rejectVisualAuthoringCommand("DH", cmd, "bad-target"); return true; }
+    uint8_t colorIndex = 0;
+    bool randomColor = false;
+    if (!parseVisualHoloColor(colorName, colorIndex, randomColor)) { rejectVisualAuthoringCommand("DH", cmd, "bad-color"); return true; }
+    uint8_t durationOrCount = 0;
+    if (count == 5 && !parseVisualByte(fields[4], 99, durationOrCount)) { rejectVisualAuthoringCommand("DH", cmd, "bad-duration-count"); return true; }
+    if (!applyVisualHoloEffect(targetCode, projector, effect, colorName, colorIndex, randomColor, durationOrCount))
+    {
+        rejectVisualAuthoringCommand("DH", cmd, "unsupported-combination");
+        return true;
+    }
+
+    strlcpy(sVisualAuthoringHolo.lastCmd, cmd, sizeof(sVisualAuthoringHolo.lastCmd));
+    strlcpy(sVisualAuthoringHolo.target, target, sizeof(sVisualAuthoringHolo.target));
+    strlcpy(sVisualAuthoringHolo.effect, effect, sizeof(sVisualAuthoringHolo.effect));
+    strlcpy(sVisualAuthoringHolo.color, colorName, sizeof(sVisualAuthoringHolo.color));
+    sVisualAuthoringHolo.durationOrCount = durationOrCount;
+    sVisualAuthoringHolo.applyCount++;
+    sVisualAuthoringHolo.lastAppliedMs = millis();
+    logCapture.printf("[DH] applied target=%s effect=%s color=%s duration_or_count=%u\n", target, effect, colorName, durationOrCount);
+    return true;
+}
+
+static bool applyDomeVisualAuthoringCommand(const char *source, const char *cmd)
+{
+    (void)source;
+    if (cmd == nullptr) return false;
+    size_t len = strlen(cmd);
+    if (len > 63)
+    {
+        if (strncmp(cmd, "DL:", 3) == 0) { rejectVisualAuthoringCommand("DL", cmd, "too-long"); return true; }
+        if (strncmp(cmd, "DT:", 3) == 0) { rejectVisualAuthoringCommand("DT", cmd, "too-long"); return true; }
+        if (strncmp(cmd, "DH:", 3) == 0) { rejectVisualAuthoringCommand("DH", cmd, "too-long"); return true; }
+        return false;
+    }
+    if (strncmp(cmd, "DL:", 3) == 0) return applyVisualLogicCommand(cmd);
+    if (strncmp(cmd, "DT:", 3) == 0) return applyVisualTextCommand(cmd);
+    if (strncmp(cmd, "DH:", 3) == 0) return applyVisualHoloCommand(cmd);
+    return false;
+}
+
 static void domeResetBody()
 {
     domeSendToBody("RESET");
