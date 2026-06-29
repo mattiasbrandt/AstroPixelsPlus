@@ -63,7 +63,9 @@ sequence editor around the same boundary.
 - Fetching `/api/dome/layout` when connected and rendering the sequence/editor
   picker from `elements[]`.
 - Keeping the vendored MK4 model as an offline/fallback visual model only.
-- Caching by `template_id`, `template_revision`, and `schema_revision`.
+- Caching geometry/layout by `template_id`, `template_revision`, and
+  `schema_revision`; runtime availability from cache is stale/unverified unless
+  refreshed by a live layout fetch.
 - Treating unsupported schemas, unreachable domes, and unknown runtime state
   conservatively.
 - The coordinator command map: translating canonical element IDs plus generic
@@ -71,8 +73,11 @@ sequence editor around the same boundary.
 - Sequence editor behavior for inactive, disabled, or `in_layout:false` targets:
   visible diagnostics, non-actionable controls, load/edit/save resilience, and
   run-time skip/block policy.
-- Persisting saved sequence steps by canonical element ID and generic
-  capability, not aliases, labels, raw commands, slots, or channels.
+- Preserving the accepted protoArtoo learned-sequence storage posture for v1:
+  saved sequence steps remain command-string based unless a separate body ADR
+  deliberately supersedes that decision.
+- Proxying the dome layout as a thin byte relay for browser/editor consumers;
+  body firmware does not parse or recompose the full layout JSON.
 
 ### Shared contract boundary
 
@@ -213,6 +218,11 @@ element status separately to determine what to render and what is usable. The
 dome firmware composes template data, live wiring/runtime state, and persisted
 element status into the layout response.
 
+protoArtoo consumes element status through the composed `/api/dome/layout`
+response in v1. It should not make a separate `/api/dome/element-status` fetch
+for editor rendering; that endpoint is dome-owned for local operator status
+editing and for the dome's own composition path.
+
 Template/layout editing is distinct from operator status editing. V1 includes
 runtime editing for element status (`disabled` / `disabled_reason`) because that
 is local operational state. Editing geometry, labels, label anchors, callouts, or
@@ -250,7 +260,8 @@ space:
   "template_revision": 1,
   "schema_revision": 1,
   "source": "AstroPixelsPlus",
-  "coordinate_space": { "viewBox": "0 0 400 400" },
+  "coordinate_space": { "viewBox": "0 0 480 480" },
+  "runtime_state_ts": "2026-06-30T12:00:00Z",
   "elements": [
     {
       "id": "PP3",
@@ -276,7 +287,7 @@ space:
       "aliases": ["FHP"],
       "render_order": 220,
       "commandable": true,
-      "capabilities": ["light", "horizontal_servo", "vertical_servo"],
+      "capabilities": ["light", "aim", "center", "test"],
       "geometry": {
         "type": "svg_path",
         "d": "..."
@@ -295,11 +306,12 @@ space:
         "connector_to": { "x": 301.2, "y": 62.2 }
       },
       "commandable": true,
-      "capabilities": ["psi_display"],
+      "capabilities": ["effect"],
       "geometry": {
         "type": "point",
         "cx": 309.3,
-        "cy": 38.6
+        "cy": 38.6,
+        "r": 6
       }
     }
   ]
@@ -329,6 +341,11 @@ rather than as independent commandable panels. The current MK4 SVG's combined
 `P6 / MP / P5` region is acceptable for v1 as long as the individual identities
 remain represented in labels/metadata.
 
+Merged fixed regions should not collapse identities out of the model. For v1,
+`P6`, `MP`, and `P5` are discrete elements with `commandable:false`; they may
+share the same underlying geometry region or use separate point/label anchors
+when the source SVG represents them as a combined physical structure.
+
 Mounted features should be first-class elements with a relationship to their
 host element via `mounted_on`, not hidden only inside the host panel label. This
 lets UI/search/diagnostics highlight features such as RPSI, FPSI, RLD, FLD,
@@ -347,12 +364,16 @@ V1 geometry types are intentionally limited:
 { "type": "svg_path", "d": "..." }
 { "type": "circle", "cx": 320.4, "cy": 172.5, "r": 6 }
 { "type": "ellipse", "cx": 240, "cy": 81, "rx": 14.1, "ry": 10.9, "rotation": 0 }
-{ "type": "point", "cx": 309.3, "cy": 38.6 }
+{ "type": "point", "cx": 309.3, "cy": 38.6, "r": 6 }
 ```
 
 Arbitrary SVG fragments are out of scope for v1. Templates should remain
 structured, validated, and renderable by the body editor without DOM scraping or
 opaque SVG interpretation.
+
+For `point` geometry, renderers use a default marker and hit radius of `6` in
+template coordinate-space units when `r` is omitted. Templates may override the
+default with an explicit `r`.
 
 `render_order` controls drawing/z-order. It is meaningful for rendering only and
 does not define domain semantics. Semantics come from fields such as `id`,
@@ -374,7 +395,9 @@ For commandable panel elements, `active` means physically commandable in the
 current booted runtime, not merely configured in NVS. If `/api/panels/config` is
 changed by POST and the firmware requires a reboot before that wiring is applied,
 `/api/dome/layout` continues to report the pre-reboot runtime state until the
-reboot occurs.
+reboot occurs. For commandable non-panel elements, `active` means currently
+usable by that subsystem. It may be omitted when the dome cannot provide a useful
+runtime fact; consumers must treat missing runtime availability conservatively.
 
 The layout model does not expose low-level backend details such as Marcduino
 command strings, servo slots, PCA9685 channels, SPI chains, or hardware bus
@@ -399,30 +422,35 @@ project-local or alternate community names that refer to the same physical
 element. For example, the layout may expose HP1/HP2/HP3 as canonical holo
 projector identities while also listing AstroPixels names such as FHP/RHP/THP.
 `label` is template-owned presentation text and may vary by template or future
-localization layer. Runtime logic and persisted references must use `id`, not
-`label`.
+localization layer. Runtime layout joins and editor view-model references should
+use `id`, not `label`.
 
 Holo projector canonical IDs follow the clearer Printed Droid/current UI pattern:
 `HP1`, `HP2`, and `HP3`. AstroPixels names are aliases: `FHP`, `RHP`, and `THP`.
 
 For commandable non-panel elements, the layout exposes high-level capabilities
-such as `light`, `horizontal_servo`, `vertical_servo`, `logic_display`, or
-`psi_display`. It does not enumerate the full Marcduino command catalog for
-those subsystems. Detailed command behavior remains in command documentation or
-future subsystem-specific metadata endpoints.
+as descriptive/context metadata. It does not enumerate the full Marcduino command
+catalog for those subsystems. Detailed command behavior remains in command
+documentation, existing protoArtoo controls, or future subsystem-specific
+metadata endpoints.
 
 Capabilities are generic coordinator-facing action tags, not AstroPixels command
-names. For example, panels may advertise `open`, `close`, and `flutter`; holos
-may advertise `light`, `aim`, `center`, and `test`; logic displays may advertise
-`display_text` and `effect`. protoArtoo's coordinator translates these identity
-and capability signals into the appropriate command behavior.
+names. For v1, only panel capabilities `open`, `close`, and `flutter` are
+layout-picker actionable. Non-panel capabilities such as `light`, `aim`,
+`center`, `test`, `display_text`, and `effect` are descriptive/context-only in
+the layout picker; holo/logic/PSI authoring remains in existing protoArtoo
+`DH:`/`DL:`/`DT:` controls unless a future body ADR expands picker authoring.
 
 For v1, protoArtoo should treat `schema_revision` strictly. It supports
 `schema_revision:1`; any other value is unsupported until explicitly handled.
 Unknown optional fields within a supported schema may be ignored. A newer
 `template_revision` is acceptable as long as `schema_revision` is supported.
-Body-side caches should key layout data by `template_id`, `template_revision`,
-and `schema_revision`.
+Body-side caches should key durable geometry/template data by `template_id`,
+`template_revision`, and `schema_revision`. Runtime fields such as `active` and
+`disabled` are point-in-time facts and are trusted only from a fresh live fetch;
+when served from cache they must be marked stale/unverified. The composed
+response includes `runtime_state_ts` so consumers can reason about when runtime
+state was produced.
 
 For v1, `/api/dome/layout` returns the full layout JSON inline. Splitting
 geometry into secondary assets, ETags, conditional requests, or runtime revision
@@ -431,18 +459,22 @@ tokens can wait until response size or fetch frequency proves it is needed.
 Body-side fallback order:
 
 1. If the connected dome serves `/api/dome/layout` with a supported
-   `schema_revision`, use it.
-2. If the connected dome lacks `/api/dome/layout` but exposes older known
-   endpoints, use the vendored MK4 fallback layout and only hydrate runtime
-   wiring state from older endpoints where the semantics are known.
-3. If the dome is unreachable, use the vendored MK4 fallback layout and mark all
-   runtime state as unverified.
+   `schema_revision`, use live geometry and live runtime availability.
+2. If the live fetch fails but browser/local cache has a previously fetched
+   layout with supported `schema_revision`, reuse cached geometry and mark all
+   runtime availability stale/unverified.
+3. If there is no usable cached live layout, use the vendored MK4 fallback layout
+   and mark runtime availability unverified.
 4. If the connected dome serves an unsupported `schema_revision`, do not
    partially trust it; use fallback and show an unsupported-schema warning.
 
 Fallback visuals are acceptable. Fallback automation must be conservative:
 unknown `active` state is not safe, and unknown pie/upper-panel state should not
 be assumed safe for body-authored sequences.
+
+Older endpoints such as `/api/panels/config` are not part of the v1 canonical
+fallback hierarchy. Hydrating layout availability from old endpoints would be a
+separate compatibility extension, not the default contract.
 
 If an element is `in_layout:true` but inactive or disabled, the body editor keeps
 it visible in the layout and styles it as unavailable. Action controls are hidden
@@ -458,10 +490,21 @@ operator explicitly removes or remaps the step. Running a sequence must skip or
 block unsafe unavailable actions according to coordinator policy, never crash the
 sequence runner.
 
-Saved body sequence actions should persist canonical element IDs and generic
-capabilities, not aliases or labels. Labels and aliases are display/search
-metadata from the current layout. The coordinator maps `target_id + capability`
-to behavior.
+For v1, saved protoArtoo sequence actions continue to persist the accepted
+command-string shape, for example `{ "type": "dome", "cmd": ":OP01" }`. The
+layout picker may operate in canonical element IDs and generic capabilities while
+the user is editing, but the protoArtoo coordinator resolves that transient
+`element_id + capability` selection to the existing command-string storage shape
+before save/run. A future structured saved-step format requires a separate
+protoArtoo ADR that explicitly supersedes its current learned-sequence storage
+decision.
+
+Because saved steps remain command-string based, protoArtoo also needs a reverse
+map from command strings back to canonical layout IDs for editor highlighting and
+diagnostics. The reverse map must key on command form, not aliases: numeric
+targets such as `:OP01` resolve to ring panels such as `P1`, while pie-family
+targets such as `:OPP1` resolve to `PP1`. The `P1` token in `:OPP1` is a command
+target token, not the canonical ring-panel ID `P1`.
 
 `disabled` is an operator-maintained suppression flag sourced from
 `/api/dome/element-status`. It means the element may be wired and physically
