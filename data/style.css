@@ -180,6 +180,10 @@ nav a.active {
   background: #4a2020;
   border-color: var(--danger);
 }
+.btn.is-dome-disabled {
+  border-color: rgba(232,84,84,0.45);
+  color: var(--danger);
+}
 
 .power-toggle {
   min-width: 92px;
@@ -667,6 +671,30 @@ table td { color: var(--silver); }
 .panel-cell { padding: 4px; }
 .panel-cell-dim { padding: 4px; color: var(--text-dim); }
 .panel-cell-center { padding: 4px; text-align: center; }
+.dome-status-row-disabled { background: rgba(232,84,84,0.08); }
+.dome-status-row-inactive { background: rgba(232,168,50,0.06); }
+.dome-status-id {
+  display: inline-flex;
+  min-width: 44px;
+  margin-right: 8px;
+  color: var(--silver-bright);
+  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.dome-status-label { color: var(--text-dim); }
+.dome-status-reason {
+  width: 100%;
+  min-width: 180px;
+}
+#dome-panel-svg .dome-disabled {
+  fill: #5a2630 !important;
+  stroke: var(--danger) !important;
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+#dome-panel-svg .dome-disabled:hover {
+  fill: #5a2630 !important;
+}
 .table-wrap {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
