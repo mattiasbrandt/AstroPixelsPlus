@@ -10,9 +10,12 @@
 #include <Wire.h>
 #include <WiFi.h>
 #include <ctype.h>
+#include <string.h>
 #include "SPIFFS.h"
 #include "LogCapture.h"
 #include "WiringConfig.h"
+#include "GeneratedDomeLayout.h"
+#include "DomeElementStatus.h"
 
 // Gadget includes for extern declarations
 #if AP_ENABLE_FIRESTRIP
@@ -586,6 +589,213 @@ static String wiringConfigBuildJson(const char *board, int slotCount,
         }
         json += '}';
     }
+    json += "]}";
+    return json;
+}
+
+static int domeLayoutPanelSlotForId(const char *id)
+{
+    if (!id) return -1;
+    for (int i = 0; i < NUM_PANEL_SLOTS; i++)
+    {
+        if (strcmp(id, kPanelSlotLabels[i]) == 0) return i;
+    }
+    return -1;
+}
+
+static bool domeLayoutPanelActive(const char *id)
+{
+    int slot = domeLayoutPanelSlotForId(id);
+    if (slot < 0) return false;
+    return servoDispatch.getPin(slot) != 0 && servoDispatch.getGroup(slot) != 0;
+}
+
+static void domeLayoutAppendStringArray(String &json, const char *field,
+                                        const char *const *values, size_t count)
+{
+    json += ",\"";
+    json += field;
+    json += "\":[";
+    for (size_t i = 0; i < count; i++)
+    {
+        if (i > 0) json += ',';
+        json += '"';
+        json += jsonEscape(String(values[i]));
+        json += '"';
+    }
+    json += ']';
+}
+
+static void domeLayoutAppendPoint(String &json, const char *field,
+                                  const DomeLayout::DomeLayoutPoint &point)
+{
+    if (!point.present) return;
+    json += ",\"";
+    json += field;
+    json += "\":{\"x\":";
+    json += String(point.x, 1);
+    json += ",\"y\":";
+    json += String(point.y, 1);
+    json += '}';
+}
+
+static void domeLayoutAppendGeometry(String &json,
+                                     const DomeLayout::DomeLayoutElement &element)
+{
+    if (!element.inLayout) return;
+    json += ",\"geometry\":{\"type\":\"";
+    switch (element.geometryType)
+    {
+        case DomeLayout::DomeLayoutGeometryType::SvgPath:
+            json += "svg_path\",\"d\":\"";
+            json += jsonEscape(String(element.svgPath ? element.svgPath : ""));
+            json += '"';
+            break;
+        case DomeLayout::DomeLayoutGeometryType::Circle:
+            json += "circle\",\"cx\":";
+            json += String(element.cx, 1);
+            json += ",\"cy\":";
+            json += String(element.cy, 1);
+            json += ",\"r\":";
+            json += String(element.r, 1);
+            break;
+        case DomeLayout::DomeLayoutGeometryType::Ellipse:
+            json += "ellipse\",\"cx\":";
+            json += String(element.cx, 1);
+            json += ",\"cy\":";
+            json += String(element.cy, 1);
+            json += ",\"rx\":";
+            json += String(element.rx, 1);
+            json += ",\"ry\":";
+            json += String(element.ry, 1);
+            json += ",\"rotation\":";
+            json += String(element.rotation, 1);
+            break;
+        case DomeLayout::DomeLayoutGeometryType::Point:
+            json += "point\",\"cx\":";
+            json += String(element.cx, 1);
+            json += ",\"cy\":";
+            json += String(element.cy, 1);
+            json += ",\"r\":";
+            json += String(element.r, 1);
+            break;
+    }
+    json += '}';
+}
+
+static void domeLayoutAppendCallout(String &json,
+                                    const DomeLayout::DomeLayoutCallout &callout)
+{
+    if (!callout.present) return;
+    json += ",\"callout\":{\"x\":";
+    json += String(callout.x, 1);
+    json += ",\"y\":";
+    json += String(callout.y, 1);
+    json += ",\"r\":";
+    json += String(callout.r, 1);
+    if (callout.connectorPresent)
+    {
+        json += ",\"connector_to\":{\"x\":";
+        json += String(callout.connectorX, 1);
+        json += ",\"y\":";
+        json += String(callout.connectorY, 1);
+        json += '}';
+    }
+    json += '}';
+}
+
+static String buildDomeLayoutJson()
+{
+    DomeElementStatusSnapshot statuses[DOME_ELEMENT_STATUS_MAX_ELEMENTS];
+    bool statusOk = domeElementStatusReadAll(statuses, DOME_ELEMENT_STATUS_MAX_ELEMENTS);
+
+    String json = "{";
+    json.reserve(2048 + (DomeLayout::kElementCount * 360));
+    json += "\"schema_revision\":";
+    json += DomeLayout::kSchemaRevision;
+    json += ",\"template_id\":\"";
+    json += jsonEscape(String(DomeLayout::kTemplateId));
+    json += "\",\"template_name\":\"";
+    json += jsonEscape(String(DomeLayout::kTemplateName));
+    json += "\",\"template_revision\":";
+    json += DomeLayout::kTemplateRevision;
+    json += ",\"model\":\"";
+    json += jsonEscape(String(DomeLayout::kModel));
+    json += "\",\"source\":\"";
+    json += jsonEscape(String(DomeLayout::kSource));
+    json += "\",\"coordinate_space\":{\"viewBox\":\"";
+    json += jsonEscape(String(DomeLayout::kCoordinateSpaceViewBox));
+    json += "\"},\"runtime_state_ts\":";
+    json += millis();
+    json += ",\"elements\":[";
+
+    for (size_t i = 0; i < DomeLayout::kElementCount; i++)
+    {
+        const DomeLayout::DomeLayoutElement &element = DomeLayout::kElements[i];
+        if (i > 0) json += ',';
+        json += "{\"id\":\"";
+        json += jsonEscape(String(element.id));
+        json += "\",\"label\":\"";
+        json += jsonEscape(String(element.label));
+        json += "\",\"element_type\":\"";
+        json += jsonEscape(String(element.elementType));
+        json += "\",\"panel_kind\":";
+        if (element.panelKind)
+        {
+            json += '"';
+            json += jsonEscape(String(element.panelKind));
+            json += '"';
+        }
+        else
+        {
+            json += "null";
+        }
+        json += ",\"mounted_on\":";
+        if (element.mountedOn)
+        {
+            json += '"';
+            json += jsonEscape(String(element.mountedOn));
+            json += '"';
+        }
+        else
+        {
+            json += "null";
+        }
+        json += ",\"in_layout\":";
+        json += element.inLayout ? "true" : "false";
+        json += ",\"commandable\":";
+        json += element.commandable ? "true" : "false";
+        if (element.commandable && element.panelKind && strcmp(element.panelKind, "fixed") != 0)
+        {
+            json += ",\"active\":";
+            json += domeLayoutPanelActive(element.id) ? "true" : "false";
+        }
+        json += ",\"disabled\":";
+        bool disabled = statusOk ? statuses[i].disabled : false;
+        String reason = statusOk ? statuses[i].reason : "";
+        json += disabled ? "true" : "false";
+        json += ",\"disabled_reason\":";
+        if (disabled && reason.length() > 0)
+        {
+            json += '"';
+            json += jsonEscape(reason);
+            json += '"';
+        }
+        else
+        {
+            json += "null";
+        }
+        domeLayoutAppendStringArray(json, "aliases", element.aliases, element.aliasCount);
+        domeLayoutAppendStringArray(json, "capabilities", element.capabilities,
+                                    element.capabilityCount);
+        json += ",\"render_order\":";
+        json += element.renderOrder;
+        domeLayoutAppendGeometry(json, element);
+        domeLayoutAppendPoint(json, "label_anchor", element.labelAnchor);
+        domeLayoutAppendCallout(json, element.callout);
+        json += '}';
+    }
+
     json += "]}";
     return json;
 }
@@ -1446,6 +1656,77 @@ static void initAsyncWeb()
         NULL,
         [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
         {
+            if (total > 4096) return;
+            if (index == 0)
+            {
+                request->_tempObject = new String();
+                ((String *)request->_tempObject)->reserve(total + 1);
+            }
+            String *body = (String *)request->_tempObject;
+            if (body) body->concat((const char *)data, len);
+        });
+
+    // ---- REST API: Dome layout read model ----
+    // External editors consume this composed model instead of stitching
+    // together template geometry, wiring state, and maintenance status.
+    asyncServer.on("/api/dome/layout", HTTP_GET, [](AsyncWebServerRequest *request)
+    {
+        request->send(200, "application/json", buildDomeLayoutJson());
+    });
+
+    // ---- REST API: Dome element status ----
+    // Operator maintenance flags for the layout contract. This endpoint only
+    // persists advisory element availability; it never blocks commands or
+    // changes servo/runtime routing.
+    asyncServer.on("/api/dome/element-status", HTTP_GET, [](AsyncWebServerRequest *request)
+    {
+        request->send(200, "application/json", domeElementStatusBuildJson(jsonEscape));
+    });
+
+    asyncServer.on("/api/dome/element-status", HTTP_POST,
+        [](AsyncWebServerRequest *request)
+        {
+            String *body = (String *)request->_tempObject;
+            if (!body || body->length() == 0)
+            {
+                logCapture.println("[API] dome/element-status rejected: empty body");
+                request->send(400, "application/json", "{\"error\":\"empty body\"}");
+                if (body) { delete body; request->_tempObject = nullptr; }
+                return;
+            }
+
+            DomeElementStatusUpdate updates[DOME_ELEMENT_STATUS_MAX_ELEMENTS];
+            int updateCount = 0;
+            String errMsg;
+            bool ok = domeElementStatusParseBody(*body, updates,
+                                                 DOME_ELEMENT_STATUS_MAX_ELEMENTS,
+                                                 updateCount, errMsg);
+            delete body;
+            request->_tempObject = nullptr;
+            if (!ok)
+            {
+                logCapture.printf("[API] dome/element-status rejected: %s\n", errMsg.c_str());
+                request->send(400, "application/json",
+                    String("{\"error\":\"") + jsonEscape(errMsg) + "\"}");
+                return;
+            }
+            if (!domeElementStatusSaveUpdates(updates, updateCount))
+            {
+                logCapture.println("[API] Error: dome/element-status NVS save failed "
+                                    "(flash full or NVS corrupt — investigate)");
+                request->send(500, "application/json", "{\"error\":\"NVS save failed\"}");
+                return;
+            }
+            logCapture.printf("[API] dome/element-status saved: %d update(s)\n",
+                              updateCount);
+            request->send(200, "application/json",
+                String("{\"ok\":true,\"updated\":") + updateCount + "}");
+        },
+        NULL,
+        [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
+        {
+            // Status updates are small; cap at 4 KiB to match the wiring config
+            // endpoints while still allowing several annotated elements at once.
             if (total > 4096) return;
             if (index == 0)
             {

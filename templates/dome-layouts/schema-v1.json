@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mattiasbrandt/AstroPixelsPlus/templates/dome-layouts/schema-v1.json",
+  "title": "AstroPixelsPlus Dome Layout Template v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_revision",
+    "template_id",
+    "template_name",
+    "template_revision",
+    "model",
+    "source",
+    "coordinate_space",
+    "elements"
+  ],
+  "properties": {
+    "schema_revision": { "const": 1 },
+    "template_id": { "type": "string", "minLength": 1 },
+    "template_name": { "type": "string", "minLength": 1 },
+    "template_revision": { "type": "integer", "minimum": 1 },
+    "model": { "type": "string", "minLength": 1 },
+    "source": { "type": "string", "minLength": 1 },
+    "coordinate_space": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["viewBox"],
+      "properties": {
+        "viewBox": { "const": "0 0 480 480" }
+      }
+    },
+    "elements": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/element" }
+    }
+  },
+  "$defs": {
+    "known_id": {
+      "enum": [
+        "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13", "P14",
+        "PP1", "PP2", "PP3", "PP4", "PP5", "PP6",
+        "HP1", "HP2", "HP3",
+        "RLD", "FLD", "RPSI", "FPSI",
+        "MP"
+      ]
+    },
+    "point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      }
+    },
+    "callout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "r"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "r": { "type": "number", "exclusiveMinimum": 0 },
+        "connector_to": { "$ref": "#/$defs/point" }
+      }
+    },
+    "geometry": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "d"],
+          "properties": {
+            "type": { "const": "svg_path" },
+            "d": { "type": "string", "minLength": 1 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "cx", "cy", "r"],
+          "properties": {
+            "type": { "const": "circle" },
+            "cx": { "type": "number" },
+            "cy": { "type": "number" },
+            "r": { "type": "number", "exclusiveMinimum": 0 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "cx", "cy"],
+          "properties": {
+            "type": { "const": "point" },
+            "cx": { "type": "number" },
+            "cy": { "type": "number" },
+            "r": { "type": "number", "exclusiveMinimum": 0 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "cx", "cy", "rx", "ry"],
+          "properties": {
+            "type": { "const": "ellipse" },
+            "cx": { "type": "number" },
+            "cy": { "type": "number" },
+            "rx": { "type": "number", "exclusiveMinimum": 0 },
+            "ry": { "type": "number", "exclusiveMinimum": 0 },
+            "rotation": { "type": "number" }
+          }
+        }
+      ]
+    },
+    "element": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label",
+        "aliases",
+        "in_layout",
+        "element_type",
+        "panel_kind",
+        "mounted_on",
+        "commandable",
+        "capabilities",
+        "render_order"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/known_id" },
+        "label": { "type": "string", "minLength": 1 },
+        "aliases": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "in_layout": { "type": "boolean" },
+        "element_type": { "enum": ["panel", "holo", "logic", "psi"] },
+        "panel_kind": {
+          "anyOf": [
+            { "enum": ["ring", "pie", "fixed"] },
+            { "type": "null" }
+          ]
+        },
+        "mounted_on": {
+          "anyOf": [
+            { "$ref": "#/$defs/known_id" },
+            { "type": "null" }
+          ]
+        },
+        "commandable": { "type": "boolean" },
+        "capabilities": {
+          "type": "array",
+          "items": { "enum": ["open", "close", "flutter", "light", "aim", "effect"] },
+          "uniqueItems": true
+        },
+        "render_order": { "type": "integer", "minimum": 0 },
+        "geometry": { "$ref": "#/$defs/geometry" },
+        "label_anchor": { "$ref": "#/$defs/point" },
+        "callout": { "$ref": "#/$defs/callout" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "in_layout": { "const": true } },
+            "required": ["in_layout"]
+          },
+          "then": {
+            "required": ["geometry", "label_anchor"]
+          }
+        },
+        {
+          "if": {
+            "properties": { "in_layout": { "const": false } },
+            "required": ["in_layout"]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                { "required": ["geometry"] },
+                { "required": ["label_anchor"] },
+                { "required": ["callout"] }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}

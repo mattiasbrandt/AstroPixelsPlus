@@ -138,6 +138,73 @@ curl http://192.168.1.100/api/diag/i2c?force=1
 
 ---
 
+## Dome Layout & Element Status
+
+### GET /api/dome/layout
+
+Returns the editor-facing dome layout model composed from the bundled MK4
+template, live runtime state, and persisted operator element status.
+
+```bash
+curl http://192.168.1.100/api/dome/layout
+```
+
+The response includes stable element IDs, labels, aliases, geometry, render
+order, commandability, panel kind, and advisory availability fields. It does not
+include Marcduino command strings, servo slots, PCA9685 channels, or hardware bus
+details.
+
+```json
+{
+  "schema_revision": 1,
+  "template_id": "mr-baddeley-complex-dome-mk4",
+  "template_revision": 1,
+  "coordinate_space": { "viewBox": "0 0 480 480" },
+  "runtime_state_ts": 123456,
+  "elements": [
+    {
+      "id": "PP3",
+      "element_type": "panel",
+      "panel_kind": "pie",
+      "commandable": true,
+      "active": false,
+      "disabled": true,
+      "disabled_reason": "Upper pie linkage binding"
+    }
+  ]
+}
+```
+
+### GET /api/dome/element-status
+
+Returns persisted operator status for every known layout element.
+
+```bash
+curl http://192.168.1.100/api/dome/element-status
+```
+
+### POST /api/dome/element-status
+
+Persists advisory disabled flags and optional short reasons. Status changes take
+effect immediately and survive reboot, but they do not block raw Marcduino
+commands in v1.
+
+```bash
+curl -X POST http://192.168.1.100/api/dome/element-status \
+  -H "Content-Type: application/json" \
+  -d '{"elements":[{"id":"PP3","disabled":true,"disabled_reason":"Upper pie linkage binding"}]}'
+```
+
+To clear a disabled flag:
+
+```bash
+curl -X POST http://192.168.1.100/api/dome/element-status \
+  -H "Content-Type: application/json" \
+  -d '{"elements":[{"id":"PP3","disabled":false}]}'
+```
+
+---
+
 ## Sequence & Effect Control
 
 ### Triggering Sequences

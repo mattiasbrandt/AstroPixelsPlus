@@ -112,6 +112,34 @@ Body→dome commands (WiFi path) use HTTP POST to the dome's `/api/cmd` endpoint
 - 65-byte UART buffer with overflow logging and null-termination safety
 - `#PAWU` whitelisted in sleep gate so a body-initiated wake is never blocked by dome sleep mode
 
+### Dome Layout Contract for Body Editor Integration
+
+Added a dome-owned layout read model for protoArtoo/editor consumers:
+
+- `GET /api/dome/layout` returns the bundled Mr Baddeley Complex Dome MK4 layout composed with live runtime state.
+- `GET /api/dome/element-status` returns operator-maintained disabled flags for every known layout element.
+- `POST /api/dome/element-status` persists advisory disabled flags and short reasons, e.g. marking `PP3` disabled while an upper pie linkage is binding.
+
+The layout endpoint deliberately reports high-level element identity and geometry only. It does **not** expose Marcduino command strings, servo slots, PCA9685 channels, SPI chains, or other backend implementation details. Those remain owned by firmware command handlers and protoArtoo's coordinator mapping.
+
+The bundled MK4 template is now reviewable JSON under `templates/dome-layouts/` and compiled into firmware through deterministic tooling:
+
+| File | Purpose |
+|---|---|
+| `templates/dome-layouts/mr-baddeley-complex-dome-mk4.json` | Source-of-truth MK4 layout template, extracted from the existing `data/panels.html` SVG geometry |
+| `templates/dome-layouts/schema-v1.json` | JSON Schema for template authors and reviewers |
+| `tools/generate_dome_layout_header.py` | Validates the template and generates the firmware table |
+| `tools/check_dome_layout_generated.py` | Drift check for generated output |
+| `GeneratedDomeLayout.h` | Committed generated firmware table used by `/api/dome/layout` |
+| `DomeElementStatus.h` | Persistent operator status storage and strict status JSON parser |
+
+Runtime behavior:
+
+- Commandable ring/pie panels expose `active` based on the boot-applied `servoDispatch` state, not pending NVS wiring config.
+- Fixed panels, holos, logic displays, and PSI elements are present as first-class layout context but remain non-commandable in this endpoint.
+- Operator `disabled` status is advisory. It is surfaced to editors/automation but does not block raw Marcduino commands in v1.
+- Status is keyed by generated element index in NVS, with template/schema metadata stored beside it so stale flags are ignored after a layout revision.
+
 ### Servo Grind Protection — Per-Mask Post-Close PWM Release
 
 **Problem discovered:** During the 2026-05-21 protoR2 integration test, `#PASL` (body sleep sync) fired mid-panel-wave, the sleep guard blocked `:SE00`/`:OF00`, and `SeqPanelAllClose` fought the running sequence — grinding noise, no recovery without a full power cycle.
