@@ -250,12 +250,13 @@ the core read-model endpoint.
 
 Implementation slices:
 
-- **V1:** bundled MK4 template, generated firmware table, `/api/dome/layout`,
-  `/api/dome/element-status`, validation/check tooling, protoArtoo consumption.
-- **V1.5:** visual/template authoring outside firmware, likely in protoArtoo or
-  tooling, with JSON export for review and GitHub contribution.
-- **V2:** dome-side custom template upload/selection, with validation, preview,
-  persistence, and guaranteed rollback to bundled MK4.
+- Bundled MK4 template, generated firmware table, `/api/dome/layout`,
+  `/api/dome/element-status`, validation/check tooling, and protoArtoo
+  consumption.
+- Visual/template authoring outside firmware, likely in protoArtoo or tooling,
+  with JSON export for review and GitHub contribution.
+- Dome-side custom display-template install/selection, with validation,
+  persistence, operator UI, and guaranteed rollback to bundled MK4.
 
 For v1, element suppression is an editor/automation safety signal, not a raw
 Marcduino command interlock. A disabled panel is excluded from body-editor
@@ -599,9 +600,9 @@ backend identities excluded by the selected layout.
   labels are portable, command semantics are not.
 - Cache invalidation and compatibility checks can distinguish layout changes
   from API contract changes.
-- Template assets can be reviewed and shared without editing firmware behavior.
-  The selected template can later become configurable without changing the body
-  editor's consumption path.
+- Template assets can be reviewed, shared, installed, selected, and rolled back
+  without editing firmware behavior or changing the body editor's consumption
+  path.
 - Template validation prevents the body editor from drawing panels that the dome
   firmware cannot command.
 - Explicit `in_layout:false` lets custom or imperfect physical builds describe

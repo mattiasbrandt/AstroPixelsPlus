@@ -202,6 +202,31 @@
     </svg>
   </div>
 
+  <details class="card" id="dome-layout-template">
+    <summary><strong>Dome Layout Template</strong> — install, select, or roll back display geometry</summary>
+    <div class="desc mt-8">Templates change layout geometry, labels, and callouts only. They cannot define commands, slots, channels, or backend behavior.</div>
+    <div id="dome-template-loading" class="desc mt-8">Loading dome template status...</div>
+    <div id="dome-template-error" class="feedback error mt-8"></div>
+    <div id="dome-template-panel" class="template-panel mt-8" style="display:none;">
+      <div class="template-meta">
+        <div><span class="template-label">Serving</span><strong id="dome-template-serving">-</strong></div>
+        <div><span class="template-label">Template</span><span id="dome-template-name">-</span></div>
+        <div><span class="template-label">Revision</span><span id="dome-template-revision">-</span></div>
+        <div><span class="template-label">Custom</span><span id="dome-template-custom">-</span></div>
+      </div>
+      <div class="stack-6 mt-8">
+        <input type="file" id="dome-template-file" class="file-input" accept="application/json,.json">
+        <div class="toolbar">
+          <button class="btn" id="dome-template-upload" type="button">Upload &amp; Select</button>
+          <button class="btn" id="dome-template-select-custom" type="button">Use Custom</button>
+          <button class="btn" id="dome-template-select-bundled" type="button">Use Bundled MK4</button>
+          <button class="btn danger" id="dome-template-delete" type="button">Delete Custom</button>
+        </div>
+      </div>
+    </div>
+    <div id="dome-template-result" class="desc mt-8"></div>
+  </details>
+
   <details class="card" id="dome-element-status">
     <summary><strong>Dome Layout Status</strong> — mark mechanical or commissioning issues</summary>
     <div class="desc mt-8">Status flags are advisory for the web UI and connected editors. Raw Marcduino commands remain accepted by the firmware.</div>
@@ -570,6 +595,175 @@
       }
       sendCmd(isOpen ? close : open);
     }
+
+    // Dome layout templates are display-only JSON. Firmware validates the
+    // uploaded shape before selecting it and always keeps bundled MK4 available.
+    (function() {
+      'use strict';
+      var details = document.getElementById('dome-layout-template');
+      var loading = document.getElementById('dome-template-loading');
+      var errorEl = document.getElementById('dome-template-error');
+      var panel = document.getElementById('dome-template-panel');
+      var resultEl = document.getElementById('dome-template-result');
+      var servingEl = document.getElementById('dome-template-serving');
+      var nameEl = document.getElementById('dome-template-name');
+      var revisionEl = document.getElementById('dome-template-revision');
+      var customEl = document.getElementById('dome-template-custom');
+      var fileInput = document.getElementById('dome-template-file');
+      var uploadBtn = document.getElementById('dome-template-upload');
+      var useCustomBtn = document.getElementById('dome-template-select-custom');
+      var useBundledBtn = document.getElementById('dome-template-select-bundled');
+      var deleteBtn = document.getElementById('dome-template-delete');
+      var LOCAL_KEY = 'panels.domeTemplateOpen';
+
+      function showError(msg) {
+        if (!errorEl) return;
+        errorEl.textContent = msg;
+        errorEl.classList.add('show');
+      }
+
+      function clearError() {
+        if (!errorEl) return;
+        errorEl.textContent = '';
+        errorEl.classList.remove('show');
+      }
+
+      function setBusy(button, busy, text) {
+        if (!button) return;
+        button.disabled = !!busy;
+        if (busy) {
+          button.dataset.baseText = button.textContent;
+          button.textContent = text || 'Working';
+        } else if (button.dataset.baseText) {
+          button.textContent = button.dataset.baseText;
+          delete button.dataset.baseText;
+        }
+      }
+
+      function renderInfo(info) {
+        if (!info) return;
+        if (servingEl) servingEl.textContent = info.selected_source || 'bundled';
+        if (nameEl) nameEl.textContent = info.template_name || info.template_id || '-';
+        if (revisionEl) revisionEl.textContent = String(info.template_revision || '-');
+        if (customEl) {
+          if (!info.custom_installed) {
+            customEl.textContent = 'Not installed';
+          } else if (!info.custom_valid) {
+            customEl.textContent = 'Installed but invalid' + (info.error ? (': ' + info.error) : '');
+          } else {
+            var selected = info.custom_selected ? 'selected' : 'available';
+            customEl.textContent = (info.custom_template_name || info.custom_template_id || 'Custom') + ' (' + selected + ')';
+          }
+        }
+        if (useCustomBtn) useCustomBtn.disabled = !info.custom_installed || !info.custom_valid || info.selected_source === 'custom';
+        if (useBundledBtn) useBundledBtn.disabled = info.selected_source === 'bundled';
+        if (deleteBtn) deleteBtn.disabled = !info.custom_installed;
+      }
+
+      function loadTemplateInfo() {
+        clearError();
+        if (loading) loading.style.display = '';
+        if (panel) panel.style.display = 'none';
+        return fetch('/api/dome/layout-template').then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        }).then(function(info) {
+          renderInfo(info);
+          if (loading) loading.style.display = 'none';
+          if (panel) panel.style.display = '';
+        }).catch(function(err) {
+          if (loading) loading.style.display = 'none';
+          showError('Failed to load template status: ' + err.message);
+        });
+      }
+
+      function refreshAfterTemplateChange(message) {
+        if (resultEl) resultEl.textContent = message || '';
+        if (typeof window.reloadDomeLayoutStatus === 'function') window.reloadDomeLayoutStatus();
+        return loadTemplateInfo();
+      }
+
+      function postSelection(source, button) {
+        setBusy(button, true, 'Switching');
+        return window.apiPost('/api/dome/layout-template/select', {
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source: source })
+        }).then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        }).then(function() {
+          var label = source === 'custom' ? 'Custom template selected.' : 'Bundled MK4 selected.';
+          if (typeof window.uiToast === 'function') window.uiToast(label);
+          return refreshAfterTemplateChange(label);
+        }).catch(function(err) {
+          showError('Template selection failed: ' + err.message);
+          if (typeof window.uiToast === 'function') window.uiToast('Template selection failed', 'error');
+        }).finally(function() {
+          setBusy(button, false);
+        });
+      }
+
+      function uploadTemplate() {
+        var file = fileInput && fileInput.files && fileInput.files[0];
+        if (!file) {
+          showError('Choose a template JSON file first.');
+          return;
+        }
+        setBusy(uploadBtn, true, 'Uploading');
+        file.text().then(function(text) {
+          return fetch('/api/dome/layout-template', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: text
+          });
+        }).then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        }).then(function() {
+          if (fileInput) fileInput.value = '';
+          if (typeof window.uiToast === 'function') window.uiToast('Template uploaded and selected');
+          return refreshAfterTemplateChange('Template uploaded and selected.');
+        }).catch(function(err) {
+          showError('Template upload failed: ' + err.message);
+          if (typeof window.uiToast === 'function') window.uiToast('Template upload failed', 'error');
+        }).finally(function() {
+          setBusy(uploadBtn, false);
+        });
+      }
+
+      function deleteCustomTemplate() {
+        setBusy(deleteBtn, true, 'Deleting');
+        fetch('/api/dome/layout-template', { method: 'DELETE' }).then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        }).then(function() {
+          if (typeof window.uiToast === 'function') window.uiToast('Custom template deleted');
+          return refreshAfterTemplateChange('Custom template deleted; bundled MK4 is active.');
+        }).catch(function(err) {
+          showError('Template delete failed: ' + err.message);
+          if (typeof window.uiToast === 'function') window.uiToast('Template delete failed', 'error');
+        }).finally(function() {
+          setBusy(deleteBtn, false);
+        });
+      }
+
+      if (uploadBtn) uploadBtn.addEventListener('click', uploadTemplate);
+      if (useCustomBtn) useCustomBtn.addEventListener('click', function() { postSelection('custom', useCustomBtn); });
+      if (useBundledBtn) useBundledBtn.addEventListener('click', function() { postSelection('bundled', useBundledBtn); });
+      if (deleteBtn) deleteBtn.addEventListener('click', deleteCustomTemplate);
+
+      try {
+        if (localStorage.getItem(LOCAL_KEY) === '1') details.open = true;
+      } catch (e) {}
+      if (details) {
+        details.addEventListener('toggle', function() {
+          try { localStorage.setItem(LOCAL_KEY, details.open ? '1' : '0'); } catch (e) {}
+          if (details.open) loadTemplateInfo();
+        });
+      }
+
+      loadTemplateInfo();
+    })();
 
     // Operator-maintained layout status is advisory firmware state. The page
     // uses it to prevent accidental panel clicks during maintenance, while raw

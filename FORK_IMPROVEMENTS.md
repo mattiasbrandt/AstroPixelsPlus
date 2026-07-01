@@ -119,6 +119,10 @@ Added a dome-owned layout read model for protoArtoo/editor consumers:
 - `GET /api/dome/layout` returns the bundled Mr Baddeley Complex Dome MK4 layout composed with live runtime state.
 - `GET /api/dome/element-status` returns operator-maintained disabled flags for every known layout element.
 - `POST /api/dome/element-status` persists advisory disabled flags and short reasons, e.g. marking `PP3` disabled while an upper pie linkage is binding.
+- `GET /api/dome/layout-template` reports whether the dome is serving bundled MK4 or an installed custom display template.
+- `POST /api/dome/layout-template` installs a custom display template JSON into SPIFFS, validates it for schema/identity/backend-field safety, selects it, and keeps bundled MK4 as rollback.
+- `POST /api/dome/layout-template/select` switches between bundled and installed custom layout templates.
+- `DELETE /api/dome/layout-template` removes the custom template and rolls back to bundled MK4.
 
 The layout endpoint deliberately reports high-level element identity and geometry only. It does **not** expose Marcduino command strings, servo slots, PCA9685 channels, SPI chains, or other backend implementation details. Those remain owned by firmware command handlers and protoArtoo's coordinator mapping.
 
@@ -133,16 +137,18 @@ The bundled MK4 template is now reviewable JSON under `templates/dome-layouts/` 
 | `tools/check_dome_layout_generated.py` | Drift check for generated output |
 | `tools/validate_dome_layout_templates.py` | Validates bundled and future contributed display templates without requiring them to be the firmware-selected MK4 template |
 | `tools/test_dome_layout_validation.py` | Regression tests for template identity, geometry, capability, and relationship validation rules |
-| `tools/render_dome_layout_preview.py` | Renders a review SVG from any validated v1 template so geometry/labels/callouts can be inspected before contribution or firmware selection |
+| `tools/render_dome_layout_preview.py` | Renders a review SVG from any validated schema-1 template so geometry/labels/callouts can be inspected before contribution or firmware selection |
 | `tools/test_dome_layout_preview.py` | Regression tests for preview rendering and general non-MK4 template support |
 | `GeneratedDomeLayout.h` | Committed generated firmware table used by `/api/dome/layout` |
 | `DomeElementStatus.h` | Persistent operator status storage and strict status JSON parser |
+| `DomeLayoutTemplateStore.h` | SPIFFS-backed custom display-template install/select/rollback support |
 
 Runtime behavior:
 
 - Commandable ring/pie panels expose `active` based on the boot-applied `servoDispatch` state, not pending NVS wiring config.
 - Fixed panels, holos, logic displays, and PSI elements are present as first-class layout context but remain non-commandable in this endpoint.
-- Operator `disabled` status is advisory. It is surfaced to editors/automation but does not block raw Marcduino commands in v1.
+- Operator `disabled` status is advisory. It is surfaced to editors/automation but does not block raw Marcduino commands.
+- If a selected custom template is missing or fails activation validation at serve time, `/api/dome/layout` falls back to the bundled MK4 template instead of serving partial layout JSON.
 - The Panels page exposes a Dome Layout Status section for marking any layout element disabled with a short reason; disabled commandable panels are highlighted on the SVG and suppressed in individual web UI panel buttons/clicks while raw Marcduino commands remain accepted.
 - Status is keyed by generated element index in NVS, with template/schema metadata stored beside it so stale flags are ignored after a layout revision.
 

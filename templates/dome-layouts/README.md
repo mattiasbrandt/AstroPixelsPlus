@@ -5,13 +5,13 @@ The firmware currently bundles `mr-baddeley-complex-dome-mk4.json` by generating
 `GeneratedDomeLayout.h` from it, but additional templates can be reviewed here
 before any runtime upload/selection feature exists.
 
-## V1 Policy
+## Schema 1 Policy
 
-V1 templates are display templates only:
+Schema 1 templates are display templates only:
 
 - They may change geometry, labels, aliases, label anchors, callouts, render
   order, and `in_layout` membership.
-- They must use the known v1 identity set from `schema-v1.json`.
+- They must use the known schema-1 identity set from `schema-v1.json`.
 - They must explicitly include or exclude every known identity.
 - They must not define commands, command targets, slots, channels, buses, SPI
   chains, PCA9685 details, or firmware behavior.
@@ -19,9 +19,9 @@ V1 templates are display templates only:
   `open`, `close`, and `flutter`.
 - They must keep non-panel capabilities descriptive/context-only.
 
-The selected firmware template is still the bundled MK4 template. Runtime
-template upload/selection is intentionally deferred until a later slice with
-validation, preview, persistence, and rollback.
+The bundled MK4 template remains the immutable fallback, but a validated custom
+display template can be installed on the dome at runtime and selected without
+reflashing firmware.
 
 ## Validate Templates
 
@@ -83,13 +83,43 @@ python3 tools/validate_dome_layout_templates.py --strict-bundled templates/dome-
 It intentionally rejects non-MK4 template identity because firmware generation
 is still pinned to the bundled MK4 template.
 
+## Install On A Dome
+
+Validate and preview a candidate before installing it:
+
+```bash
+python3 tools/validate_dome_layout_templates.py templates/dome-layouts/my-layout.json
+python3 tools/render_dome_layout_preview.py --template templates/dome-layouts/my-layout.json --output /tmp/my-layout-preview.svg
+```
+
+Install and select the template on a running dome:
+
+```bash
+curl -X POST http://astropixelsplus.local/api/dome/layout-template \
+  -H "Content-Type: application/json" \
+  --data-binary @templates/dome-layouts/my-layout.json
+```
+
+Inspect the selected template:
+
+```bash
+curl http://astropixelsplus.local/api/dome/layout-template
+curl http://astropixelsplus.local/api/dome/layout
+```
+
+Roll back to bundled MK4:
+
+```bash
+curl -X DELETE http://astropixelsplus.local/api/dome/layout-template
+```
+
 ## Review Checklist
 
 - `template_id` is stable, lowercase/kebab-case, and not reused for a different
   physical layout.
 - `template_revision` increments when geometry, labels, anchors, callouts, or
   layout membership changes.
-- `coordinate_space.viewBox` remains `0 0 480 480` for schema v1.
+- `coordinate_space.viewBox` remains `0 0 480 480` for schema revision 1.
 - Every known identity is present exactly once.
 - Identities outside the selected physical layout use `in_layout:false` and omit
   render geometry.

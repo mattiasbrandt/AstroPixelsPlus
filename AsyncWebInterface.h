@@ -16,6 +16,7 @@
 #include "WiringConfig.h"
 #include "GeneratedDomeLayout.h"
 #include "DomeElementStatus.h"
+#include "DomeLayoutTemplateStore.h"
 
 // Gadget includes for extern declarations
 #if AP_ENABLE_FIRESTRIP
@@ -704,7 +705,194 @@ static void domeLayoutAppendCallout(String &json,
     json += '}';
 }
 
-static String buildDomeLayoutJson()
+static bool domeLayoutReadStatusForId(const String &id,
+                                      const DomeElementStatusSnapshot *statuses,
+                                      bool statusOk,
+                                      bool &disabled,
+                                      String &reason)
+{
+    disabled = false;
+    reason = "";
+    if (!statusOk) return false;
+    int index = domeElementStatusIndexOf(id);
+    if (index < 0 || index >= DOME_ELEMENT_STATUS_MAX_ELEMENTS) return false;
+    disabled = statuses[index].disabled;
+    reason = statuses[index].reason;
+    return true;
+}
+
+static bool domeLayoutTemplateFindElementFieldBool(const String &objectJson,
+                                                   const char *wantedKey,
+                                                   bool &out)
+{
+    String needle = String("\"") + wantedKey + "\"";
+    int keyAt = objectJson.indexOf(needle);
+    if (keyAt < 0) return false;
+    int colonAt = objectJson.indexOf(':', keyAt + needle.length());
+    if (colonAt < 0) return false;
+    const char *p = objectJson.c_str() + colonAt + 1;
+    while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r') p++;
+    if (strncmp(p, "true", 4) == 0)
+    {
+        out = true;
+        return true;
+    }
+    if (strncmp(p, "false", 5) == 0)
+    {
+        out = false;
+        return true;
+    }
+    return false;
+}
+
+static int domeLayoutTemplateFindElementsKey(const String &json)
+{
+    const char *p = json.c_str();
+    String errMsg;
+    if (!domeLayoutTemplateExpectChar(p, '{', errMsg)) return -1;
+    while (true)
+    {
+        domeLayoutTemplateSkipWs(p);
+        if (*p == '}') return -1;
+        const char *keyStart = p;
+        String key;
+        if (!domeLayoutTemplateParseJsonString(p, key, errMsg)) return -1;
+        if (!domeLayoutTemplateExpectChar(p, ':', errMsg)) return -1;
+        if (key == "elements") return keyStart - json.c_str();
+        if (!domeLayoutTemplateSkipJsonValue(p, errMsg)) return -1;
+        domeLayoutTemplateSkipWs(p);
+        if (*p == ',') { p++; continue; }
+        if (*p == '}') return -1;
+        return -1;
+    }
+}
+
+static bool domeLayoutTemplateFindArrayEnd(const String &json, int arrayStart,
+                                           int &arrayEnd)
+{
+    if (arrayStart < 0 || arrayStart >= (int)json.length() ||
+        json[arrayStart] != '[') return false;
+    const char *p = json.c_str() + arrayStart;
+    String errMsg;
+    if (!domeLayoutTemplateSkipJsonArray(p, errMsg)) return false;
+    arrayEnd = p - json.c_str();
+    return true;
+}
+
+static bool domeLayoutTemplateAppendComposedElement(String &out,
+                                                    const String &elementJson,
+                                                    const DomeElementStatusSnapshot *statuses,
+                                                    bool statusOk)
+{
+    String errMsg;
+    String id;
+    if (!domeLayoutTemplateFindRootString(elementJson, "id", id, errMsg)) return false;
+    bool commandable = false;
+    domeLayoutTemplateFindElementFieldBool(elementJson, "commandable", commandable);
+
+    int closeAt = elementJson.lastIndexOf('}');
+    if (closeAt < 0) return false;
+    out += elementJson.substring(0, closeAt);
+    if (commandable && domeLayoutTemplateIsCommandableId(id))
+    {
+        out += ",\"active\":";
+        out += domeLayoutPanelActive(id.c_str()) ? "true" : "false";
+    }
+
+    bool disabled = false;
+    String reason;
+    domeLayoutReadStatusForId(id, statuses, statusOk, disabled, reason);
+    out += ",\"disabled\":";
+    out += disabled ? "true" : "false";
+    out += ",\"disabled_reason\":";
+    if (disabled && reason.length() > 0)
+    {
+        out += '"';
+        out += jsonEscape(reason);
+        out += '"';
+    }
+    else
+    {
+        out += "null";
+    }
+    out += '}';
+    return true;
+}
+
+static bool domeLayoutBuildCustomLayoutJson(const String &templateJson,
+                                            String &out,
+                                            String &errMsg)
+{
+    DomeLayoutTemplateInfo info = {};
+    if (!domeLayoutTemplateValidateJson(templateJson, info, errMsg)) return false;
+
+    int keyAt = domeLayoutTemplateFindElementsKey(templateJson);
+    if (keyAt < 0)
+    {
+        errMsg = "custom template missing elements array";
+        return false;
+    }
+    int colonAt = templateJson.indexOf(':', keyAt);
+    if (colonAt < 0)
+    {
+        errMsg = "custom template elements array is malformed";
+        return false;
+    }
+    int arrayStart = colonAt + 1;
+    while (arrayStart < (int)templateJson.length() &&
+           isspace((unsigned char)templateJson[arrayStart])) arrayStart++;
+    int arrayEnd = -1;
+    if (!domeLayoutTemplateFindArrayEnd(templateJson, arrayStart, arrayEnd))
+    {
+        errMsg = "custom template elements array is malformed";
+        return false;
+    }
+
+    DomeElementStatusSnapshot statuses[DOME_ELEMENT_STATUS_MAX_ELEMENTS];
+    bool statusOk = domeElementStatusReadAll(statuses, DOME_ELEMENT_STATUS_MAX_ELEMENTS);
+
+    out = "";
+    out.reserve(templateJson.length() + 2048);
+    out += templateJson.substring(0, keyAt);
+    out += "\"layout_source\":\"custom\",\"runtime_state_ts\":";
+    out += millis();
+    out += ",\"elements\":[";
+
+    const char *p = templateJson.c_str() + arrayStart + 1;
+    bool first = true;
+    while (true)
+    {
+        domeLayoutTemplateSkipWs(p);
+        if (*p == ']') break;
+        const char *elementStart = p;
+        if (!domeLayoutTemplateSkipJsonObject(p, errMsg)) return false;
+        String elementJson = templateJson.substring(elementStart - templateJson.c_str(),
+                                                    p - templateJson.c_str());
+        if (!first) out += ',';
+        if (!domeLayoutTemplateAppendComposedElement(out, elementJson,
+                                                     statuses, statusOk))
+        {
+            errMsg = "custom template element composition failed";
+            return false;
+        }
+        first = false;
+        domeLayoutTemplateSkipWs(p);
+        if (*p == ',')
+        {
+            p++;
+            continue;
+        }
+        if (*p == ']') break;
+        errMsg = "expected ',' or ']' in custom elements array";
+        return false;
+    }
+
+    out += "]";
+    out += templateJson.substring(arrayEnd);
+    return true;
+}
+
+static String buildBundledDomeLayoutJson()
 {
     DomeElementStatusSnapshot statuses[DOME_ELEMENT_STATUS_MAX_ELEMENTS];
     bool statusOk = domeElementStatusReadAll(statuses, DOME_ELEMENT_STATUS_MAX_ELEMENTS);
@@ -723,7 +911,7 @@ static String buildDomeLayoutJson()
     json += jsonEscape(String(DomeLayout::kModel));
     json += "\",\"source\":\"";
     json += jsonEscape(String(DomeLayout::kSource));
-    json += "\",\"coordinate_space\":{\"viewBox\":\"";
+    json += "\",\"layout_source\":\"bundled\",\"coordinate_space\":{\"viewBox\":\"";
     json += jsonEscape(String(DomeLayout::kCoordinateSpaceViewBox));
     json += "\"},\"runtime_state_ts\":";
     json += millis();
@@ -798,6 +986,31 @@ static String buildDomeLayoutJson()
 
     json += "]}";
     return json;
+}
+
+static String buildDomeLayoutJson()
+{
+    if (domeLayoutTemplateIsCustomSelected())
+    {
+        String customJson;
+        String errMsg;
+        if (domeLayoutTemplateReadFile(customJson, errMsg))
+        {
+            String composed;
+            if (domeLayoutBuildCustomLayoutJson(customJson, composed, errMsg))
+            {
+                return composed;
+            }
+            logCapture.printf("[API] custom dome layout rejected at serve time: %s\n",
+                              errMsg.c_str());
+        }
+        else
+        {
+            logCapture.printf("[API] custom dome layout unavailable: %s\n",
+                              errMsg.c_str());
+        }
+    }
+    return buildBundledDomeLayoutJson();
 }
 
 
@@ -1673,6 +1886,149 @@ static void initAsyncWeb()
     {
         request->send(200, "application/json", buildDomeLayoutJson());
     });
+
+    // ---- REST API: Dome layout template management ----
+    // Custom templates live on SPIFFS and stay display-only: validation rejects
+    // command/slot/channel fields before a template can be activated. Bundled
+    // MK4 remains the immutable fallback and rollback target.
+    asyncServer.on("/api/dome/layout-template", HTTP_GET, [](AsyncWebServerRequest *request)
+    {
+        request->send(200, "application/json", domeLayoutTemplateInfoJson(jsonEscape));
+    });
+
+    asyncServer.on("/api/dome/layout-template", HTTP_DELETE, [](AsyncWebServerRequest *request)
+    {
+        bool removed = true;
+        if (SPIFFS.exists(DOME_LAYOUT_TEMPLATE_PATH))
+        {
+            removed = SPIFFS.remove(DOME_LAYOUT_TEMPLATE_PATH);
+        }
+        if (SPIFFS.exists(DOME_LAYOUT_TEMPLATE_TMP_PATH))
+        {
+            SPIFFS.remove(DOME_LAYOUT_TEMPLATE_TMP_PATH);
+        }
+        bool selectedOk = domeLayoutTemplateSetCustomSelected(false);
+        if (!removed || !selectedOk)
+        {
+            request->send(500, "application/json", "{\"error\":\"template rollback failed\"}");
+            return;
+        }
+        request->send(200, "application/json",
+                      "{\"ok\":true,\"selected_source\":\"bundled\"}");
+    });
+
+    asyncServer.on("/api/dome/layout-template/select", HTTP_POST,
+        [](AsyncWebServerRequest *request)
+        {
+            String *body = (String *)request->_tempObject;
+            if (!body || body->length() == 0)
+            {
+                request->send(400, "application/json", "{\"error\":\"empty body\"}");
+                if (body) { delete body; request->_tempObject = nullptr; }
+                return;
+            }
+
+            String errMsg;
+            String source;
+            bool parsed = domeLayoutTemplateFindRootString(*body, "source",
+                                                           source, errMsg);
+            delete body;
+            request->_tempObject = nullptr;
+            if (!parsed || (source != "custom" && source != "bundled"))
+            {
+                request->send(400, "application/json",
+                              "{\"error\":\"source must be custom or bundled\"}");
+                return;
+            }
+            bool selectCustom = source == "custom";
+            if (selectCustom)
+            {
+                String customJson;
+                DomeLayoutTemplateInfo info = {};
+                if (!domeLayoutTemplateReadFile(customJson, errMsg) ||
+                    !domeLayoutTemplateValidateJson(customJson, info, errMsg))
+                {
+                    request->send(400, "application/json",
+                        String("{\"error\":\"") + jsonEscape(errMsg) + "\"}");
+                    return;
+                }
+            }
+            if (!domeLayoutTemplateSetCustomSelected(selectCustom))
+            {
+                request->send(500, "application/json",
+                              "{\"error\":\"template selection save failed\"}");
+                return;
+            }
+            request->send(200, "application/json",
+                String("{\"ok\":true,\"selected_source\":\"") +
+                (selectCustom ? "custom" : "bundled") + "\"}");
+        },
+        NULL,
+        [](AsyncWebServerRequest *request, uint8_t *data, size_t len,
+           size_t index, size_t total)
+        {
+            if (total > DOME_LAYOUT_TEMPLATE_MAX_BYTES) return;
+            if (index == 0)
+            {
+                request->_tempObject = new String();
+                ((String *)request->_tempObject)->reserve(total + 1);
+            }
+            String *body = (String *)request->_tempObject;
+            if (body) body->concat((const char *)data, len);
+        });
+
+    asyncServer.on("/api/dome/layout-template", HTTP_POST,
+        [](AsyncWebServerRequest *request)
+        {
+            String *body = (String *)request->_tempObject;
+            if (!body || body->length() == 0)
+            {
+                logCapture.println("[API] dome/layout-template rejected: empty body");
+                request->send(400, "application/json", "{\"error\":\"empty body\"}");
+                if (body) { delete body; request->_tempObject = nullptr; }
+                return;
+            }
+
+            DomeLayoutTemplateInfo info = {};
+            String errMsg;
+            bool ok = domeLayoutTemplateValidateJson(*body, info, errMsg);
+            if (ok) ok = domeLayoutTemplateWriteCustom(*body, errMsg);
+            delete body;
+            request->_tempObject = nullptr;
+            if (!ok)
+            {
+                logCapture.printf("[API] dome/layout-template rejected: %s\n",
+                                  errMsg.c_str());
+                request->send(400, "application/json",
+                    String("{\"error\":\"") + jsonEscape(errMsg) + "\"}");
+                return;
+            }
+            if (!domeLayoutTemplateSetCustomSelected(true))
+            {
+                request->send(500, "application/json",
+                              "{\"error\":\"template selection save failed\"}");
+                return;
+            }
+            logCapture.printf("[API] dome/layout-template installed: %s rev %d\n",
+                              info.templateId.c_str(), info.templateRevision);
+            request->send(200, "application/json",
+                String("{\"ok\":true,\"selected_source\":\"custom\",") +
+                "\"template_id\":\"" + jsonEscape(info.templateId) + "\"," +
+                "\"template_revision\":" + info.templateRevision + "}");
+        },
+        NULL,
+        [](AsyncWebServerRequest *request, uint8_t *data, size_t len,
+           size_t index, size_t total)
+        {
+            if (total > DOME_LAYOUT_TEMPLATE_MAX_BYTES) return;
+            if (index == 0)
+            {
+                request->_tempObject = new String();
+                ((String *)request->_tempObject)->reserve(total + 1);
+            }
+            String *body = (String *)request->_tempObject;
+            if (body) body->concat((const char *)data, len);
+        });
 
     // ---- REST API: Dome element status ----
     // Operator maintenance flags for the layout contract. This endpoint only

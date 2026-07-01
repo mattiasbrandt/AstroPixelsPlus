@@ -142,8 +142,10 @@ curl http://192.168.1.100/api/diag/i2c?force=1
 
 ### GET /api/dome/layout
 
-Returns the editor-facing dome layout model composed from the bundled MK4
-template, live runtime state, and persisted operator element status.
+Returns the editor-facing dome layout model composed from the selected dome
+layout template, live runtime state, and persisted operator element status. The
+selected template is either the immutable bundled MK4 fallback or an installed
+custom display template.
 
 ```bash
 curl http://192.168.1.100/api/dome/layout
@@ -159,6 +161,7 @@ details.
   "schema_revision": 1,
   "template_id": "mr-baddeley-complex-dome-mk4",
   "template_revision": 1,
+  "layout_source": "bundled",
   "coordinate_space": { "viewBox": "0 0 480 480" },
   "runtime_state_ts": 123456,
   "elements": [
@@ -175,6 +178,47 @@ details.
 }
 ```
 
+### GET /api/dome/layout-template
+
+Returns the current template selection and installed custom-template status.
+
+```bash
+curl http://192.168.1.100/api/dome/layout-template
+```
+
+### POST /api/dome/layout-template
+
+Installs a validated custom display template JSON into SPIFFS and selects it.
+The firmware rejects templates that omit known identities, use an unsupported
+schema, define runtime fields, or leak backend details such as command strings,
+slots, channels, buses, or targets. The bundled MK4 template remains available
+for rollback.
+
+```bash
+curl -X POST http://192.168.1.100/api/dome/layout-template \
+  -H "Content-Type: application/json" \
+  --data-binary @templates/dome-layouts/my-layout.json
+```
+
+### POST /api/dome/layout-template/select
+
+Switches between the installed custom template and bundled MK4.
+
+```bash
+curl -X POST http://192.168.1.100/api/dome/layout-template/select \
+  -H "Content-Type: application/json" \
+  -d '{"source":"bundled"}'
+```
+
+### DELETE /api/dome/layout-template
+
+Deletes the installed custom template and rolls `/api/dome/layout` back to the
+bundled MK4 template.
+
+```bash
+curl -X DELETE http://192.168.1.100/api/dome/layout-template
+```
+
 ### GET /api/dome/element-status
 
 Returns persisted operator status for every known layout element.
@@ -187,7 +231,7 @@ curl http://192.168.1.100/api/dome/element-status
 
 Persists advisory disabled flags and optional short reasons. Status changes take
 effect immediately and survive reboot, but they do not block raw Marcduino
-commands in v1.
+commands.
 
 ```bash
 curl -X POST http://192.168.1.100/api/dome/element-status \
