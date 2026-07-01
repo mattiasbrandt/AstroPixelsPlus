@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import difflib
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -15,6 +16,9 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_TEMPLATE = ROOT / "templates/dome-layouts/mr-baddeley-complex-dome-mk4.json"
 DEFAULT_OUTPUT = ROOT / "GeneratedDomeLayout.h"
+DEFAULT_TEMPLATE_ID = "mr-baddeley-complex-dome-mk4"
+DEFAULT_TEMPLATE_NAME = "Mr Baddeley Complex Dome MK4"
+DEFAULT_TEMPLATE_REVISION = 1
 
 KNOWN_IDS = {
     "P1",
@@ -48,7 +52,17 @@ KNOWN_IDS = {
 }
 PANEL_KINDS = {"ring", "pie", "fixed"}
 ELEMENT_TYPES = {"panel", "holo", "logic", "psi"}
-CAPABILITIES = {"open", "close", "flutter", "light", "aim", "effect"}
+CAPABILITIES = {
+    "open",
+    "close",
+    "flutter",
+    "light",
+    "aim",
+    "center",
+    "test",
+    "display_text",
+    "effect",
+}
 PANEL_ACTION_CAPABILITIES = ["open", "close", "flutter"]
 GEOMETRY_TYPES = {"svg_path", "circle", "ellipse", "point"}
 PATH_COMMAND_RE = re.compile(r"[AaCcHhLlMmQqSsTtVvZz]")
@@ -97,7 +111,10 @@ def require_int(value: Any, context: str) -> int:
 def require_number(value: Any, context: str) -> float:
     if not isinstance(value, (int, float)) or isinstance(value, bool):
         fail(f"{context} must be a number")
-    return float(value)
+    number = float(value)
+    if not math.isfinite(number):
+        fail(f"{context} must be finite")
+    return number
 
 
 def optional_string(value: Any, context: str) -> str | None:
@@ -199,7 +216,9 @@ def validate_geometry(value: Any, context: str) -> dict[str, Any]:
     return result
 
 
-def validate_template(data: Any) -> dict[str, Any]:
+def validate_template(
+    data: Any, *, enforce_default_identity: bool = False
+) -> dict[str, Any]:
     template = require_dict(data, "template")
     expected_top = {
         "schema_revision",
@@ -217,16 +236,18 @@ def validate_template(data: Any) -> dict[str, Any]:
 
     if require_int(template.get("schema_revision"), "schema_revision") != 1:
         fail("schema_revision must be 1")
-    if require_string(template.get("template_id"), "template_id") != (
-        "mr-baddeley-complex-dome-mk4"
-    ):
-        fail("template_id must be mr-baddeley-complex-dome-mk4")
-    if require_string(template.get("template_name"), "template_name") != (
-        "Mr Baddeley Complex Dome MK4"
-    ):
-        fail("template_name must be Mr Baddeley Complex Dome MK4")
-    if require_int(template.get("template_revision"), "template_revision") != 1:
-        fail("template_revision must be 1")
+    template_id = require_string(template.get("template_id"), "template_id")
+    template_name = require_string(template.get("template_name"), "template_name")
+    template_revision = require_int(template.get("template_revision"), "template_revision")
+    if template_revision < 1:
+        fail("template_revision must be positive")
+    if enforce_default_identity:
+        if template_id != DEFAULT_TEMPLATE_ID:
+            fail(f"template_id must be {DEFAULT_TEMPLATE_ID}")
+        if template_name != DEFAULT_TEMPLATE_NAME:
+            fail(f"template_name must be {DEFAULT_TEMPLATE_NAME}")
+        if template_revision != DEFAULT_TEMPLATE_REVISION:
+            fail(f"template_revision must be {DEFAULT_TEMPLATE_REVISION}")
 
     coordinate_space = require_dict(template.get("coordinate_space"), "coordinate_space")
     if coordinate_space != {"viewBox": "0 0 480 480"}:
@@ -573,10 +594,16 @@ def render_header(template: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def load_and_render(template_path: Path) -> str:
+def load_and_validate(
+    template_path: Path, *, enforce_default_identity: bool = False
+) -> dict[str, Any]:
     with template_path.open("r", encoding="utf-8") as handle:
         data = json.load(handle)
-    template = validate_template(data)
+    return validate_template(data, enforce_default_identity=enforce_default_identity)
+
+
+def load_and_render(template_path: Path) -> str:
+    template = load_and_validate(template_path, enforce_default_identity=True)
     return render_header(template)
 
 

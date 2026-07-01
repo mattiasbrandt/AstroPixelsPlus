@@ -153,7 +153,7 @@
         "commandable": { "type": "boolean" },
         "capabilities": {
           "type": "array",
-          "items": { "enum": ["open", "close", "flutter", "light", "aim", "effect"] },
+          "items": { "enum": ["open", "close", "flutter", "light", "aim", "center", "test", "display_text", "effect"] },
           "uniqueItems": true
         },
         "render_order": { "type": "integer", "minimum": 0 },

@@ -128,8 +128,10 @@ The bundled MK4 template is now reviewable JSON under `templates/dome-layouts/` 
 |---|---|
 | `templates/dome-layouts/mr-baddeley-complex-dome-mk4.json` | Source-of-truth MK4 layout template, extracted from the existing `data/panels.html` SVG geometry |
 | `templates/dome-layouts/schema-v1.json` | JSON Schema for template authors and reviewers |
+| `templates/dome-layouts/README.md` | Template contribution policy, validation commands, and review checklist |
 | `tools/generate_dome_layout_header.py` | Validates the template and generates the firmware table |
 | `tools/check_dome_layout_generated.py` | Drift check for generated output |
+| `tools/validate_dome_layout_templates.py` | Validates bundled and future contributed display templates without requiring them to be the firmware-selected MK4 template |
 | `GeneratedDomeLayout.h` | Committed generated firmware table used by `/api/dome/layout` |
 | `DomeElementStatus.h` | Persistent operator status storage and strict status JSON parser |
 

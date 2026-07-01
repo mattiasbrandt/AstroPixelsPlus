@@ -166,6 +166,19 @@ template from day one. The reviewable JSON template is the source of truth; a
 small generator emits a firmware header/table suitable for serving
 `/api/dome/layout` without runtime JSON parsing.
 
+Template validation has two modes: general v1 validation for reviewable display
+templates, and strict bundled-template validation for the firmware-selected MK4
+template. Future community templates should be able to pass the general v1
+contract without pretending to be `mr-baddeley-complex-dome-mk4`; firmware
+generation remains pinned to the selected bundled template until runtime
+template selection is deliberately implemented.
+
+`schema-v1.json` is an authoring aid for the single-template JSON shape. The
+Python validator/check tooling is the canonical review gate for v1 because it
+also enforces cross-element invariants such as duplicate IDs, full known-ID
+inventory, mounted relationships, commandable capability rules, finite numbers,
+and coordinate guard bands.
+
 The generated firmware header/table should be committed. PlatformIO builds stay
 simple and deterministic, reviewers can inspect the exact compiled representation,
 and a local/CI check verifies that generated output matches the JSON source.
@@ -175,8 +188,10 @@ Initial file layout:
 ```text
 templates/dome-layouts/mr-baddeley-complex-dome-mk4.json
 templates/dome-layouts/schema-v1.json
+templates/dome-layouts/README.md
 tools/generate_dome_layout_header.py
 tools/check_dome_layout_generated.py
+tools/validate_dome_layout_templates.py
 GeneratedDomeLayout.h
 ```
 
