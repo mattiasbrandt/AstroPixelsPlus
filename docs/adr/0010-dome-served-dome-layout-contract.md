@@ -192,6 +192,7 @@ templates/dome-layouts/README.md
 tools/generate_dome_layout_header.py
 tools/check_dome_layout_generated.py
 tools/validate_dome_layout_templates.py
+tools/test_dome_layout_validation.py
 GeneratedDomeLayout.h
 ```
 

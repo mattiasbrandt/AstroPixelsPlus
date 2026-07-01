@@ -37,6 +37,12 @@ Validate every reviewable template in this folder:
 python3 tools/validate_dome_layout_templates.py
 ```
 
+Run the validator regression tests:
+
+```bash
+python3 tools/test_dome_layout_validation.py
+```
+
 Validate a specific candidate template:
 
 ```bash
