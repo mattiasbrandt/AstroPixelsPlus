@@ -783,7 +783,7 @@ static constexpr DomeLayoutElement kElements[] = {
         0.0f,
         0.0f,
         0.0f,
-        { true, 296.0f, 216.0f },
+        { true, 313.0f, 190.0f },
         { false, 0.0f, 0.0f, 0.0f, false, 0.0f, 0.0f },
     },
 
