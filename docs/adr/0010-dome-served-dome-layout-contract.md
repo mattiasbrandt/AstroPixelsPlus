@@ -193,6 +193,8 @@ tools/generate_dome_layout_header.py
 tools/check_dome_layout_generated.py
 tools/validate_dome_layout_templates.py
 tools/test_dome_layout_validation.py
+tools/render_dome_layout_preview.py
+tools/test_dome_layout_preview.py
 GeneratedDomeLayout.h
 ```
 
@@ -262,11 +264,19 @@ commands such as `:OPP3`.
 
 Community template sharing should begin with exportable JSON files that can be
 submitted by GitHub PR, reviewed, and added to a template folder with a stable
-`template_id`, revision, and preview/documentation. The firmware command surface
-continues to define which panel identities and commands are actually supported.
+`template_id`, revision, and preview/documentation. The repository preview tool
+renders review SVGs from the same canonical Python validation path used by the
+firmware generator, but it validates in general template-review mode so valid
+non-MK4 layouts are not rejected for lacking the bundled firmware identity. The
+firmware command surface continues to define which panel identities and commands
+are actually supported.
 
 The first contract uses SVG path geometry per panel, in a declared coordinate
 space:
+
+The following JSON is explanatory. The current literal v1 field vocabulary is
+defined by `templates/dome-layouts/schema-v1.json` and enforced by
+`tools/validate_dome_layout_templates.py`.
 
 ```json
 {

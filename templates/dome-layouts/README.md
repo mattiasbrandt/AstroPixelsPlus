@@ -43,6 +43,24 @@ Run the validator regression tests:
 python3 tools/test_dome_layout_validation.py
 ```
 
+Render a visual SVG review preview for the bundled MK4 template:
+
+```bash
+python3 tools/render_dome_layout_preview.py --output /tmp/mk4-dome-layout-preview.svg
+```
+
+Render a visual preview for a candidate template:
+
+```bash
+python3 tools/render_dome_layout_preview.py --template templates/dome-layouts/my-layout.json --output /tmp/my-layout-preview.svg
+```
+
+Run the preview renderer regression tests:
+
+```bash
+python3 tools/test_dome_layout_preview.py
+```
+
 Validate a specific candidate template:
 
 ```bash
@@ -80,3 +98,6 @@ is still pinned to the bundled MK4 template.
 - Mounted features use `mounted_on` instead of being hidden only in host labels.
 - No template field leaks command strings, slots, channels, or backend hardware
   details.
+- The SVG preview is visually reviewable: rendered elements are recognizable,
+  labels/callouts remain legible, excluded identities are listed as diagnostics,
+  and obvious off-canvas or overlapping geometry is corrected before review.

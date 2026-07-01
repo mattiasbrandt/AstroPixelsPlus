@@ -133,6 +133,8 @@ The bundled MK4 template is now reviewable JSON under `templates/dome-layouts/` 
 | `tools/check_dome_layout_generated.py` | Drift check for generated output |
 | `tools/validate_dome_layout_templates.py` | Validates bundled and future contributed display templates without requiring them to be the firmware-selected MK4 template |
 | `tools/test_dome_layout_validation.py` | Regression tests for template identity, geometry, capability, and relationship validation rules |
+| `tools/render_dome_layout_preview.py` | Renders a review SVG from any validated v1 template so geometry/labels/callouts can be inspected before contribution or firmware selection |
+| `tools/test_dome_layout_preview.py` | Regression tests for preview rendering and general non-MK4 template support |
 | `GeneratedDomeLayout.h` | Committed generated firmware table used by `/api/dome/layout` |
 | `DomeElementStatus.h` | Persistent operator status storage and strict status JSON parser |
 
