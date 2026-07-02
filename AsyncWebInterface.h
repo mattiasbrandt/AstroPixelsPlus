@@ -1360,6 +1360,7 @@ static String buildI2CDiagnosticsJson(bool forceScan = false)
     json += ",\"5\":\"timeout\"";
     json += "}";
     json += "}";
+    json += "}";
     return json;
 }
 
