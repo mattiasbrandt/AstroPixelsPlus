@@ -138,6 +138,85 @@ curl http://192.168.1.100/api/diag/i2c?force=1
 
 ---
 
+## Wiring Commissioning
+
+These endpoints support build/rewire-time servo commissioning. They are not
+operational movement commands.
+
+### GET /api/panels/config
+
+Returns panel servo slot wiring for the panel PCA9685 board at `0x40`.
+
+```bash
+curl http://192.168.1.100/api/panels/config
+```
+
+### POST /api/panels/config
+
+Saves and live-applies panel slot routing. Successful saves return
+`reboot_required:false`. The request body must include all 13 panel slots; this
+example is abbreviated for readability.
+
+```bash
+curl -X POST http://192.168.1.100/api/panels/config \
+  -H "Content-Type: application/json" \
+  -d '{"slots":[{"index":0,"channel":0,"active":true}]}'
+```
+
+### GET /api/holos/config
+
+Returns holo servo slot wiring for the holo PCA9685 board at `0x41`.
+
+```bash
+curl http://192.168.1.100/api/holos/config
+```
+
+### POST /api/holos/config
+
+Saves and live-applies holo slot routing. Successful saves return
+`reboot_required:false`. The request body must include all 6 holo slots; this
+example is abbreviated for readability.
+
+```bash
+curl -X POST http://192.168.1.100/api/holos/config \
+  -H "Content-Type: application/json" \
+  -d '{"slots":[{"index":0,"channel":0,"active":true}]}'
+```
+
+Successful save response:
+
+```json
+{
+  "ok": true,
+  "applied": true,
+  "reboot_required": false
+}
+```
+
+### POST /api/servo/test
+
+Starts a raw servo test on one physical channel. Panel tests hold open; holo
+tests sweep until stopped. Starting a new test on the same board auto-stops the
+previous one.
+
+```bash
+curl -X POST http://192.168.1.100/api/servo/test \
+  -H "Content-Type: application/json" \
+  -d '{"board":"panels","channel":0}'
+```
+
+### POST /api/servo/stop
+
+Stops the active raw servo test on a board. Stop is idempotent.
+
+```bash
+curl -X POST http://192.168.1.100/api/servo/stop \
+  -H "Content-Type: application/json" \
+  -d '{"board":"panels"}'
+```
+
+---
+
 ## Dome Layout & Element Status
 
 ### GET /api/dome/layout

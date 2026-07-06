@@ -41,7 +41,7 @@ static const uint8_t defaultPanelCh[NUM_PANEL_SLOTS] = {
     8,   // slot 8:  PP1  (pie)
     9,   // slot 9:  PP2  (pie)
     10,  // slot 10: PP4  (pie)
-    11,  // slot 11: PP6  (pie, :OP11 group only)
+    11,  // slot 11: PP6  (pie, :OP12 / :OPP6)
     0,   // slot 12: PP3  — unserviced by default; channel value ignored when active=false
 };
 static const bool defaultPanelActive[NUM_PANEL_SLOTS] = {
@@ -76,10 +76,10 @@ static const bool defaultHoloActive[NUM_HOLO_SLOTS] = {
 // ---------------------------------------------------------------
 // Slot labels
 // kPanelSlotLabels: MK4 printed-droid identifiers, indexed by slot.  Used in
-// boot logs (panelConfigLoad) and referenced by panelSlotLabel() in
-// AsyncWebInterface.h for the GET /api/panels/config response.
-// kHoloSlotLabels: short axis format for boot logs.  AsyncWebInterface.h uses
-// a more verbose format (with community HP equivalents) in holoSlotLabel().
+// boot logs (panelConfigLoad) and referenced by WiringCommissioning.h for
+// the GET /api/panels/config response.
+// kHoloSlotLabels: short axis format for boot logs.  WiringCommissioning.h uses
+// a more verbose format (with community HP equivalents) for GET responses.
 // ---------------------------------------------------------------
 static const char *kPanelSlotLabels[NUM_PANEL_SLOTS] = {
     "P1", "P2", "P3", "P4", "P7", "P11", "P13",

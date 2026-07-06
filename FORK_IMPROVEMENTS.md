@@ -145,7 +145,7 @@ The bundled MK4 template is now reviewable JSON under `templates/dome-layouts/` 
 
 Runtime behavior:
 
-- Commandable ring/pie panels expose `active` based on the boot-applied `servoDispatch` state, not pending NVS wiring config.
+- Commandable ring/pie panels expose `active` based on current `servoDispatch` state after boot load or live wiring apply, not unsaved UI edits.
 - Fixed panels, holos, logic displays, and PSI elements are present as first-class layout context but remain non-commandable in this endpoint.
 - Operator `disabled` status is advisory. It is surfaced to editors/automation but does not block raw Marcduino commands.
 - If operator status storage cannot be read, composed layout responses fail closed by surfacing elements as disabled with `disabled_reason:"status unavailable"`.
@@ -694,10 +694,10 @@ A table, one row per servo slot:
 #### What the operator gets behaviourally
 
 - **Out of the box (no saved config)** — the dome works without touching the new sections if your physical wiring matches the firmware's shipped defaults: ring panels on silkscreen CH0–CH6 (P1–P4, P7, P11, P13), pie panels on CH8–CH11 (PP1, PP2, PP4, PP6), holo axes on the holo board's CH0–CH5. The Mr Baddeley MK4 Complex Dome standard defines which panels exist and which have servo mounts (he also makes a Simple Dome with few or no moving panels) — but it does NOT define controller choice or channel wiring, so these defaults are a firmware convention, not a community one.
-- **Wired differently than the defaults** — set the per-slot mapping entirely from the web UI: change the channel dropdowns to match your physical wiring, click Save, reboot. Every Marcduino command (`:OP01`–`:OP11`, `:OP00`, `:CL00`, wave/flutter/marching-ants sequences, the panel SVG diagram clicks) routes through whatever mapping you save.
-- **P11 not wired yet?** — uncheck Active for P11, save, reboot. `:OP06` and group commands skip it cleanly. No grinding, no errors. Wire it later, re-check, save, reboot.
+- **Wired differently than the defaults** — set the per-slot mapping entirely from the web UI: change the channel dropdowns to match your physical wiring, click **Save & Apply**. Every Marcduino command (`:OP01`–`:OP11`, `:OP00`, `:CL00`, wave/flutter/marching-ants sequences, the panel SVG diagram clicks) routes through the mapping immediately.
+- **P11 not wired yet?** — uncheck Active for P11 and save. `:OP06` and group commands skip it cleanly as soon as the save succeeds. No grinding, no errors. Wire it later, re-check, and save again.
 - **Two slots assigned the same channel** — both rows turn amber, the Save button greys out, with a message naming the conflicting channel. Even if the UI is bypassed entirely, the dome refuses to save a conflicting config (returns an error and leaves the saved settings untouched).
-- **Wiring stuck open?** — reboot. Test pulses don't survive a power cycle. The dome comes back with whatever the saved config says.
+- **Wiring stuck open?** — click the row's Close/Stop button. Saving wiring config also stops any active raw servo test on the same board before live-applying the new mapping. Test pulses don't survive a power cycle.
 - **Saved config survives reboot** — config lives in the dome's persistent storage, separate from anything else (no risk of accidentally clobbering it via factory reset of other prefs).
 
 #### What this also fixed in passing
@@ -714,12 +714,14 @@ A table, one row per servo slot:
 
 | File | Changes |
 |---|---|
-| `AstroPixelsPlus.ino` | Corrected default channel mappings for both PCA9685 boards. Added boot-time loaders that apply the saved wiring config before the first hardware update, plus a state machine in the main loop driving the holo sweep test. New operator-facing warnings if a slot is enabled but has no working command routing. |
-| `AsyncWebInterface.h` | Four new endpoints: read/save panel config, read/save holo config, raw channel test, stop test. Server-side validation rejects bad payloads before saving. Auto-stops any previous test before starting a new one. All test/save/reject events log to the web log viewer. |
-| `data/panels.html` | New collapsed *Servo Wiring Config* section under the existing calibration card. Conflict highlighting, test buttons, save flow with reboot prompt. Collapse state is remembered per browser. |
-| `data/holos.html` | New collapsed *Holo Wiring Config* section grouped by projector (FHP / RHP / THP) with horizontal/vertical axis rows and sweep-direction indicators. |
+| `AstroPixelsPlus.ino` | Corrected default channel mappings for both PCA9685 boards. Boot-time loaders apply saved wiring config before the first hardware update. |
+| `WiringCommissioning.h` | Deep wiring commissioning module: board metadata, config JSON, validation/save/live-apply, raw servo test lifecycle, direct PCA9685 writes, and holo sweep polling. |
+| `AsyncWebInterface.h` | Thin route adapters for read/save panel config, read/save holo config, raw channel test, and stop test. Server-side validation rejects bad payloads before saving. Auto-stops any previous test before starting a new one. All test/save/reject events log to the web log viewer. |
+| `data/wiring-config.js` | Shared browser-side wiring config module for load, duplicate-channel validation, save, reload, raw servo test, stop, and active-test cleanup behavior. |
+| `data/panels.html` | Collapsed *Servo Wiring Config* section under the existing calibration card. Conflict highlighting, test buttons, live-apply save flow. Collapse state is remembered per browser. |
+| `data/holos.html` | Collapsed *Holo Wiring Config* section grouped by projector (FHP / RHP / THP) with horizontal/vertical axis rows and sweep-direction indicators. |
 | `docs/HARDWARE_WIRING.md` | Servo channel mapping tables rewritten in silkscreen-first numbering. Holo table corrected. Callout explaining the (now-hidden) internal numbering convention. |
-| `docs/adr/0001`…`0004` | Design records for: UI uses silkscreen channel numbers; the runtime hook used to apply saved config; why command-to-slot routing stays fixed for now; why the holo board starts at firmware pin 17, not 16. Background reading for anyone modifying this code later. |
+| `docs/adr/0001`…`0004`, `docs/adr/0011-live-apply-wiring-config-saves.md` | Design records for: UI uses silkscreen channel numbers; the runtime hook used to apply saved config; why command-to-slot routing stays fixed for now; why the holo board starts at firmware pin 17, not 16; why wiring config saves now live-apply routing. |
 
 ### Logic Effects UI Coverage
 Added a new **Custom effect** builder card on Logics page to construct full `@APLE` commands from UI controls instead of relying on shortcut-only coverage. Builder supports explicit target selection (both/front/rear), complete effect list, color chips, speed/sensitivity, and duration controls with live command preview.

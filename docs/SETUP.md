@@ -517,6 +517,49 @@ Only a full `#APZERO` factory reset clears calibration data.
 
 ---
 
+## 6b. Servo Wiring Commissioning
+
+Use wiring commissioning when a panel or holo command moves the wrong physical
+servo, or when a builder wired servos to different PCA9685 silkscreen channels
+than the shipped defaults.
+
+### Panels
+
+1. Open **Panels** (`/panels.html`).
+2. Expand **Servo Wiring Config**.
+3. Use **Test** on a row to drive the selected physical channel on the panel
+   board (`0x40`).
+4. Set the row's **Channel** to the silkscreen number that actually moved.
+5. Uncheck **Active** for slots with no wired servo.
+6. Click **Save & Apply**.
+
+Saved panel wiring applies immediately. You do not need to reboot before sending
+the matching Marcduino panel command.
+
+### Holos
+
+1. Open **Holos** (`/holos.html`).
+2. Expand **Holo Wiring Config**.
+3. Use **Test** on a row to sweep the selected physical channel on the holo
+   board (`0x41`).
+4. Set the row's **Channel** to the silkscreen number that actually swept.
+5. Uncheck **Active** for axes with no wired servo.
+6. Click **Save & Apply**.
+
+Saved holo wiring applies immediately.
+
+### Safety Notes
+
+- Only one raw servo test runs per board at a time.
+- Saving wiring config stops any active raw servo test on that board before the
+  new routing is applied.
+- Duplicate active channels are rejected. The UI highlights conflicts before
+  save, and the firmware rejects conflicting POST bodies as well.
+- Wiring config changes routing only; it does not open, close, or settle every
+  configured servo.
+
+---
+
 ## 7. Hardware Wiring
 
 For detailed wiring diagrams, power requirements, and step-by-step instructions, see:
@@ -651,7 +694,9 @@ curl http://192.168.4.1/api/diag/i2c?force=1
 **Expected:** Servos move panels. If no movement:
 1. Check I2C 0x40 is detected at boot
 2. Check servo 5–6V power (servos need more current than USB can supply)
-3. Verify servo min/max pulse range in `servoSettings[]`
+3. Use **Servo Wiring Config** to confirm the panel slot is active and mapped to
+   the physical channel that actually has a servo connected
+4. Verify servo min/max pulse range in calibration
 
 ### 8.6 — Bad Motivator (if enabled)
 

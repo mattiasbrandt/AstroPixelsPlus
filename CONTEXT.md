@@ -102,6 +102,12 @@ The commissioning-time activity of assigning physical board channels to servo sl
 and marking which slots have servos wired. Done once at build or rewire time. Distinct
 from operational control (commanding panels to open/close during operation).
 
+**Raw servo test**
+A commissioning-time action that writes directly to a physical PCA9685 channel
+to identify which wired servo is connected there. It bypasses servo slots and
+Marcduino command routing. Panel raw servo tests hold the channel open until
+stopped; holo raw servo tests sweep the selected channel until stopped.
+
 **Operational control**
 Day-to-day commands sent to panels and holos: open, close, sequences, holo position.
 The primary purpose of the web UI panel and holo pages.
