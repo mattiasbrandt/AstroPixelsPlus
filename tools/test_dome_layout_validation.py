@@ -9,11 +9,12 @@ import math
 import unittest
 from pathlib import Path
 
-from generate_dome_layout_header import ValidationError, validate_template
+from generate_dome_layout_header import KNOWN_IDS, ValidationError, validate_template
 
 
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE_PATH = ROOT / "templates/dome-layouts/mr-baddeley-complex-dome-mk4.json"
+SCHEMA_PATH = ROOT / "templates/dome-layouts/schema-v1.json"
 
 
 def load_template() -> dict:
@@ -46,6 +47,14 @@ class DomeLayoutValidationTests(unittest.TestCase):
         self.assertEqual(general["template_id"], "mr-baddeley-complex-dome-mk4")
         self.assertEqual(strict["template_id"], "mr-baddeley-complex-dome-mk4")
         self.assertEqual(len(general["elements"]), 28)
+
+    def test_schema_known_id_enum_matches_generator_registry(self) -> None:
+        with SCHEMA_PATH.open("r", encoding="utf-8") as handle:
+            schema = json.load(handle)
+
+        schema_ids = set(schema["$defs"]["known_id"]["enum"])
+
+        self.assertEqual(schema_ids, KNOWN_IDS)
 
     def test_non_mk4_identity_is_valid_for_review_but_not_for_firmware_generation(self) -> None:
         template = clone_template()

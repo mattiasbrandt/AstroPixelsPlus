@@ -8,6 +8,8 @@
 #include <Arduino.h>
 #include <Preferences.h>
 
+#include "DomeJsonParsing.h"
+
 #if __has_include("GeneratedDomeLayout.h")
 #include "GeneratedDomeLayout.h"
 #define DOME_ELEMENT_STATUS_HAS_GENERATED_LAYOUT 1
@@ -21,8 +23,14 @@
 #define DOME_ELEMENT_STATUS_META_SCHEMA "es_schema"
 #define DOME_ELEMENT_STATUS_META_TEMPLATE "es_tid"
 #define DOME_ELEMENT_STATUS_META_REVISION "es_trev"
+#define DOME_ELEMENT_STATUS_META_ORDER_HASH "es_order"
 #define DOME_ELEMENT_STATUS_MAX_REASON_LEN 96
 #define DOME_ELEMENT_STATUS_MAX_ELEMENTS 64
+
+#if DOME_ELEMENT_STATUS_HAS_GENERATED_LAYOUT
+static_assert(DomeLayout::kElementCount <= DOME_ELEMENT_STATUS_MAX_ELEMENTS,
+              "Dome layout known identity count exceeds element status storage");
+#endif
 
 typedef String (*DomeElementStatusEscapeFn)(const String &);
 
@@ -121,6 +129,24 @@ static int domeElementStatusIndexOf(const String &id)
     return -1;
 }
 
+static uint32_t domeElementStatusOrderHash()
+{
+    uint32_t hash = 2166136261UL;
+    for (int i = 0; i < domeElementStatusElementCount(); i++)
+    {
+        const char *id = domeElementStatusElementId(i);
+        if (!id) continue;
+        while (*id)
+        {
+            hash ^= (uint8_t)(*id++);
+            hash *= 16777619UL;
+        }
+        hash ^= 0xFFU;
+        hash *= 16777619UL;
+    }
+    return hash;
+}
+
 static inline void domeElementStatusKey(char *out, size_t outSize,
                                         const char *fmt, int index)
 {
@@ -149,53 +175,13 @@ static bool domeElementStatusValidateReason(String &reason, String &errMsg)
 
 static void domeElementStatusSkipWs(const char *&p)
 {
-    while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r') p++;
+    domeJsonSkipWs(p);
 }
 
 static bool domeElementStatusParseJsonString(const char *&p, String &out,
                                              String &errMsg)
 {
-    domeElementStatusSkipWs(p);
-    if (*p != '"') { errMsg = "expected string"; return false; }
-    p++;
-    out = "";
-    while (*p)
-    {
-        char c = *p++;
-        if (c == '"') return true;
-        if ((unsigned char)c < 0x20)
-        {
-            errMsg = "string contains control characters";
-            return false;
-        }
-        if (c != '\\')
-        {
-            out += c;
-            continue;
-        }
-
-        char esc = *p++;
-        if (esc == '"' || esc == '\\' || esc == '/') out += esc;
-        else if (esc == 'b') out += '\b';
-        else if (esc == 'f') out += '\f';
-        else if (esc == 'n') out += '\n';
-        else if (esc == 'r') out += '\r';
-        else if (esc == 't') out += '\t';
-        else if (esc == 'u')
-        {
-            // IDs and operator reasons are ASCII-only for this endpoint. Refuse
-            // unicode escapes instead of accepting text we cannot normalize.
-            errMsg = "unicode escapes are not supported";
-            return false;
-        }
-        else
-        {
-            errMsg = "invalid string escape";
-            return false;
-        }
-    }
-    errMsg = "unterminated string";
-    return false;
+    return domeJsonParseString(p, out, errMsg, "unicode escapes are not supported");
 }
 
 static bool domeElementStatusParseLiteral(const char *&p, const char *literal)
@@ -455,6 +441,8 @@ static bool domeElementStatusSaveUpdates(const DomeElementStatusUpdate *updates,
                      domeElementStatusSchemaRevision()) == 0) allOk = false;
     if (allOk && prefs.putInt(DOME_ELEMENT_STATUS_META_REVISION,
                               domeElementStatusTemplateRevision()) == 0) allOk = false;
+    if (allOk && prefs.putULong(DOME_ELEMENT_STATUS_META_ORDER_HASH,
+                                domeElementStatusOrderHash()) == 0) allOk = false;
     if (allOk && prefs.putString(DOME_ELEMENT_STATUS_META_TEMPLATE,
                                  domeElementStatusTemplateId()) == 0) allOk = false;
     for (int i = 0; i < updateCount && allOk; i++)
@@ -491,7 +479,8 @@ static bool domeElementStatusMetadataMatches(Preferences &prefs)
 {
     if (!prefs.isKey(DOME_ELEMENT_STATUS_META_SCHEMA) ||
         !prefs.isKey(DOME_ELEMENT_STATUS_META_REVISION) ||
-        !prefs.isKey(DOME_ELEMENT_STATUS_META_TEMPLATE))
+        !prefs.isKey(DOME_ELEMENT_STATUS_META_TEMPLATE) ||
+        !prefs.isKey(DOME_ELEMENT_STATUS_META_ORDER_HASH))
     {
         return false;
     }
@@ -499,6 +488,8 @@ static bool domeElementStatusMetadataMatches(Preferences &prefs)
                domeElementStatusSchemaRevision() &&
            prefs.getInt(DOME_ELEMENT_STATUS_META_REVISION, -1) ==
                domeElementStatusTemplateRevision() &&
+           prefs.getULong(DOME_ELEMENT_STATUS_META_ORDER_HASH, 0) ==
+               domeElementStatusOrderHash() &&
            prefs.getString(DOME_ELEMENT_STATUS_META_TEMPLATE, "") ==
                domeElementStatusTemplateId();
 }

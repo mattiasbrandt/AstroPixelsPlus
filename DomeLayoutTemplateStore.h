@@ -9,6 +9,7 @@
 #include <Preferences.h>
 #include "SPIFFS.h"
 
+#include "DomeJsonParsing.h"
 #include "GeneratedDomeLayout.h"
 
 #define DOME_LAYOUT_TEMPLATE_NS "dome_layout"
@@ -17,6 +18,9 @@
 #define DOME_LAYOUT_TEMPLATE_TMP_PATH "/dome-layout-template.tmp"
 #define DOME_LAYOUT_TEMPLATE_MAX_BYTES 32768
 #define DOME_LAYOUT_TEMPLATE_MAX_ELEMENTS 64
+
+static_assert(DomeLayout::kElementCount <= DOME_LAYOUT_TEMPLATE_MAX_ELEMENTS,
+              "Dome layout known identity count exceeds template validator storage");
 
 struct DomeLayoutTemplateInfo
 {
@@ -33,51 +37,14 @@ struct DomeLayoutTemplateInfo
 
 static void domeLayoutTemplateSkipWs(const char *&p)
 {
-    while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r') p++;
+    domeJsonSkipWs(p);
 }
 
 static bool domeLayoutTemplateParseJsonString(const char *&p, String &out,
                                               String &errMsg)
 {
-    domeLayoutTemplateSkipWs(p);
-    if (*p != '"') { errMsg = "expected string"; return false; }
-    p++;
-    out = "";
-    while (*p)
-    {
-        char c = *p++;
-        if (c == '"') return true;
-        if ((unsigned char)c < 0x20)
-        {
-            errMsg = "string contains control characters";
-            return false;
-        }
-        if (c != '\\')
-        {
-            out += c;
-            continue;
-        }
-
-        char esc = *p++;
-        if (esc == '"' || esc == '\\' || esc == '/') out += esc;
-        else if (esc == 'b') out += '\b';
-        else if (esc == 'f') out += '\f';
-        else if (esc == 'n') out += '\n';
-        else if (esc == 'r') out += '\r';
-        else if (esc == 't') out += '\t';
-        else if (esc == 'u')
-        {
-            errMsg = "unicode escapes are not supported in dome templates";
-            return false;
-        }
-        else
-        {
-            errMsg = "invalid string escape";
-            return false;
-        }
-    }
-    errMsg = "unterminated string";
-    return false;
+    return domeJsonParseString(p, out, errMsg,
+                               "unicode escapes are not supported in dome templates");
 }
 
 static bool domeLayoutTemplateExpectChar(const char *&p, char expected,
@@ -114,6 +81,30 @@ static bool domeLayoutTemplateParseInt(const char *&p, int &out)
     return true;
 }
 
+static bool domeLayoutTemplateParseLiteral(const char *&p, const char *literal)
+{
+    domeLayoutTemplateSkipWs(p);
+    size_t len = strlen(literal);
+    if (strncmp(p, literal, len) != 0) return false;
+    p += len;
+    return true;
+}
+
+static bool domeLayoutTemplateParseBool(const char *&p, bool &out)
+{
+    if (domeLayoutTemplateParseLiteral(p, "true"))
+    {
+        out = true;
+        return true;
+    }
+    if (domeLayoutTemplateParseLiteral(p, "false"))
+    {
+        out = false;
+        return true;
+    }
+    return false;
+}
+
 static int domeLayoutTemplateFindKnownId(const String &id)
 {
     for (size_t i = 0; i < DomeLayout::kElementCount; i++)
@@ -131,6 +122,21 @@ static bool domeLayoutTemplateIsCommandableId(const String &id)
         if (id == element.id) return element.commandable;
     }
     return false;
+}
+
+static bool domeLayoutTemplateIsElementType(const String &value)
+{
+    return value == "panel" ||
+           value == "holo" ||
+           value == "logic" ||
+           value == "psi";
+}
+
+static bool domeLayoutTemplateIsPanelKind(const String &value)
+{
+    return value == "ring" ||
+           value == "pie" ||
+           value == "fixed";
 }
 
 static bool domeLayoutTemplateHasForbiddenBackendKey(const String &key)
@@ -303,8 +309,12 @@ static bool domeLayoutTemplateValidateElementObject(const char *&p, bool *seenId
     if (!domeLayoutTemplateExpectChar(p, '{', errMsg)) return false;
     bool seenId = false;
     bool seenInLayout = false;
+    bool seenElementType = false;
+    bool seenPanelKind = false;
     bool seenCommandable = false;
     bool inLayout = false;
+    String elementType;
+    String panelKind;
     bool commandable = false;
     String id;
 
@@ -338,18 +348,48 @@ static bool domeLayoutTemplateValidateElementObject(const char *&p, bool *seenId
         }
         else if (key == "in_layout")
         {
-            domeLayoutTemplateSkipWs(p);
-            if (strncmp(p, "true", 4) == 0) { inLayout = true; p += 4; }
-            else if (strncmp(p, "false", 5) == 0) { inLayout = false; p += 5; }
-            else { errMsg = "in_layout must be boolean"; return false; }
+            if (!domeLayoutTemplateParseBool(p, inLayout))
+            {
+                errMsg = "in_layout must be boolean";
+                return false;
+            }
             seenInLayout = true;
+        }
+        else if (key == "element_type")
+        {
+            if (!domeLayoutTemplateParseJsonString(p, elementType, errMsg)) return false;
+            if (!domeLayoutTemplateIsElementType(elementType))
+            {
+                errMsg = "unsupported element_type: " + elementType;
+                return false;
+            }
+            seenElementType = true;
+        }
+        else if (key == "panel_kind")
+        {
+            domeLayoutTemplateSkipWs(p);
+            if (domeLayoutTemplateParseLiteral(p, "null"))
+            {
+                panelKind = "";
+            }
+            else
+            {
+                if (!domeLayoutTemplateParseJsonString(p, panelKind, errMsg)) return false;
+                if (!domeLayoutTemplateIsPanelKind(panelKind))
+                {
+                    errMsg = "unsupported panel_kind: " + panelKind;
+                    return false;
+                }
+            }
+            seenPanelKind = true;
         }
         else if (key == "commandable")
         {
-            domeLayoutTemplateSkipWs(p);
-            if (strncmp(p, "true", 4) == 0) { commandable = true; p += 4; }
-            else if (strncmp(p, "false", 5) == 0) { commandable = false; p += 5; }
-            else { errMsg = "commandable must be boolean"; return false; }
+            if (!domeLayoutTemplateParseBool(p, commandable))
+            {
+                errMsg = "commandable must be boolean";
+                return false;
+            }
             seenCommandable = true;
         }
         else
@@ -364,9 +404,23 @@ static bool domeLayoutTemplateValidateElementObject(const char *&p, bool *seenId
         return false;
     }
 
-    if (!seenId || !seenInLayout || !seenCommandable)
+    if (!seenId || !seenInLayout || !seenElementType || !seenPanelKind ||
+        !seenCommandable)
     {
-        errMsg = "element requires id, in_layout, and commandable";
+        errMsg = "element requires id, in_layout, element_type, panel_kind, and commandable";
+        return false;
+    }
+    if (elementType == "panel")
+    {
+        if (!domeLayoutTemplateIsPanelKind(panelKind))
+        {
+            errMsg = "panel_kind is required for panel element: " + id;
+            return false;
+        }
+    }
+    else if (panelKind.length() > 0)
+    {
+        errMsg = "panel_kind must be null for non-panel element: " + id;
         return false;
     }
     int index = domeLayoutTemplateFindKnownId(id);

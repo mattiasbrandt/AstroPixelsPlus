@@ -565,9 +565,13 @@
     function domePanelClick(id) {
       var el = document.getElementById(id.toLowerCase());
       if (!el) return;
+      if (!window.domeLayoutStatusLoaded) {
+        if (typeof window.uiToast === 'function') window.uiToast('Dome layout status is still loading', 'warn');
+        return;
+      }
       var status = window.domeElementStatusById && window.domeElementStatusById[id];
-      if (status && status.disabled) {
-        var reason = status.disabled_reason ? (': ' + status.disabled_reason) : '';
+      if (!status || status.disabled) {
+        var reason = status && status.disabled_reason ? (': ' + status.disabled_reason) : '';
         if (typeof window.uiToast === 'function') window.uiToast(id + ' disabled' + reason, 'warn');
         return;
       }
@@ -778,6 +782,7 @@
       var elements = [];
 
       window.domeElementStatusById = window.domeElementStatusById || {};
+      window.domeLayoutStatusLoaded = false;
 
       function showError(msg) {
         if (!errorEl) return;
@@ -846,6 +851,21 @@
         });
       }
 
+      function setAllPanelControlsDisabled(disabled, title) {
+        Array.prototype.forEach.call(document.querySelectorAll('[data-dome-panel]'), function(btn) {
+          var base = titleBase(btn);
+          btn.disabled = !!disabled;
+          btn.classList.toggle('is-dome-disabled', !!disabled);
+          if (disabled) {
+            btn.setAttribute('title', title || 'Dome layout status unavailable');
+          } else if (base) {
+            btn.setAttribute('title', base);
+          } else {
+            btn.removeAttribute('title');
+          }
+        });
+      }
+
       function setSvgStatus(el) {
         var id = el.id;
         var disabled = !!el.disabled;
@@ -879,6 +899,7 @@
           setSvgStatus(el);
           if (el.commandable) setButtonStatus(el.id, !!el.disabled, el.disabled_reason || '');
         });
+        window.domeLayoutStatusLoaded = true;
       }
 
       function renderRows() {
@@ -955,6 +976,8 @@
         if (loading) loading.style.display = '';
         if (tableWrap) tableWrap.style.display = 'none';
         if (resultEl) resultEl.textContent = '';
+        window.domeLayoutStatusLoaded = false;
+        setAllPanelControlsDisabled(true, 'Dome layout status loading');
         return fetch('/api/dome/layout').then(function(r) {
           if (!r.ok) throw new Error('HTTP ' + r.status);
           return r.json();
@@ -966,6 +989,7 @@
           if (tableWrap) tableWrap.style.display = '';
         }).catch(function(err) {
           if (loading) loading.style.display = 'none';
+          setAllPanelControlsDisabled(true, 'Dome layout status unavailable');
           showError('Failed to load dome layout: ' + err.message);
         });
       }

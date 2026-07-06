@@ -160,23 +160,47 @@ details.
 {
   "schema_revision": 1,
   "template_id": "mr-baddeley-complex-dome-mk4",
+  "template_name": "Mr Baddeley Complex Dome MK4",
   "template_revision": 1,
+  "model": "MK4",
+  "source": "AstroPixelsPlus data/panels.html",
   "layout_source": "bundled",
   "coordinate_space": { "viewBox": "0 0 480 480" },
   "runtime_state_ts": 123456,
   "elements": [
     {
       "id": "PP3",
+      "label": "PP3",
       "element_type": "panel",
       "panel_kind": "pie",
+      "mounted_on": null,
+      "in_layout": true,
       "commandable": true,
       "active": false,
       "disabled": true,
-      "disabled_reason": "Upper pie linkage binding"
+      "disabled_reason": "Upper pie linkage binding",
+      "aliases": [],
+      "capabilities": ["open", "close", "flutter"],
+      "render_order": 180,
+      "geometry": {
+        "type": "svg_path",
+        "d": "M 279.9,166.2 A 80,80 0 0 1 270.3,178.6 L 246.2,160.7 A 50,50 0 0 0 252.2,152.9 Z"
+      },
+      "label_anchor": { "x": 301.8, "y": 158.9 },
+      "callout": {
+        "x": 301.8,
+        "y": 158.9,
+        "r": 10.0,
+        "connector_to": { "x": 266.1, "y": 156.6 }
+      }
     }
   ]
 }
 ```
+
+If operator status storage cannot be read, `disabled` fails closed as `true`
+with `disabled_reason:"status unavailable"` so consumers do not accidentally
+author movement for an element whose suppression state is unknown.
 
 ### GET /api/dome/layout-template
 

@@ -713,7 +713,12 @@ static bool domeLayoutReadStatusForId(const String &id,
 {
     disabled = false;
     reason = "";
-    if (!statusOk) return false;
+    if (!statusOk)
+    {
+        disabled = true;
+        reason = "status unavailable";
+        return false;
+    }
     int index = domeElementStatusIndexOf(id);
     if (index < 0 || index >= DOME_ELEMENT_STATUS_MAX_ELEMENTS) return false;
     disabled = statuses[index].disabled;
@@ -721,28 +726,35 @@ static bool domeLayoutReadStatusForId(const String &id,
     return true;
 }
 
+static bool domeLayoutElementCarriesActive(const String &id)
+{
+    return domeLayoutTemplateIsCommandableId(id);
+}
+
 static bool domeLayoutTemplateFindElementFieldBool(const String &objectJson,
                                                    const char *wantedKey,
                                                    bool &out)
 {
-    String needle = String("\"") + wantedKey + "\"";
-    int keyAt = objectJson.indexOf(needle);
-    if (keyAt < 0) return false;
-    int colonAt = objectJson.indexOf(':', keyAt + needle.length());
-    if (colonAt < 0) return false;
-    const char *p = objectJson.c_str() + colonAt + 1;
-    while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r') p++;
-    if (strncmp(p, "true", 4) == 0)
+    const char *p = objectJson.c_str();
+    String errMsg;
+    if (!domeLayoutTemplateExpectChar(p, '{', errMsg)) return false;
+    while (true)
     {
-        out = true;
-        return true;
+        domeLayoutTemplateSkipWs(p);
+        if (*p == '}') return false;
+        String key;
+        if (!domeLayoutTemplateParseJsonString(p, key, errMsg)) return false;
+        if (!domeLayoutTemplateExpectChar(p, ':', errMsg)) return false;
+        if (key == wantedKey)
+        {
+            return domeLayoutTemplateParseBool(p, out);
+        }
+        if (!domeLayoutTemplateSkipJsonValue(p, errMsg)) return false;
+        domeLayoutTemplateSkipWs(p);
+        if (*p == ',') { p++; continue; }
+        if (*p == '}') return false;
+        return false;
     }
-    if (strncmp(p, "false", 5) == 0)
-    {
-        out = false;
-        return true;
-    }
-    return false;
 }
 
 static int domeLayoutTemplateFindElementsKey(const String &json)
@@ -793,7 +805,7 @@ static bool domeLayoutTemplateAppendComposedElement(String &out,
     int closeAt = elementJson.lastIndexOf('}');
     if (closeAt < 0) return false;
     out += elementJson.substring(0, closeAt);
-    if (commandable && domeLayoutTemplateIsCommandableId(id))
+    if (commandable && domeLayoutElementCarriesActive(id))
     {
         out += ",\"active\":";
         out += domeLayoutPanelActive(id.c_str()) ? "true" : "false";
@@ -953,14 +965,15 @@ static String buildBundledDomeLayoutJson()
         json += element.inLayout ? "true" : "false";
         json += ",\"commandable\":";
         json += element.commandable ? "true" : "false";
-        if (element.commandable && element.panelKind && strcmp(element.panelKind, "fixed") != 0)
+        if (element.commandable && domeLayoutElementCarriesActive(String(element.id)))
         {
             json += ",\"active\":";
             json += domeLayoutPanelActive(element.id) ? "true" : "false";
         }
         json += ",\"disabled\":";
-        bool disabled = statusOk ? statuses[i].disabled : false;
-        String reason = statusOk ? statuses[i].reason : "";
+        bool disabled = false;
+        String reason;
+        domeLayoutReadStatusForId(String(element.id), statuses, statusOk, disabled, reason);
         json += disabled ? "true" : "false";
         json += ",\"disabled_reason\":";
         if (disabled && reason.length() > 0)
