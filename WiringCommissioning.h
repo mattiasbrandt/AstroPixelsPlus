@@ -334,16 +334,45 @@ static uint8_t sWiringHoloSweepChannel = 0;
 static uint8_t sWiringHoloSweepPhase = 0;
 static uint32_t sWiringHoloSweepDeadline = 0;
 
-static void wiringWritePwm(uint8_t boardAddr, uint8_t channel, uint16_t count)
+struct WiringPwmWrite
 {
-    if (channel > 15) return;
-    Wire.beginTransmission(boardAddr);
-    Wire.write(6 + channel * 4);
+    uint8_t boardAddr;
+    uint8_t channel;
+    uint16_t count;
+};
+
+typedef bool (*WiringPwmWriter)(const WiringPwmWrite &write);
+
+static bool wiringWritePwmToWire(const WiringPwmWrite &write)
+{
+    Wire.beginTransmission(write.boardAddr);
+    Wire.write(6 + write.channel * 4);
     Wire.write(0);
     Wire.write(0);
-    Wire.write(lowByte(count));
-    Wire.write(highByte(count));
-    Wire.endTransmission();
+    Wire.write(lowByte(write.count));
+    Wire.write(highByte(write.count));
+    return Wire.endTransmission() == 0;
+}
+
+static WiringPwmWriter sWiringPwmWriter = wiringWritePwmToWire;
+
+#ifdef WIRING_COMMISSIONING_TEST_HOOKS
+static void wiringCommissioningSetPwmWriterForTest(WiringPwmWriter writer)
+{
+    sWiringPwmWriter = writer ? writer : wiringWritePwmToWire;
+}
+
+static void wiringCommissioningResetPwmWriterForTest()
+{
+    sWiringPwmWriter = wiringWritePwmToWire;
+}
+#endif
+
+static bool wiringWritePwm(uint8_t boardAddr, uint8_t channel, uint16_t count)
+{
+    if (channel > 15) return false;
+    WiringPwmWrite write = { boardAddr, channel, count };
+    return sWiringPwmWriter(write);
 }
 
 static int8_t wiringActiveTestChannel(const WiringBoardSpec &spec)
