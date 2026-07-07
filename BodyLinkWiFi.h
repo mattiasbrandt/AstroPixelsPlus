@@ -37,7 +37,7 @@ static uint32_t sBodyLastMdnsResolveMs = 0;
 static IPAddress sBodyPeerIp(0, 0, 0, 0);
 static BodyLinkPeerSource sBodyPeerSource = BODY_LINK_PEER_NONE;
 
-static void processMarcduinoCommandWithSourceMain(const char *source, const char *cmd);
+static void processMarcduinoCommandWithSourceMain(const MarcduinoIngressSource &source, const char *cmd);
 
 static bool bodyLinkIpKnown(const IPAddress &ip)
 {
@@ -271,7 +271,7 @@ static void bodyLinkWiFiRx()
                 else
                 {
                     bodyLinkMarkWifiActivity(now);
-                    processMarcduinoCommandWithSourceMain("body-link-wifi", lineBuf);
+                    processMarcduinoCommandWithSourceMain(kMarcduinoIngressBodyLinkWifi, lineBuf);
                 }
                 lineLen = 0;
                 continue;

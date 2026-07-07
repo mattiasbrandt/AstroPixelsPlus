@@ -223,20 +223,21 @@ static bool guardSleep(AsyncWebServerRequest *request, const char *cmd)
     return false;
 }
 
-static void processMarcduinoCommandWithSource(const char *source, const char *cmd)
+static void processMarcduinoCommandWithSource(const MarcduinoIngressSource &source, const char *cmd)
 {
     if (cmd == nullptr || cmd[0] == '\0') return;
+    const char *label = marcduinoIngressSourceLabel(source);
     if (shouldBlockCommandDuringSleep(cmd))
     {
-        logCapture.printf("[CMD][%s][sleep-blocked] %s\n", source, cmd);
+        logCapture.printf("[CMD][%s][sleep-blocked] %s\n", label, cmd);
         return;
     }
-    logCapture.printf("[CMD][%s] %s\n", source, cmd);
-    if (handleImmediateServoMoveCommand(source, cmd))
+    logCapture.printf("[CMD][%s] %s\n", label, cmd);
+    if (handleImmediateServoMoveCommand(label, cmd))
         return;
-    if (applyDomeVisualPresetCommand(source, cmd))
+    if (applyDomeVisualPresetCommand(label, cmd))
         return;
-    if (applyDomeVisualAuthoringCommand(source, cmd))
+    if (applyDomeVisualAuthoringCommand(label, cmd))
         return;
 
     // Panel calibration commands are handled here synchronously rather than
@@ -304,7 +305,7 @@ static void processMarcduinoCommandWithSource(const char *source, const char *cm
         return;
     }
 
-    enqueueMarcduinoCommand(source, cmd);
+    enqueueMarcduinoCommand(label, cmd);
 }
 
 static bool isSensitivePrefKey(const String &key)
@@ -441,7 +442,7 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
             char cmd[64];
             if (parseWsCommand(data, len, cmd, sizeof(cmd)))
             {
-                processMarcduinoCommandWithSource("astropixel-web-ws", cmd);
+                processMarcduinoCommandWithSource(kMarcduinoIngressWebSocket, cmd);
                 broadcastState();
             }
         }
@@ -1332,7 +1333,7 @@ static void initAsyncWeb()
         if (!validateMarcduinoCmd(request, cmd)) return;
         if (guardSleep(request, cmd.c_str())) return;
         logCapture.printf("[API] cmd=%s len=%u\n", cmd.c_str(), (unsigned int)cmd.length());
-        processMarcduinoCommandWithSource("astropixel-web-api", cmd.c_str());
+        processMarcduinoCommandWithSource(kMarcduinoIngressWebApi, cmd.c_str());
         broadcastState();
         request->send(200, "application/json", "{\"ok\":true}");
     });
@@ -1881,12 +1882,12 @@ static void initAsyncWeb()
         if (!parsePostParam(request, "state", state)) return;
         if (state == "on")
         {
-            processMarcduinoCommandWithSource("astropixel-web-api", "BMON");
+            processMarcduinoCommandWithSource(kMarcduinoIngressWebApi, "BMON");
             request->send(200, "application/json", "{\"ok\":true,\"state\":\"on\"}");
         }
         else if (state == "off")
         {
-            processMarcduinoCommandWithSource("astropixel-web-api", "BMOFF");
+            processMarcduinoCommandWithSource(kMarcduinoIngressWebApi, "BMOFF");
             request->send(200, "application/json", "{\"ok\":true,\"state\":\"off\"}");
         }
         else
@@ -1902,12 +1903,12 @@ static void initAsyncWeb()
         if (!parsePostParam(request, "state", state)) return;
         if (state == "on")
         {
-            processMarcduinoCommandWithSource("astropixel-web-api", "FS11000");
+            processMarcduinoCommandWithSource(kMarcduinoIngressWebApi, "FS11000");
             request->send(200, "application/json", "{\"ok\":true,\"state\":\"on\"}");
         }
         else if (state == "off")
         {
-            processMarcduinoCommandWithSource("astropixel-web-api", "FSOFF");
+            processMarcduinoCommandWithSource(kMarcduinoIngressWebApi, "FSOFF");
             request->send(200, "application/json", "{\"ok\":true,\"state\":\"off\"}");
         }
         else
@@ -1939,7 +1940,7 @@ static void initAsyncWeb()
             char duration[3];
             snprintf(duration, sizeof(duration), "%02u", durationSec);
             String cmd = "CB2" + String(duration) + "006";
-            processMarcduinoCommandWithSource("astropixel-web-api", cmd.c_str());
+            processMarcduinoCommandWithSource(kMarcduinoIngressWebApi, cmd.c_str());
             request->send(200, "application/json", "{\"ok\":true,\"action\":\"flicker\",\"duration\":" + String(durationSec) + "}");
         }
         else if (action == "disable")
@@ -1954,7 +1955,7 @@ static void initAsyncWeb()
             char duration[3];
             snprintf(duration, sizeof(duration), "%02u", durationSec);
             String cmd = "CB1" + String(duration) + "008";
-            processMarcduinoCommandWithSource("astropixel-web-api", cmd.c_str());
+            processMarcduinoCommandWithSource(kMarcduinoIngressWebApi, cmd.c_str());
             request->send(200, "application/json", "{\"ok\":true,\"action\":\"disable\",\"duration\":" + String(durationSec) + "}");
         }
         else
@@ -1986,7 +1987,7 @@ static void initAsyncWeb()
             char duration[3];
             snprintf(duration, sizeof(duration), "%02u", durationSec);
             String cmd = "DP2" + String(duration) + "006";
-            processMarcduinoCommandWithSource("astropixel-web-api", cmd.c_str());
+            processMarcduinoCommandWithSource(kMarcduinoIngressWebApi, cmd.c_str());
             request->send(200, "application/json", "{\"ok\":true,\"action\":\"flicker\",\"duration\":" + String(durationSec) + "}");
         }
         else if (action == "disable")
@@ -2001,7 +2002,7 @@ static void initAsyncWeb()
             char duration[3];
             snprintf(duration, sizeof(duration), "%02u", durationSec);
             String cmd = "DP1" + String(duration) + "008";
-            processMarcduinoCommandWithSource("astropixel-web-api", cmd.c_str());
+            processMarcduinoCommandWithSource(kMarcduinoIngressWebApi, cmd.c_str());
             request->send(200, "application/json", "{\"ok\":true,\"action\":\"disable\",\"duration\":" + String(durationSec) + "}");
         }
         else

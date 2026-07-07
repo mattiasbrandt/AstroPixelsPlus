@@ -127,6 +127,7 @@
 
 #include "WiringConfig.h"
 #include "DomeElementStatus.h"
+#include "MarcduinoIngress.h"
 
 
 #define PREFERENCE_MARCSOUND "msound"
@@ -845,11 +846,6 @@ static bool bodyLinkConnected()
     return sBodyLastSeenMs > 0 && (millis() - sBodyLastSeenMs) < 5000;
 }
 
-static bool isBodyLinkSource(const char *source)
-{
-    return source != nullptr && strncmp(source, "body-link-", 10) == 0;
-}
-
 static bool isMoodResetCommand(const char *cmd)
 {
     return cmd != nullptr &&
@@ -941,7 +937,7 @@ static void handleBodySerial()
                 else
                 {
                     bodyLinkMarkUartActivity(now);
-                    processMarcduinoCommandWithSourceMain("body-link-uart", sBuf);
+                    processMarcduinoCommandWithSourceMain(kMarcduinoIngressBodyLinkUart, sBuf);
                 }
                 sBufLen = 0;
             }
@@ -1490,7 +1486,7 @@ void setup()
             wifiMarcduinoReceiver.setCommandHandler([](const char *cmd)
                                                     {
                 printf("cmd: %s\n", cmd);
-                processMarcduinoCommandWithSourceMain("wifi-marcduino", cmd);
+                processMarcduinoCommandWithSourceMain(kMarcduinoIngressWifiMarcduino, cmd);
                 if (preferences.getBool(PREFERENCE_MARCWIFI_SERIAL_PASS, MARC_WIFI_SERIAL_PASS))
                 {
                     COMMAND_SERIAL.print(cmd); COMMAND_SERIAL.print('\r');
@@ -1968,27 +1964,28 @@ bool exitSoftSleepMode(bool fromPeer)
     return true;
 }
 
-static void processMarcduinoCommandWithSourceMain(const char *source, const char *cmd)
+static void processMarcduinoCommandWithSourceMain(const MarcduinoIngressSource &source, const char *cmd)
 {
     if (cmd == nullptr || cmd[0] == '\0') return;
+    const char *label = marcduinoIngressSourceLabel(source);
     if (shouldBlockCommandDuringSleep(cmd))
     {
-        logCapture.printf("[CMD][%s][sleep-blocked] %s\n", source, cmd);
+        logCapture.printf("[CMD][%s][sleep-blocked] %s\n", label, cmd);
         return;
     }
     if (shouldDropDuplicateMoodReset(cmd))
     {
-        logCapture.printf("[CMD][%s][mood-duplicate-dropped] %s\n", source, cmd);
+        logCapture.printf("[CMD][%s][mood-duplicate-dropped] %s\n", label, cmd);
         return;
     }
-    logCapture.printf("[CMD][%s] %s\n", source, cmd);
-    if (handleImmediateServoMoveCommand(source, cmd))
+    logCapture.printf("[CMD][%s] %s\n", label, cmd);
+    if (handleImmediateServoMoveCommand(label, cmd))
         return;
-    if (applyDomeVisualPresetCommand(source, cmd))
+    if (applyDomeVisualPresetCommand(label, cmd))
         return;
-    if (applyDomeVisualAuthoringCommand(source, cmd))
+    if (applyDomeVisualAuthoringCommand(label, cmd))
         return;
-    enqueueMarcduinoCommand(source, cmd, isBodyLinkSource(source));
+    enqueueMarcduinoCommand(label, cmd, marcduinoIngressSuppressesBodyLinkEgress(source));
 }
 
 ////////////////
@@ -1999,7 +1996,7 @@ I2CReceiverBase<CONSOLE_BUFFER_SIZE> i2cReceiver(USE_I2C_ADDRESS, [](char *cmd)
     DEBUG_PRINT(F("[I2C] RECEIVED=\""));
     DEBUG_PRINT(cmd);
     DEBUG_PRINTLN(F("\""));
-    processMarcduinoCommandWithSourceMain("i2c-slave", cmd); });
+    processMarcduinoCommandWithSourceMain(kMarcduinoIngressI2CSlave, cmd); });
 #endif
 
 ////////////////
@@ -2139,7 +2136,7 @@ void mainLoop()
         // ================================================================
         if (ch == 0x0A || ch == 0x0D)
         {
-            processMarcduinoCommandWithSourceMain("usb-serial", sBuffer);
+            processMarcduinoCommandWithSourceMain(kMarcduinoIngressUsbSerial, sBuffer);
             sPos = 0;
         }
         else if (sPos < SizeOfArray(sBuffer) - 1)
