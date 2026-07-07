@@ -36,7 +36,7 @@ Updated and pinned dependency set for reproducible builds:
 Build verification passes with this set (`pio run` and `buildfs`). Runtime validation on hardware confirms web server stability and light control path functionality.
 
 ### Async Web Migration (Transport Layer Only)
-Migrated UI transport from static ReelTwo `WebPages.h` patterns to async REST/WS + SPIFFS pages. Core control path remains unchanged: all command sources still route into `Marcduino::processCommand(...)`. Added/maintained API endpoints for state/health/logs, command posting, preferences, reboot, and OTA upload.
+Migrated UI transport from static ReelTwo `WebPages.h` patterns to async REST/WS + SPIFFS pages. Command transports now cross the shared `marcduinoIngressAdmit()` seam before reaching immediate handlers or the Marcduino queue. Added/maintained API endpoints for state/health/logs, command posting, preferences, reboot, and OTA upload.
 
 ### Async Startup Ordering Hardening
 Fixed startup ordering for async web startup to avoid early lwIP calls before WiFi connectivity is established. `initAsyncWeb()` is now started from WiFi-connected callback flow instead of unconditional early setup startup. This addresses observed `tcpip_api_call ... Invalid mbox` crashloop behavior seen during dependency test iterations.
@@ -493,6 +493,12 @@ Added source-tagged command logging for ingress paths:
 - `body-link-uart`
 - `body-link-wifi`
 
+All external command transports use `MarcduinoIngress.h` source metadata for
+sleep gating, mood-reset dedupe, immediate servo moves, visual preset/authoring
+commands, calibration command safety, queue admission, and body-link echo
+suppression. Human-readable labels stay in logs, but policy no longer depends
+on raw source-string comparisons.
+
 ### Holo Command Corrections
 Corrected holo OFF semantics to ReelTwo clear command form:
 - `*OF00 -> HPA096`
@@ -604,9 +610,9 @@ Fixed a silent failure in `:MV`, `#SO`, `#SC`, `#SW` where the servo never moved
 
 **Root cause:** `MARCDUINO_ACTION` wraps the handler body in `DO_ONCE()` inside `animateOnce()`, deferring execution to the next `AnimatedEvent::process()` loop iteration. The incoming `cmd` string is a temporary buffer that is freed before that iteration runs. `getCommand()` inside the deferred body returned a dangling pointer, causing all argument parsing to silently fail.
 
-**Fix:** `:MV`, `#SO`, `#SC`, `#SW` are now intercepted and executed synchronously in `processMarcduinoCommandWithSource()` (`AsyncWebInterface.h`) while `cmd` is still valid on the stack. The `MARCDUINO_ACTION` stubs in `MarcduinoPanel.h` are kept as empty registrations so the Marcduino command registry still recognises the prefixes.
+**Fix:** `:MV`, `#SO`, `#SC`, `#SW` are now intercepted and executed synchronously in `marcduinoIngressAdmit()` (`MarcduinoIngress.h`) before queueing, while `cmd` is still valid. The `MARCDUINO_ACTION` handlers in `MarcduinoPanel.h` remain as compatibility registrations/fallbacks, but normal REST, WebSocket, USB serial, WiFi Marcduino, body-link UART/WiFi, and I2C ingress no longer rely on deferred suffix parsing.
 
-**Limitation:** Commands sent over physical Serial2 (Marcduino serial path) still go through `Marcduino::processCommand()` directly and will hit the empty stubs — calibration is a web UI workflow and is not expected to be driven over serial.
+**Transport behavior:** Calibration safety now applies uniformly across the shared ingress seam. Physical Serial2/body-link calibration commands are handled by the same synchronous path as web commands when body-link/manual ingress is active.
 
 Follow-up: raw `:SM` servo move commands hit the same deferred `getCommand()` trap when arriving through queued web/body/serial ingress. Dome-owned sequences worked because they call `servoDispatch.moveToPulse(...)` directly and never parse a Marcduino suffix. `:SM` is now intercepted synchronously for all ingress paths before queueing, logs `[SM-exec]` with the parsed slot/timing/pulse, and cancels pending panel-release state for the target slot group before moving.
 
@@ -827,7 +833,7 @@ Dispatch path: a `DM:*` handler sets `dome_pendingAnim` (an `AnimationStep`); `m
 Consequence: a direct panel command (`:OP01`) now **preempts** a running dome sequence (they share `player`) instead of being blocked behind it. `DM:LOW` open/close + a following `:OP01`/`:CL01` is hardware-verified to work without a reboot.
 
 #### Command logging
-All command ingress paths now write through `logCapture`, not raw `Serial.printf`, so the web console and `/api/logs` show commands received over USB serial, WiFi Marcduino, body-link UART/WiFi, WebSocket, and REST. The main-loop queue drain also logs `[CMD][source][dispatch] ...` immediately before `Marcduino::processCommand(...)`, making it visible when an accepted command actually reaches the Marcduino action layer.
+All command ingress paths now write through `logCapture`, not raw `Serial.printf`, so the web console and `/api/logs` show commands received over USB serial, WiFi Marcduino, body-link UART/WiFi, WebSocket, and REST. The shared `marcduinoIngressAdmit()` path logs admission, and the main-loop queue drain logs `[CMD][source][dispatch] ...` immediately before `Marcduino::processCommand(...)`, making it visible when an accepted command actually reaches the Marcduino action layer.
 
 #### Command reference
 

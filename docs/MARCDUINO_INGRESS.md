@@ -5,15 +5,15 @@ while unifying Marcduino command ingress.
 
 ## Entry Points
 
-| Source | Current caller | Admission path before refactor | Notes |
+| Source | Current caller | Current admission path | Notes |
 | --- | --- | --- | --- |
-| REST API | `POST /api/cmd` and feature routes in `AsyncWebInterface.h` | `processMarcduinoCommandWithSource` | `/api/cmd` validates command text and returns HTTP 423 while sleeping. Feature routes synthesize fixed commands and rely on the shared web path for the sleep gate. |
-| WebSocket | `/ws` text command frames | `processMarcduinoCommandWithSource` | Parsed into a local 64-byte buffer. No per-message response; state is broadcast after admission. |
-| USB serial | `Serial` in `mainLoop()` | `processMarcduinoCommandWithSourceMain` | Uses `sBuffer`, capped by `CONSOLE_BUFFER_SIZE`. Optional pass-through to `COMMAND_SERIAL` happens before local admission. |
-| Body-link UART | `COMMAND_SERIAL` in `handleBodySerial()` | `processMarcduinoCommandWithSourceMain` | Heartbeat `#PAHB` is consumed by the transport and not admitted as a Marcduino command. Other lines update body-link activity. |
-| Body-link WiFi | UDP in `BodyLinkWiFi.h` | `processMarcduinoCommandWithSourceMain` | Heartbeat `#PAHB` is consumed by the transport and not admitted. UDP payload lines are capped at 64 bytes. |
-| WiFi Marcduino | `WifiMarcduinoReceiver` callback | `processMarcduinoCommandWithSourceMain` | Optional serial pass-through is controlled by `MARC_WIFI_SERIAL_PASS`. |
-| I2C slave | `I2CReceiverBase` callback when `USE_I2C_ADDRESS` is enabled | `processMarcduinoCommandWithSourceMain` | Logs the received frame before admission. This build mode disables servo support. |
+| REST API | `POST /api/cmd` and feature routes in `AsyncWebInterface.h` | `marcduinoIngressAdmit(kMarcduinoIngressWebApi, cmd)` | `/api/cmd` validates command text and returns HTTP 423 while sleeping. Feature routes synthesize fixed commands and rely on shared ingress for policy. |
+| WebSocket | `/ws` text command frames | `marcduinoIngressAdmit(kMarcduinoIngressWebSocket, cmd)` | Parsed into a local 64-byte buffer. No per-message response; state is broadcast after admission. |
+| USB serial | `Serial` in `mainLoop()` | `marcduinoIngressAdmit(kMarcduinoIngressUsbSerial, cmd)` | Uses `sBuffer`, capped by `CONSOLE_BUFFER_SIZE`. Optional pass-through to `COMMAND_SERIAL` happens before local admission. |
+| Body-link UART | `COMMAND_SERIAL` in `handleBodySerial()` | `marcduinoIngressAdmit(kMarcduinoIngressBodyLinkUart, cmd)` | Heartbeat `#PAHB` is consumed by the transport and not admitted as a Marcduino command. Other lines update body-link activity. |
+| Body-link WiFi | UDP in `BodyLinkWiFi.h` | `marcduinoIngressAdmit(kMarcduinoIngressBodyLinkWifi, cmd)` | Heartbeat `#PAHB` is consumed by the transport and not admitted. UDP payload lines are capped at 64 bytes. |
+| WiFi Marcduino | `WifiMarcduinoReceiver` callback | `marcduinoIngressAdmit(kMarcduinoIngressWifiMarcduino, cmd)` | Optional serial pass-through is controlled by `MARC_WIFI_SERIAL_PASS`. |
+| I2C slave | `I2CReceiverBase` callback when `USE_I2C_ADDRESS` is enabled | `marcduinoIngressAdmit(kMarcduinoIngressI2CSlave, cmd)` | Logs the received frame before admission. This build mode disables servo support. |
 | Internal dome sequence queue | `DomeSequences.h` | `enqueueMarcduinoCommand` | Used to avoid re-entrant `Marcduino::processCommand()` from sequence callbacks. |
 | Legacy Marcduino serial parser | `MarcduinoSerial` when body-link is disabled | ReelTwo stream handler | Bypasses the fork ingress functions and is left out of scope unless the stream callback is explicitly rewired. |
 
@@ -26,11 +26,11 @@ while unifying Marcduino command ingress.
 | Immediate servo move (`:SM`) | Runs immediately, bypasses queue | Same | Same | Invalid args are consumed and logged as `SM-invalid` or `SM-bad-slot`. |
 | Visual preset (`DV:*`) | Runs immediately, bypasses queue | Same | Same | Unknown presets are consumed, increment unknown telemetry, and do not reach Marcduino handlers. |
 | Visual authoring (`DL:`, `DT:`, `DH:`) | Runs immediately, bypasses queue | Same | Same | Rejected authoring commands are still consumed and counted so they do not fall through to legacy handlers. |
-| Panel calibration (`:MV`, `#SO`, `#SC`, `#SW`) | Runs synchronously in the web path | Queued to Marcduino action handlers | Queued to Marcduino action handlers | Web has a lifetime workaround because `MARCDUINO_ACTION` can defer suffix parsing past the lifetime of temporary async request strings. |
+| Panel calibration (`:MV`, `#SO`, `#SC`, `#SW`) | Runs synchronously before queueing | Same | Same | Shared ingress keeps all transports safe from deferred `getCommand()` suffix parsing. |
 | Queue admission | Enqueues after immediate handlers | Same | Same | Queue depth is 8 entries. Commands are copied with `strlcpy` into `CONSOLE_BUFFER_SIZE`. Long commands truncate silently at the queue buffer boundary. |
 | Queue-full behavior | Drops command, increments `sMarcduinoQueueFullCount`, logs `[queue-full]` | Same | Same | Caller does not get a failure response today. |
-| Mood reset dedupe (`:SE10`, `:SE11`, `:SE13`, `:SE14`) | Not applied | Applied before queueing | Applied before queueing | Duplicate is dropped when the same mood command repeats within 2500 ms. |
-| Body-link echo suppression | Not applied | Not applied | Queue item sets `suppressBodyLinkEgress` | While dispatching a suppressed queue item, `sendBodyCommand()` logs and does not forward back to the active body-link transport. |
+| Mood reset dedupe (`:SE10`, `:SE11`, `:SE13`, `:SE14`) | Applied before queueing | Same | Same | Duplicate is dropped when the same mood command repeats within 2500 ms. |
+| Body-link echo suppression | Not applied | Not applied | Queue item sets `suppressBodyLinkEgress` | Suppression is computed from source metadata. While dispatching a suppressed queue item, `sendBodyCommand()` logs and does not forward back to the active body-link transport. |
 | Body-link heartbeat handling | N/A | N/A | Transport-local | `#PAHB` is not a Marcduino command. Dome heartbeat `#APHB` is emitted from heartbeat handling, not command admission. |
 
 ## Intentional Differences
@@ -49,17 +49,16 @@ while unifying Marcduino command ingress.
   body-link is disabled. It is ReelTwo's parser path, not the fork's async
   transport layer.
 
-## Accidental Drift To Remove
+## Drift Removed By Shared Ingress
 
-- Mood reset dedupe exists only in the main/body/serial path. The unified ingress
-  should make this either common policy or explicitly source-specific policy.
-- Panel calibration safety exists only in the web path. The unified ingress
-  should make command storage and synchronous calibration handling explicit so
-  callers do not need to know which buffers are safe for deferred suffix parsing.
-- Body-link echo suppression is selected by caller path and raw source strings.
-  The unified ingress should compute it from source metadata.
-- Web and main paths duplicate sleep gate, logging, immediate command handling,
-  visual command handling, and queue admission.
+- Mood reset dedupe is common policy across all `marcduinoIngressAdmit()`
+  callers.
+- Panel calibration commands are synchronous before queueing across all ingress
+  sources.
+- Body-link echo suppression is computed from `MarcduinoIngressSource` metadata,
+  not raw source strings.
+- Sleep gate, logging, immediate command handling, visual command handling, and
+  queue admission live in `MarcduinoIngress.h`.
 
 ## Behavior Lock For Refactor
 
