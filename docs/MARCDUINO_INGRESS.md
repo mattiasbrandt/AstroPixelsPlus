@@ -71,3 +71,16 @@ while unifying Marcduino command ingress.
 - Queue capacity, queue truncation, and queue-full logging stay unchanged unless
   a separate behavior issue changes them.
 - Async-web calibration commands must stay lifetime-safe after the refactor.
+
+## Slice 3 Refactor Outcome
+
+- Mood reset dedupe is now shared across REST, WebSocket, USB serial, body-link
+  UART/WiFi, WiFi Marcduino, and I2C ingress. Repeating the same mood reset
+  command within 2500 ms is dropped before queueing for every source.
+- Panel calibration commands (`:MV`, `#SO`, `#SC`, `#SW`) are handled
+  synchronously before queueing for every ingress source. The legacy
+  `MARCDUINO_ACTION` handlers remain in `MarcduinoPanel.h` as compatibility
+  fallbacks, but unified ingress does not rely on deferred suffix parsing.
+- Queue capacity remains eight entries, queued commands are still copied with
+  `strlcpy` into `CONSOLE_BUFFER_SIZE`, and queue-full behavior still logs and
+  drops without surfacing a caller error.

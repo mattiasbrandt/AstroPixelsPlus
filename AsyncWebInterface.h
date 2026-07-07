@@ -223,91 +223,6 @@ static bool guardSleep(AsyncWebServerRequest *request, const char *cmd)
     return false;
 }
 
-static void processMarcduinoCommandWithSource(const MarcduinoIngressSource &source, const char *cmd)
-{
-    if (cmd == nullptr || cmd[0] == '\0') return;
-    const char *label = marcduinoIngressSourceLabel(source);
-    if (shouldBlockCommandDuringSleep(cmd))
-    {
-        logCapture.printf("[CMD][%s][sleep-blocked] %s\n", label, cmd);
-        return;
-    }
-    logCapture.printf("[CMD][%s] %s\n", label, cmd);
-    if (handleImmediateServoMoveCommand(label, cmd))
-        return;
-    if (applyDomeVisualPresetCommand(label, cmd))
-        return;
-    if (applyDomeVisualAuthoringCommand(label, cmd))
-        return;
-
-    // Panel calibration commands are handled here synchronously rather than
-    // via MARCDUINO_ACTION. The reason: MARCDUINO_ACTION wraps the body in
-    // DO_ONCE() inside animateOnce(), which defers execution to the next
-    // AnimatedEvent::process() loop iteration. By that point the incoming
-    // cmd buffer (a temporary String in the async web handler) has been
-    // freed, so getCommand() inside the macro body returns a dangling
-    // pointer and all parsing silently fails. Handling them here while cmd
-    // is still on the stack avoids the issue entirely.
-    // MarcduinoPanel.h now also implements these commands for stable command
-    // buffers (e.g. MarcduinoSerial fBuffer), preserving serial parity while
-    // this synchronous path keeps async-web ingress safe.
-
-    // :MV<pp><vvvv> — move panel <pp> to pulse width <vvvv> us (temporary, not saved)
-    if (strncmp(cmd, ":MV", 3) == 0)
-    {
-        const char *args = cmd + 3;          // skip ":MV", args = "<pp><vvvv>"
-        uint8_t tgt = 0; uint16_t val = 0; uint32_t msk = 0;
-        if (parseTwoDigitTarget(args, tgt) && parseFourDigitValue(args + 2, val) && panelTargetToMask(tgt, msk))
-        {
-            if (!movePanelMaskToValue(msk, val))
-                logCapture.println("[PANEL CAL] :MV unsupported target/value for this build");
-        }
-        else { logCapture.println("[PANEL CAL] Invalid :MV command"); }
-        return;
-    }
-    // #SO<pp><vvvv> — save open position for panel <pp> as pulse width <vvvv> us
-    if (strncmp(cmd, "#SO", 3) == 0)
-    {
-        const char *args = cmd + 3;
-        uint8_t tgt = 0; uint16_t val = 0; uint32_t msk = 0;
-        if (parseTwoDigitTarget(args, tgt) && parseFourDigitValue(args + 2, val) && panelTargetToMask(tgt, msk))
-        {
-            if (!applyPanelCalibrationToMask(msk, true, false, val))
-                logCapture.println("[PANEL CAL] #SO unsupported target/value for this build");
-        }
-        else { logCapture.println("[PANEL CAL] Invalid #SO command"); }
-        return;
-    }
-    // #SC<pp><vvvv> — save closed position for panel <pp> as pulse width <vvvv> us
-    if (strncmp(cmd, "#SC", 3) == 0)
-    {
-        const char *args = cmd + 3;
-        uint8_t tgt = 0; uint16_t val = 0; uint32_t msk = 0;
-        if (parseTwoDigitTarget(args, tgt) && parseFourDigitValue(args + 2, val) && panelTargetToMask(tgt, msk))
-        {
-            if (!applyPanelCalibrationToMask(msk, false, true, val))
-                logCapture.println("[PANEL CAL] #SC unsupported target/value for this build");
-        }
-        else { logCapture.println("[PANEL CAL] Invalid #SC command"); }
-        return;
-    }
-    // #SW<pp> — swap open/closed calibration values for panel <pp>
-    if (strncmp(cmd, "#SW", 3) == 0)
-    {
-        const char *args = cmd + 3;
-        uint8_t tgt = 0; uint32_t msk = 0;
-        if (parseTwoDigitTarget(args, tgt) && panelTargetToMask(tgt, msk))
-        {
-            if (!swapPanelCalibrationInMask(msk))
-                logCapture.println("[PANEL CAL] #SW unsupported target for this build");
-        }
-        else { logCapture.println("[PANEL CAL] Invalid #SW command"); }
-        return;
-    }
-
-    enqueueMarcduinoCommand(label, cmd);
-}
-
 static bool isSensitivePrefKey(const String &key)
 {
     return key == "pass" || key == "rsecret";
@@ -442,7 +357,7 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
             char cmd[64];
             if (parseWsCommand(data, len, cmd, sizeof(cmd)))
             {
-                processMarcduinoCommandWithSource(kMarcduinoIngressWebSocket, cmd);
+                marcduinoIngressAdmit(kMarcduinoIngressWebSocket, cmd);
                 broadcastState();
             }
         }
@@ -1333,7 +1248,7 @@ static void initAsyncWeb()
         if (!validateMarcduinoCmd(request, cmd)) return;
         if (guardSleep(request, cmd.c_str())) return;
         logCapture.printf("[API] cmd=%s len=%u\n", cmd.c_str(), (unsigned int)cmd.length());
-        processMarcduinoCommandWithSource(kMarcduinoIngressWebApi, cmd.c_str());
+        marcduinoIngressAdmit(kMarcduinoIngressWebApi, cmd.c_str());
         broadcastState();
         request->send(200, "application/json", "{\"ok\":true}");
     });
@@ -1882,12 +1797,12 @@ static void initAsyncWeb()
         if (!parsePostParam(request, "state", state)) return;
         if (state == "on")
         {
-            processMarcduinoCommandWithSource(kMarcduinoIngressWebApi, "BMON");
+            marcduinoIngressAdmit(kMarcduinoIngressWebApi, "BMON");
             request->send(200, "application/json", "{\"ok\":true,\"state\":\"on\"}");
         }
         else if (state == "off")
         {
-            processMarcduinoCommandWithSource(kMarcduinoIngressWebApi, "BMOFF");
+            marcduinoIngressAdmit(kMarcduinoIngressWebApi, "BMOFF");
             request->send(200, "application/json", "{\"ok\":true,\"state\":\"off\"}");
         }
         else
@@ -1903,12 +1818,12 @@ static void initAsyncWeb()
         if (!parsePostParam(request, "state", state)) return;
         if (state == "on")
         {
-            processMarcduinoCommandWithSource(kMarcduinoIngressWebApi, "FS11000");
+            marcduinoIngressAdmit(kMarcduinoIngressWebApi, "FS11000");
             request->send(200, "application/json", "{\"ok\":true,\"state\":\"on\"}");
         }
         else if (state == "off")
         {
-            processMarcduinoCommandWithSource(kMarcduinoIngressWebApi, "FSOFF");
+            marcduinoIngressAdmit(kMarcduinoIngressWebApi, "FSOFF");
             request->send(200, "application/json", "{\"ok\":true,\"state\":\"off\"}");
         }
         else
@@ -1940,7 +1855,7 @@ static void initAsyncWeb()
             char duration[3];
             snprintf(duration, sizeof(duration), "%02u", durationSec);
             String cmd = "CB2" + String(duration) + "006";
-            processMarcduinoCommandWithSource(kMarcduinoIngressWebApi, cmd.c_str());
+            marcduinoIngressAdmit(kMarcduinoIngressWebApi, cmd.c_str());
             request->send(200, "application/json", "{\"ok\":true,\"action\":\"flicker\",\"duration\":" + String(durationSec) + "}");
         }
         else if (action == "disable")
@@ -1955,7 +1870,7 @@ static void initAsyncWeb()
             char duration[3];
             snprintf(duration, sizeof(duration), "%02u", durationSec);
             String cmd = "CB1" + String(duration) + "008";
-            processMarcduinoCommandWithSource(kMarcduinoIngressWebApi, cmd.c_str());
+            marcduinoIngressAdmit(kMarcduinoIngressWebApi, cmd.c_str());
             request->send(200, "application/json", "{\"ok\":true,\"action\":\"disable\",\"duration\":" + String(durationSec) + "}");
         }
         else
@@ -1987,7 +1902,7 @@ static void initAsyncWeb()
             char duration[3];
             snprintf(duration, sizeof(duration), "%02u", durationSec);
             String cmd = "DP2" + String(duration) + "006";
-            processMarcduinoCommandWithSource(kMarcduinoIngressWebApi, cmd.c_str());
+            marcduinoIngressAdmit(kMarcduinoIngressWebApi, cmd.c_str());
             request->send(200, "application/json", "{\"ok\":true,\"action\":\"flicker\",\"duration\":" + String(durationSec) + "}");
         }
         else if (action == "disable")
@@ -2002,7 +1917,7 @@ static void initAsyncWeb()
             char duration[3];
             snprintf(duration, sizeof(duration), "%02u", durationSec);
             String cmd = "DP1" + String(duration) + "008";
-            processMarcduinoCommandWithSource(kMarcduinoIngressWebApi, cmd.c_str());
+            marcduinoIngressAdmit(kMarcduinoIngressWebApi, cmd.c_str());
             request->send(200, "application/json", "{\"ok\":true,\"action\":\"disable\",\"duration\":" + String(durationSec) + "}");
         }
         else

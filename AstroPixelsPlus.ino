@@ -543,10 +543,6 @@ static void cancelPanelRelease(uint32_t mask = ALL_DOME_PANELS_MASK);
 static void loadPersistedPanelCalibration();
 static void domeApplyDisabledPanelOverlay();
 static void domeReloadPanelRoutingWithDisabledOverlay();
-// Forward-declared so dome sequences (DomeSequences.h, included below) can queue
-// a Marcduino command for the main loop instead of calling processCommand()
-// re-entrantly from inside player.animate(). Default arg lives here only.
-static bool enqueueMarcduinoCommand(const char *source, const char *cmd, bool suppressBodyLinkEgress = false);
 MarcduinoSerial<> marcduinoSerial(player);
 
 /////////////////////////////////////////////////////////////////////////
@@ -886,6 +882,9 @@ static const char *currentMoodName()
     return "";
 }
 
+#define MARCDUINO_INGRESS_IMPLEMENTATION
+#include "MarcduinoIngress.h"
+
 static void sendBodyCommand(const char* cmd)
 {
     if (cmd == nullptr || *cmd == '\0') return;
@@ -937,7 +936,7 @@ static void handleBodySerial()
                 else
                 {
                     bodyLinkMarkUartActivity(now);
-                    processMarcduinoCommandWithSourceMain(kMarcduinoIngressBodyLinkUart, sBuf);
+                    marcduinoIngressAdmit(kMarcduinoIngressBodyLinkUart, sBuf);
                 }
                 sBufLen = 0;
             }
@@ -1015,80 +1014,6 @@ WifiMarcduinoReceiver wifiMarcduinoReceiver(wifiAccess);
 #endif
 
 ////////////////////////////////
-
-struct PendingMarcduinoCommand
-{
-    char source[24];
-    char cmd[CONSOLE_BUFFER_SIZE];
-    bool suppressBodyLinkEgress;
-};
-
-static portMUX_TYPE sMarcduinoQueueMux = portMUX_INITIALIZER_UNLOCKED;
-static PendingMarcduinoCommand sMarcduinoQueue[8];
-static volatile uint8_t sMarcduinoQueueHead = 0;
-static volatile uint8_t sMarcduinoQueueTail = 0;
-static volatile uint8_t sMarcduinoQueueCount = 0;
-static uint32_t sMarcduinoQueueFullCount = 0;
-
-static bool enqueueMarcduinoCommand(const char *source, const char *cmd, bool suppressBodyLinkEgress)
-{
-    if (cmd == nullptr || cmd[0] == '\0') return false;
-
-    bool queued = false;
-    portENTER_CRITICAL(&sMarcduinoQueueMux);
-    if (sMarcduinoQueueCount < SizeOfArray(sMarcduinoQueue))
-    {
-        PendingMarcduinoCommand &entry = sMarcduinoQueue[sMarcduinoQueueTail];
-        strlcpy(entry.source, source ? source : "unknown", sizeof(entry.source));
-        strlcpy(entry.cmd, cmd, sizeof(entry.cmd));
-        entry.suppressBodyLinkEgress = suppressBodyLinkEgress;
-        sMarcduinoQueueTail = (sMarcduinoQueueTail + 1) % SizeOfArray(sMarcduinoQueue);
-        sMarcduinoQueueCount++;
-        queued = true;
-    }
-    portEXIT_CRITICAL(&sMarcduinoQueueMux);
-
-    if (!queued)
-    {
-        sMarcduinoQueueFullCount++;
-        logCapture.printf("[CMD][%s][queue-full] %s\n", source ? source : "unknown", cmd);
-    }
-    return queued;
-}
-
-static bool dequeueMarcduinoCommand(char *source, size_t sourceSize, char *cmd, size_t cmdSize, bool *suppressBodyLinkEgress)
-{
-    bool found = false;
-    portENTER_CRITICAL(&sMarcduinoQueueMux);
-    if (sMarcduinoQueueCount > 0)
-    {
-        PendingMarcduinoCommand &entry = sMarcduinoQueue[sMarcduinoQueueHead];
-        strlcpy(source, entry.source, sourceSize);
-        strlcpy(cmd, entry.cmd, cmdSize);
-        *suppressBodyLinkEgress = entry.suppressBodyLinkEgress;
-        sMarcduinoQueueHead = (sMarcduinoQueueHead + 1) % SizeOfArray(sMarcduinoQueue);
-        sMarcduinoQueueCount--;
-        found = true;
-    }
-    portEXIT_CRITICAL(&sMarcduinoQueueMux);
-    return found;
-}
-
-static void drainMarcduinoCommandQueue()
-{
-    char source[24];
-    char cmd[CONSOLE_BUFFER_SIZE];
-    bool suppressBodyLinkEgress = false;
-    while (dequeueMarcduinoCommand(source, sizeof(source), cmd, sizeof(cmd), &suppressBodyLinkEgress))
-    {
-        logCapture.printf("[CMD][%s][dispatch] %s\n", source, cmd);
-        bool previousSuppressBodyLinkEgress = sSuppressBodyLinkEgress;
-        if (suppressBodyLinkEgress)
-            sSuppressBodyLinkEgress = true;
-        Marcduino::processCommand(player, cmd);
-        sSuppressBodyLinkEgress = previousSuppressBodyLinkEgress;
-    }
-}
 
 ////////////////////////////////
 
@@ -1486,7 +1411,7 @@ void setup()
             wifiMarcduinoReceiver.setCommandHandler([](const char *cmd)
                                                     {
                 printf("cmd: %s\n", cmd);
-                processMarcduinoCommandWithSourceMain(kMarcduinoIngressWifiMarcduino, cmd);
+                marcduinoIngressAdmit(kMarcduinoIngressWifiMarcduino, cmd);
                 if (preferences.getBool(PREFERENCE_MARCWIFI_SERIAL_PASS, MARC_WIFI_SERIAL_PASS))
                 {
                     COMMAND_SERIAL.print(cmd); COMMAND_SERIAL.print('\r');
@@ -1964,30 +1889,6 @@ bool exitSoftSleepMode(bool fromPeer)
     return true;
 }
 
-static void processMarcduinoCommandWithSourceMain(const MarcduinoIngressSource &source, const char *cmd)
-{
-    if (cmd == nullptr || cmd[0] == '\0') return;
-    const char *label = marcduinoIngressSourceLabel(source);
-    if (shouldBlockCommandDuringSleep(cmd))
-    {
-        logCapture.printf("[CMD][%s][sleep-blocked] %s\n", label, cmd);
-        return;
-    }
-    if (shouldDropDuplicateMoodReset(cmd))
-    {
-        logCapture.printf("[CMD][%s][mood-duplicate-dropped] %s\n", label, cmd);
-        return;
-    }
-    logCapture.printf("[CMD][%s] %s\n", label, cmd);
-    if (handleImmediateServoMoveCommand(label, cmd))
-        return;
-    if (applyDomeVisualPresetCommand(label, cmd))
-        return;
-    if (applyDomeVisualAuthoringCommand(label, cmd))
-        return;
-    enqueueMarcduinoCommand(label, cmd, marcduinoIngressSuppressesBodyLinkEgress(source));
-}
-
 ////////////////
 
 #ifdef USE_I2C_ADDRESS
@@ -1996,7 +1897,7 @@ I2CReceiverBase<CONSOLE_BUFFER_SIZE> i2cReceiver(USE_I2C_ADDRESS, [](char *cmd)
     DEBUG_PRINT(F("[I2C] RECEIVED=\""));
     DEBUG_PRINT(cmd);
     DEBUG_PRINTLN(F("\""));
-    processMarcduinoCommandWithSourceMain(kMarcduinoIngressI2CSlave, cmd); });
+    marcduinoIngressAdmit(kMarcduinoIngressI2CSlave, cmd); });
 #endif
 
 ////////////////
@@ -2136,7 +2037,7 @@ void mainLoop()
         // ================================================================
         if (ch == 0x0A || ch == 0x0D)
         {
-            processMarcduinoCommandWithSourceMain(kMarcduinoIngressUsbSerial, sBuffer);
+            marcduinoIngressAdmit(kMarcduinoIngressUsbSerial, sBuffer);
             sPos = 0;
         }
         else if (sPos < SizeOfArray(sBuffer) - 1)
