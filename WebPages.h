@@ -117,7 +117,7 @@ WElement panelsContents[] = {
     WLabel("Predefined Sequences:", "seqlabel"),
     WSelect("Select Sequence:", "panelseq", panelSequences, SizeOfArray(panelSequences), []()
             { return sPanelSeqSelected; }, [](int val)
-            { 
+            {
                 sPanelSeqSelected = val;
                 if (val >= 0 && val < SizeOfArray(panelSeqCommands))
                 {
@@ -265,7 +265,7 @@ WElement holosContents[] = {
     WLabel("Holo Light Effects:", "holo_light_label"),
     WSelect("Select:", "hololight", holoLights, SizeOfArray(holoLights), []()
             { return sHoloLightSelected; }, [](int val)
-            { 
+            {
                 sHoloLightSelected = val;
                 if (val >= 0 && val < SizeOfArray(holoLightCommands))
                 {
@@ -277,7 +277,7 @@ WElement holosContents[] = {
     // Random and Nod commands physically move the holo projector servos
     WLabel("Holo Movements:", "holo_movement_label"), WSelect("Select:", "holomovement", holoMovements, SizeOfArray(holoMovements), []()
                                                               { return sHoloMovementSelected; }, [](int val)
-                                                              { 
+                                                              {
                 sHoloMovementSelected = val;
                 if (val >= 0 && val < SizeOfArray(holoMovementCommands))
                 {

@@ -35,6 +35,12 @@ pio device monitor -p /dev/ttyUSB0 -b 115200
 pio run -e astropixelsplus -t upload && pio device monitor -p /dev/ttyUSB0 -b 115200
 ```
 
+## Repository Hygiene
+
+Keep all text files LF-only. This repo has `.gitattributes` and `.editorconfig`
+to prevent CRLF churn from edit tools; do not reintroduce CRLF or mixed line
+endings when touching legacy firmware files.
+
 ### Post-build compatibility smoke test (fork workflow)
 
 After firmware/library changes and a successful build, run the command compatibility matrix runner before final sign-off:

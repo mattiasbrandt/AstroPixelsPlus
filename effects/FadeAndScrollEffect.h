@@ -272,7 +272,7 @@ static bool LogicEffectFadeAndScroll(LogicEngineRenderer& r)
                     obj->fs_index = y * w + x;
                     obj->fs_height[obj->fs_index] = obj->fs_height[obj->fs_index] + obj->fs_speed;
                     if (obj->fs_height[obj->fs_index] > obj->fs_lut_len - 1)
-                        obj->fs_height[obj->fs_index] = 0; 
+                        obj->fs_height[obj->fs_index] = 0;
                     CRGB color = obj->fs_lut[obj->fs_height[obj->fs_index]];
                     r.setPixelRGB(x, y, color.r, color.g, color.b);
                 }
@@ -286,7 +286,7 @@ static bool LogicEffectFadeAndScroll(LogicEngineRenderer& r)
                     obj->fs_index = y * w + x;
                     obj->fs_height[obj->fs_index] = obj->fs_height[obj->fs_index] - obj->fs_speed;
                     if (obj->fs_height[obj->fs_index] < 0)
-                        obj->fs_height[obj->fs_index] = obj->fs_lut_len - 1; 
+                        obj->fs_height[obj->fs_index] = obj->fs_lut_len - 1;
                     CRGB color = obj->fs_lut[obj->fs_height[obj->fs_index]];
                     r.setPixelRGB(x, y, color.r, color.g, color.b);
                 }

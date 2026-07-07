@@ -2,7 +2,7 @@
 //
 // Main screen shows current dome position if dome position changes.
 // Push button will activate SelectScreen
-// 
+//
 ///////////////////////////////////////////////////////////////////////////////
 
 static const char* sSequenceMenu[] = {

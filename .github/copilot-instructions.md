@@ -3,9 +3,9 @@
 ## Project Overview
 **AstroPixelsPlus** is an ESP32-based WiFi controller for R2-D2 dome animatronics. This is a **personal fork** with extensive improvements and enhancements over the original reeltwo/AstroPixelsPlus project.
 
-**Hardware**: AstroPixels board (ESP32 dev board with integrated components)  
-**Purchase**: https://we-make-things.co.uk/product/astropixels/  
-**Original Repository**: https://github.com/reeltwo/AstroPixelsPlus  
+**Hardware**: AstroPixels board (ESP32 dev board with integrated components)
+**Purchase**: https://we-make-things.co.uk/product/astropixels/
+**Original Repository**: https://github.com/reeltwo/AstroPixelsPlus
 **This Fork**: Contains major memory optimizations, web UI reorganization, and credenda fork features
 
 ## What This Firmware Does
@@ -36,7 +36,7 @@ This fork is configured for a **standard R2-D2 dome setup**:
 - **Dome Controller**: Controls dome panels, holos, and logics
 - **Body Controller**: Separate BetterDuino Mega 2560 (see BetterDuinoFirmwareV4 workspace)
 - **WiFi Bridge**: ESP8266 D1 Mini (protoAstroControl) connects body to WiFi
-- **Network Architecture**: 
+- **Network Architecture**:
   - AstroPixels: WiFi AP at 192.168.4.1 (dome control)
   - ESP8266 Bridge: WiFi client at 192.168.4.2 (body control via BetterDuino)
   - R2 Touch app connects to either IP on port 9750
@@ -98,7 +98,7 @@ This fork is configured for a **standard R2-D2 dome setup**:
 - Ch 5: Top Holo Vertical servo
 - Ch 6-15: Available
 
-**Moving Panels (7 total)**: P1, P2, P3, P4, P7, P10, P11 (P6 sometimes)  
+**Moving Panels (7 total)**: P1, P2, P3, P4, P7, P10, P11 (P6 sometimes)
 **Fixed Panels (5 total)**: P5 (Magic), P6 (upper), P8 (PSI), P9 (RLD), P13 (top)
 
 ## Code Architecture
@@ -450,13 +450,13 @@ monitor_speed = 115200
 upload_port = COM8  # Change to your port
 monitor_port = COM8
 
-lib_deps = 
+lib_deps =
     https://github.com/reeltwo/Reeltwo#23.5.3
     https://github.com/adafruit/Adafruit_NeoPixel
     https://github.com/FastLED/FastLED
     https://github.com/DFRobot/DFRobotDFPlayerMini
 
-build_flags = 
+build_flags =
     -DCORE_DEBUG_LEVEL=1
     -DESP32_ARDUINO_NO_RGB_BUILTIN  # Prevent FastLED RMT conflicts
     -mfix-esp32-psram-cache-issue
@@ -614,7 +614,7 @@ WButton btn2("B2", "Button 2");
 ## Troubleshooting Guide
 
 ### Issue: Boot Crashes with "vApplicationGetIdleTaskMemory"
-**Cause**: Too many WButtons or String arrays in WebPages.h  
+**Cause**: Too many WButtons or String arrays in WebPages.h
 **Solution**:
 1. Count instances: `(Get-Content WebPages.h | Select-String '\bWButton\(').Count`
 2. If > 50: Consolidate WButtons into WSelect dropdowns
@@ -645,7 +645,7 @@ WButton btn2("B2", "Button 2");
 5. Serial monitor: Enable at 115200 to see command echo
 
 ### Issue: Web Interface Blank/Crashes
-**Cause**: Memory issue or SPIFFS not mounted  
+**Cause**: Memory issue or SPIFFS not mounted
 **Solution**:
 1. Check serial for SPIFFS errors
 2. Reflash filesystem: PlatformIO → Upload Filesystem Image
@@ -723,7 +723,7 @@ When reviewing or modifying this firmware:
 - Forget to update both .ino and PlatformIO build
 
 ### Version Tracking
-**Current Fork Version**: Based on reeltwo/AstroPixelsPlus + December 2025 improvements  
+**Current Fork Version**: Based on reeltwo/AstroPixelsPlus + December 2025 improvements
 **Major Changes**: See IMPROVEMENTS.md (~822 additions, ~522 deletions)
 
 **Update locations:**
