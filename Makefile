@@ -21,6 +21,7 @@ test:
 	python3 tools/test_dome_layout_preview.py
 	python3 tools/test_operator_disabled_interlock.py
 	python3 tools/test_wiring_commissioning_seam.py
+	python3 tools/test_marcduino_ingress_echo_policy.py
 
 gate: build test smoke
 
