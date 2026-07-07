@@ -76,6 +76,32 @@ class OperatorDisabledInterlockTests(unittest.TestCase):
         self.assertIn("servoDispatch.setOutput(pin, false)", ino)
         self.assertIn("servoDispatch.disable(slot)", ino)
 
+    def test_status_metadata_mismatch_fails_closed(self) -> None:
+        status = read("DomeElementStatus.h")
+
+        read_all = re.search(
+            r"static bool domeElementStatusReadAll\(.*?\n\}\n\nstatic String",
+            status,
+            re.S,
+        )
+        self.assertIsNotNone(read_all)
+        assert read_all is not None
+        body = read_all.group(0)
+        self.assertIn("bool metadataOk = domeElementStatusMetadataMatches(prefs);", body)
+        self.assertIn("if (!metadataOk)", body)
+        self.assertIn("return false;", body)
+
+        build_json = re.search(
+            r"static String domeElementStatusBuildJson\(.*?\n\}\n",
+            status,
+            re.S,
+        )
+        self.assertIsNotNone(build_json)
+        assert build_json is not None
+        json_body = build_json.group(0)
+        self.assertIn("bool disabled = statusOk ? statuses[i].disabled : true;", json_body)
+        self.assertIn('String reason = statusOk ? statuses[i].reason : "status unavailable";', json_body)
+
 
 if __name__ == "__main__":
     unittest.main()

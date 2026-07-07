@@ -148,7 +148,7 @@ Runtime behavior:
 - Commandable ring/pie panels expose `active` based on saved panel wiring config after boot load or live wiring apply, not unsaved UI edits and not the operator-disabled runtime overlay.
 - Fixed panels, holos, logic displays, and PSI elements are present as first-class layout context but remain non-commandable in this endpoint.
 - Operator `disabled` status is a runtime panel-servo interlock. Raw Marcduino/`DM:*` commands remain accepted for compatibility, but disabled panel elements are overlaid onto `ServoDispatch` with `pin=0` and `group=0` and their PCA9685 PWM output is cut, so command handlers no-op for those slots.
-- If operator status storage cannot be read, composed layout responses fail closed by surfacing elements as disabled with `disabled_reason:"status unavailable"`.
+- If operator status storage cannot be read, or stored status metadata does not match the running layout schema/template/order hash, composed layout and element-status responses fail closed by surfacing elements as disabled with `disabled_reason:"status unavailable"`.
 - If a selected custom template is missing or fails activation validation at serve time, `/api/dome/layout` falls back to the bundled MK4 template instead of serving partial layout JSON.
 - The Panels page exposes a Dome Layout Status section for marking any layout element disabled with a short reason; disabled commandable panels are highlighted on the SVG, suppressed in individual web UI panel buttons/clicks, and protected from raw panel servo movement paths.
 - Status is keyed by generated element index in NVS, with template/schema/order-hash metadata stored beside it so stale flags are ignored after a layout revision or element reorder.

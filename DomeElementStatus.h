@@ -506,11 +506,15 @@ static bool domeElementStatusReadAll(DomeElementStatusSnapshot *out, int maxCoun
         return false;
     }
     bool metadataOk = domeElementStatusMetadataMatches(prefs);
+    if (!metadataOk)
+    {
+        prefs.end();
+        return false;
+    }
     for (int i = 0; i < count; i++)
     {
         out[i].disabled = false;
         out[i].reason = "";
-        if (!metadataOk) continue;
 
         char disabledKey[12];
         char reasonKey[12];
@@ -536,8 +540,8 @@ static String domeElementStatusBuildJson(DomeElementStatusEscapeFn escapeFn)
     {
         if (i > 0) json += ',';
         const char *id = domeElementStatusElementId(i);
-        bool disabled = statusOk ? statuses[i].disabled : false;
-        String reason = statusOk ? statuses[i].reason : "";
+        bool disabled = statusOk ? statuses[i].disabled : true;
+        String reason = statusOk ? statuses[i].reason : "status unavailable";
         json += "{\"id\":\"";
         json += escapeFn(String(id ? id : ""));
         json += "\",\"disabled\":";
