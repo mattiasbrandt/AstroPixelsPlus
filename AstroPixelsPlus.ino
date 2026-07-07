@@ -126,6 +126,7 @@
 #define HOLO_SLOT_OFFSET  13
 
 #include "WiringConfig.h"
+#include "DomeElementStatus.h"
 
 
 #define PREFERENCE_MARCSOUND "msound"
@@ -538,6 +539,9 @@ static uint32_t sPanelReleaseAtMs   = 0;
 static uint32_t sPanelReleaseMask   = 0;
 static void schedulePanelRelease(uint32_t mask, uint32_t delayMs = 1500);
 static void cancelPanelRelease(uint32_t mask = ALL_DOME_PANELS_MASK);
+static void loadPersistedPanelCalibration();
+static void domeApplyDisabledPanelOverlay();
+static void domeReloadPanelRoutingWithDisabledOverlay();
 // Forward-declared so dome sequences (DomeSequences.h, included below) can queue
 // a Marcduino command for the main loop instead of calling processCommand()
 // re-entrantly from inside player.animate(). Default arg lives here only.
@@ -1302,6 +1306,7 @@ void setup()
     // in place beforehand or the wrong channels would briefly drive. See ADR 0002.
     panelConfigLoad();
     holoConfigLoad();
+    domeApplyDisabledPanelOverlay();
 #endif
     SetupEvent::ready();
     loadPersistedPanelCalibration();
@@ -1793,6 +1798,79 @@ static void loadPersistedPanelCalibration()
             servoDispatch.setEnd(i, persistedClose);
         }
     }
+}
+
+static const char *domePanelSlotElementId(uint16_t slot)
+{
+    static const char *const ids[NUM_PANEL_SLOTS] = {
+        "P1", "P2", "P3", "P4", "P7", "P11", "P13",
+        "PP5", "PP1", "PP2", "PP4", "PP6", "PP3",
+    };
+    return (slot < NUM_PANEL_SLOTS) ? ids[slot] : nullptr;
+}
+
+static bool domePanelSlotDisabled(uint16_t slot, bool statusOk,
+                                  const DomeElementStatusSnapshot *statuses)
+{
+    if (slot >= NUM_PANEL_SLOTS) return false;
+    if (!statusOk) return true;
+
+    const char *id = domePanelSlotElementId(slot);
+    if (id == nullptr) return true;
+    int index = domeElementStatusIndexOf(String(id));
+    if (index < 0 || index >= DOME_ELEMENT_STATUS_MAX_ELEMENTS) return true;
+    return statuses[index].disabled;
+}
+
+static void domeCutPanelServoPwm(uint16_t slot)
+{
+    if (slot >= servoDispatch.getNumServos()) return;
+    uint8_t pin = servoDispatch.getPin(slot);
+#ifndef USE_I2C_ADDRESS
+    if (pin != 0)
+        servoDispatch.setOutput(pin, false);
+#endif
+    servoDispatch.disable(slot);
+}
+
+static void domeApplyDisabledPanelOverlay()
+{
+    DomeElementStatusSnapshot statuses[DOME_ELEMENT_STATUS_MAX_ELEMENTS];
+    bool statusOk = domeElementStatusReadAll(statuses, DOME_ELEMENT_STATUS_MAX_ELEMENTS);
+    if (!statusOk)
+    {
+        logCapture.println("[DomeStatus] WARNING: status unavailable; disabling all panel servo slots");
+    }
+
+    int disabledCount = 0;
+    for (uint16_t slot = 0; slot < NUM_PANEL_SLOTS; slot++)
+    {
+        if (!domePanelSlotDisabled(slot, statusOk, statuses)) continue;
+
+        uint16_t start = servoDispatch.getStart(slot);
+        uint16_t end = servoDispatch.getEnd(slot);
+        uint16_t neutral = servoDispatch.getNeutral(slot);
+        domeCutPanelServoPwm(slot);
+        servoDispatch.setServo(slot, 0, start, end, neutral, 0);
+        disabledCount++;
+
+        const char *id = domePanelSlotElementId(slot);
+        logCapture.printf("[DomeStatus] panel %s slot %u disabled: servo routing cut\n",
+                          id ? id : "?", slot);
+    }
+    if (disabledCount > 0)
+    {
+        cancelPanelRelease(ALL_DOME_PANELS_MASK);
+    }
+}
+
+static void domeReloadPanelRoutingWithDisabledOverlay()
+{
+#ifndef USE_I2C_ADDRESS
+    panelConfigLoad();
+    loadPersistedPanelCalibration();
+    domeApplyDisabledPanelOverlay();
+#endif
 }
 
 String getConfiguredDroidName()

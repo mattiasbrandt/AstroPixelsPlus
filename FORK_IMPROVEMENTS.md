@@ -118,7 +118,7 @@ Added a dome-owned layout read model for protoArtoo/editor consumers:
 
 - `GET /api/dome/layout` returns the bundled Mr Baddeley Complex Dome MK4 layout composed with live runtime state.
 - `GET /api/dome/element-status` returns operator-maintained disabled flags for every known layout element.
-- `POST /api/dome/element-status` persists advisory disabled flags and short reasons, e.g. marking `PP3` disabled while an upper pie linkage is binding.
+- `POST /api/dome/element-status` persists disabled flags and short reasons, e.g. marking `PP3` disabled while an upper pie linkage is binding.
 - `GET /api/dome/layout-template` reports whether the dome is serving bundled MK4 or an installed custom display template.
 - `POST /api/dome/layout-template` installs a custom display template JSON into SPIFFS, validates it for schema/identity/backend-field safety, selects it, and keeps bundled MK4 as rollback.
 - `POST /api/dome/layout-template/select` switches between bundled and installed custom layout templates.
@@ -145,13 +145,14 @@ The bundled MK4 template is now reviewable JSON under `templates/dome-layouts/` 
 
 Runtime behavior:
 
-- Commandable ring/pie panels expose `active` based on current `servoDispatch` state after boot load or live wiring apply, not unsaved UI edits.
+- Commandable ring/pie panels expose `active` based on saved panel wiring config after boot load or live wiring apply, not unsaved UI edits and not the operator-disabled runtime overlay.
 - Fixed panels, holos, logic displays, and PSI elements are present as first-class layout context but remain non-commandable in this endpoint.
-- Operator `disabled` status is advisory. It is surfaced to editors/automation but does not block raw Marcduino commands.
+- Operator `disabled` status is a runtime panel-servo interlock. Raw Marcduino/`DM:*` commands remain accepted for compatibility, but disabled panel elements are overlaid onto `ServoDispatch` with `pin=0` and `group=0` and their PCA9685 PWM output is cut, so command handlers no-op for those slots.
 - If operator status storage cannot be read, composed layout responses fail closed by surfacing elements as disabled with `disabled_reason:"status unavailable"`.
 - If a selected custom template is missing or fails activation validation at serve time, `/api/dome/layout` falls back to the bundled MK4 template instead of serving partial layout JSON.
-- The Panels page exposes a Dome Layout Status section for marking any layout element disabled with a short reason; disabled commandable panels are highlighted on the SVG and suppressed in individual web UI panel buttons/clicks while raw Marcduino commands remain accepted.
+- The Panels page exposes a Dome Layout Status section for marking any layout element disabled with a short reason; disabled commandable panels are highlighted on the SVG, suppressed in individual web UI panel buttons/clicks, and protected from raw panel servo movement paths.
 - Status is keyed by generated element index in NVS, with template/schema/order-hash metadata stored beside it so stale flags are ignored after a layout revision or element reorder.
+- Disabled-panel routing is applied before `SetupEvent::ready()` on boot, re-applied after `/api/dome/element-status` saves, and re-applied after panel wiring config saves. If status storage cannot be read, panel servo routing fails closed by disabling all panel slots until status is available again.
 
 ### Servo Grind Protection — Per-Mask Post-Close PWM Release
 

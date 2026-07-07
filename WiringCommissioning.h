@@ -252,6 +252,24 @@ static void wiringCommissioningLoadHolos()
     wiringLoadBoardConfig(wiringBoardSpec(kWiringBoardHolos));
 }
 
+static bool wiringCommissioningPanelSlotActive(int slot)
+{
+    if (slot < 0 || slot >= NUM_PANEL_SLOTS) return false;
+
+    const WiringBoardSpec &spec = wiringBoardSpec(kWiringBoardPanels);
+    uint8_t channels[NUM_PANEL_SLOTS];
+    bool actives[NUM_PANEL_SLOTS];
+    wiringConfigRead(spec.nvsNamespace,
+                     spec.channelKeyFormat,
+                     spec.activeKeyFormat,
+                     spec.slotCount,
+                     spec.defaultChannels,
+                     spec.defaultActives,
+                     channels,
+                     actives);
+    return actives[slot];
+}
+
 static String wiringCommissioningBuildConfigJson(WiringBoardId id)
 {
     const WiringBoardSpec &spec = wiringBoardSpec(id);

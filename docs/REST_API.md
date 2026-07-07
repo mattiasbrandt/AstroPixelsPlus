@@ -332,9 +332,14 @@ curl http://192.168.1.100/api/dome/element-status
 
 ### POST /api/dome/element-status
 
-Persists advisory disabled flags and optional short reasons. Status changes take
-effect immediately and survive reboot, but they do not block raw Marcduino
-commands.
+Persists disabled flags and optional short reasons. Status changes take effect
+immediately and survive reboot.
+
+For panel elements, `disabled:true` is a runtime safety interlock: the dome still
+accepts raw Marcduino/`DM:*` commands for compatibility, but the disabled panel's
+servo slot is removed from `ServoDispatch` routing and its PWM output is cut, so
+movement commands no-op for that slot. If operator status storage cannot be read,
+panel servo routing fails closed.
 
 ```bash
 curl -X POST http://192.168.1.100/api/dome/element-status \

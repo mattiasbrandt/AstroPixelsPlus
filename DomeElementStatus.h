@@ -1,9 +1,10 @@
 #pragma once
 // DomeElementStatus.h — persistent operator status for dome layout elements.
 //
-// This stores only editor/operator availability metadata. It must not gate
-// Marcduino command execution or servo routing; runtime no-op behavior remains
-// owned by the existing command handlers and wiring configuration.
+// This stores operator availability metadata for layout consumers and runtime
+// panel-servo safety. Command handlers may still accept raw Marcduino commands
+// for compatibility, but disabled panel elements are overlaid onto servo routing
+// as no-op slots so unsafe hardware is not driven.
 
 #include <Arduino.h>
 #include <Preferences.h>

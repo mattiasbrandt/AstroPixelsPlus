@@ -54,8 +54,9 @@ sequence editor around the same boundary.
   drift-check tooling that keeps it in sync with the JSON template.
 - Runtime `active` state as seen by the booted dome firmware.
 - Operator-maintained element suppression via `/api/dome/element-status`.
-- Keeping raw Marcduino compatibility intact: suppression/status does not block
-  manual Marcduino command handlers in v1.
+- Keeping raw Marcduino compatibility intact at the command surface while using
+  suppression/status as a panel-servo routing interlock: manual Marcduino
+  commands remain accepted, but disabled panel slots are no-ops.
 - Documenting the shipped behavior in `FORK_IMPROVEMENTS.md`.
 
 ### protoArtoo / body owns
@@ -258,10 +259,11 @@ Implementation slices:
 - Dome-side custom display-template install/selection, with validation,
   persistence, operator UI, and guaranteed rollback to bundled MK4.
 
-For v1, element suppression is an editor/automation safety signal, not a raw
-Marcduino command interlock. A disabled panel is excluded from body-editor
-automation, but the firmware continues to accept compatible manual Marcduino
-commands such as `:OPP3`.
+For v1, element suppression is both an editor/automation safety signal and a
+panel-servo runtime interlock. A disabled panel is excluded from body-editor
+automation. The firmware still accepts compatible manual Marcduino commands such
+as `:OPP3`, but the disabled panel's servo slot is removed from runtime routing
+so the command no-ops for that element.
 
 Community template sharing should begin with exportable JSON files that can be
 submitted by GitHub PR, reviewed, and added to a template folder with a stable
@@ -535,9 +537,12 @@ target token, not the canonical ring-panel ID `P1`.
 
 `disabled` is an operator-maintained suppression flag sourced from
 `/api/dome/element-status`. It means the element may be wired and physically
-commandable, but should be highlighted as unavailable and excluded from
-body-side editing/automation because the builder knows it has a mechanical or
-commissioning problem. `disabled_reason` is optional operator text for the UI.
+commandable in saved wiring config, but should be highlighted as unavailable and
+excluded from body-side editing/automation because the builder knows it has a
+mechanical or commissioning problem. For panel elements, the dome also overlays
+the disabled status onto `ServoDispatch` by cutting PWM and setting the slot to
+`pin=0, group=0` at runtime. `disabled_reason` is optional operator text for the
+UI.
 
 Inactive commandable panels still appear in the model. For example, PP3 and PP5
 appear on a standard MK4 with `active:false` and become `active:true` only when
@@ -584,13 +589,15 @@ backend identities excluded by the selected layout.
   from `servoSettings[]`, `DomeSequences.h`, and the accepted panel ADRs, without
   leaking low-level slots/channels/commands into the layout contract.
 - The model needs a way to represent operator-known mechanical faults. This is
-  distinct from wiring config: a disabled panel can remain wired and active at
-  the firmware level while the editor treats it as unavailable.
+  distinct from wiring config: a disabled panel can remain wired in saved config,
+  but the runtime overlay removes it from servo routing until the status is
+  cleared.
 - Runtime suppression/status lives behind `/api/dome/element-status`, avoiding
   wiring-config reboot semantics and keeping the mechanism extensible beyond
   panels.
-- Raw Marcduino compatibility remains intact in v1; suppression does not block
-  low-level command handlers.
+- Raw Marcduino compatibility remains intact in v1; suppression does not reject
+  low-level command handlers, but disabled panel servo slots are removed from
+  routing so accepted commands do not move unsafe hardware.
 - This is a major fork improvement and must be documented in
   `FORK_IMPROVEMENTS.md` when implementation lands.
 - MK4 becomes a first bundled template, not a hardcoded ceiling. Future custom

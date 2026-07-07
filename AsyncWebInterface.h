@@ -519,7 +519,11 @@ static bool domeLayoutPanelActive(const char *id)
 {
     int slot = domeLayoutPanelSlotForId(id);
     if (slot < 0) return false;
+#ifndef USE_I2C_ADDRESS
+    return wiringCommissioningPanelSlotActive(slot);
+#else
     return servoDispatch.getPin(slot) != 0 && servoDispatch.getGroup(slot) != 0;
+#endif
 }
 
 static void domeLayoutAppendStringArray(String &json, const char *field,
@@ -1529,6 +1533,8 @@ static void initAsyncWeb()
             int status = 500;
             String response;
             wiringCommissioningSaveConfigFromBody(kWiringBoardPanels, raw, status, response);
+            if (status == 200)
+                domeApplyDisabledPanelOverlay();
             request->send(status, "application/json", response);
         },
         NULL,
@@ -1729,9 +1735,9 @@ static void initAsyncWeb()
         });
 
     // ---- REST API: Dome element status ----
-    // Operator maintenance flags for the layout contract. This endpoint only
-    // persists advisory element availability; it never blocks commands or
-    // changes servo/runtime routing.
+    // Operator maintenance flags for the layout contract and panel-servo
+    // safety. Disabled panel elements remain visible in the layout but are
+    // overlaid onto ServoDispatch as no-op slots after saves.
     asyncServer.on("/api/dome/element-status", HTTP_GET, [](AsyncWebServerRequest *request)
     {
         request->send(200, "application/json", domeElementStatusBuildJson(jsonEscape));
@@ -1773,6 +1779,7 @@ static void initAsyncWeb()
             }
             logCapture.printf("[API] dome/element-status saved: %d update(s)\n",
                               updateCount);
+            domeReloadPanelRoutingWithDisabledOverlay();
             request->send(200, "application/json",
                 String("{\"ok\":true,\"updated\":") + updateCount + "}");
         },
