@@ -229,7 +229,7 @@ Example:
 is dome-scoped rather than panel-scoped so the same mechanism can later suppress
 or flag holos, logic displays, PSI elements, or other dome layout elements.
 Status changes persist across reboot but take effect immediately; they do not
-require the wiring-config reboot cycle.
+depend on wiring-config persistence or routing apply behavior.
 
 `/api/dome/layout` is the composed read model for external consumers such as
 protoArtoo. Consumers should not need to fetch the template, wiring config, and
@@ -422,9 +422,9 @@ fields such as `element_type`, `panel_kind`, `commandable`, `active`,
 
 For commandable panel elements, `active` means physically commandable in the
 current booted runtime, not merely configured in NVS. If `/api/panels/config` is
-changed by POST and the firmware requires a reboot before that wiring is applied,
-`/api/dome/layout` continues to report the pre-reboot runtime state until the
-reboot occurs. For commandable non-panel elements, `active` means currently
+changed by POST, the firmware live-applies routing and `/api/dome/layout`
+reflects the newly applied runtime state after the save succeeds. For
+commandable non-panel elements, `active` means currently
 usable by that subsystem. It may be omitted when the dome cannot provide a useful
 runtime fact; consumers must treat missing runtime availability conservatively.
 
@@ -592,9 +592,8 @@ backend identities excluded by the selected layout.
   distinct from wiring config: a disabled panel can remain wired in saved config,
   but the runtime overlay removes it from servo routing until the status is
   cleared.
-- Runtime suppression/status lives behind `/api/dome/element-status`, avoiding
-  wiring-config reboot semantics and keeping the mechanism extensible beyond
-  panels.
+- Runtime suppression/status lives behind `/api/dome/element-status`, separate
+  from wiring config live-apply semantics and extensible beyond panels.
 - Raw Marcduino compatibility remains intact in v1; suppression does not reject
   low-level command handlers, but disabled panel servo slots are removed from
   routing so accepted commands do not move unsafe hardware.
