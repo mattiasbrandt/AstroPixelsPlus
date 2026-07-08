@@ -10,17 +10,19 @@ Primary dependencies: **ReelTwo** library (core framework), Adafruit_NeoPixel, F
 
 ## Build & Upload (PlatformIO)
 
+Important hardware rule: when the full droid is connected together, USB upload
+is not feasible and must not be attempted. In the normal integrated setup, any
+USB cable may be connected to another controller such as protoArtoo, not the
+dome AstroPixelsPlus ESP32. Use HTTP OTA for dome firmware/SPIFFS updates.
+Only use PlatformIO USB upload or serial monitor in explicit "bench mode", where
+the dome controller is isolated and the user confirms the USB cable is plugged
+directly into that dome ESP32.
+
 ```bash
 # Compile
 pio run -e astropixelsplus
 
-# Upload firmware
-pio run -e astropixelsplus -t upload
-
-# Upload SPIFFS filesystem
-pio run -e astropixelsplus -t uploadfs
-
-# Preferred OTA workflow after initial USB setup
+# Normal integrated-droid workflow: HTTP OTA to the dome controller
 make ota OTA_IP=astropixelsplus.local
 make uploadfs OTA_IP=astropixelsplus.local
 
@@ -28,11 +30,11 @@ make uploadfs OTA_IP=astropixelsplus.local
 make ota OTA_IP=192.168.4.1
 make uploadfs OTA_IP=192.168.4.1
 
-# Monitor serial (115200 baud)
+# Bench mode only, after explicit user confirmation that USB is connected
+# directly to the isolated dome controller:
+pio run -e astropixelsplus -t upload
+pio run -e astropixelsplus -t uploadfs
 pio device monitor -p /dev/ttyUSB0 -b 115200
-
-# Build + upload in one step
-pio run -e astropixelsplus -t upload && pio device monitor -p /dev/ttyUSB0 -b 115200
 ```
 
 ## Repository Hygiene
@@ -85,7 +87,7 @@ Recommended collaboration loop:
 2. Start local server and test in browser
 3. User validates UX/behavior manually
 4. Agent tails `/tmp/astropixels-http.log` to catch missing files/404s/runtime serving issues
-5. Iterate until stable, then upload SPIFFS (`pio run -e astropixelsplus -t uploadfs`)
+5. Iterate until stable, then upload SPIFFS over HTTP OTA (`make uploadfs OTA_IP=astropixelsplus.local`, or the active dome IP)
 
 ## Fork Documentation Maintenance
 
