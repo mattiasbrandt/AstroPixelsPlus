@@ -181,6 +181,31 @@ class MarcduinoIngressSeamTests(unittest.TestCase):
             header,
         )
 
+    def test_body_uart_pumps_queue_after_each_non_heartbeat_frame(self) -> None:
+        ino = read("AstroPixelsPlus.ino")
+        body_serial = block_between(
+            ino,
+            "static void handleBodySerial()",
+            "static void handleBodyLinkHeartbeat()",
+        )
+        heartbeat = block_between(
+            body_serial,
+            'if (strcmp(sBuf, "#PAHB") == 0)',
+            "else",
+        )
+        command = block_between(
+            body_serial,
+            "bodyLinkMarkUartActivity(now);",
+            "sBufLen = 0;",
+        )
+
+        self.assertNotIn("marcduinoIngressAdmit", heartbeat)
+        self.assertIn("marcduinoIngressAdmit(kMarcduinoIngressBodyLinkUart, sBuf);", command)
+        self.assertLess(
+            command.index("marcduinoIngressAdmit(kMarcduinoIngressBodyLinkUart, sBuf);"),
+            command.index("drainMarcduinoCommandQueue();"),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

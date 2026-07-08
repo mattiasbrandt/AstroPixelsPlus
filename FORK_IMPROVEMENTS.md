@@ -111,6 +111,7 @@ Body→dome commands (WiFi path) use HTTP POST to the dome's `/api/cmd` endpoint
 - When body link is enabled, ReelTwo's `marcduinoSerial.setStream()` is explicitly disabled to prevent Serial2 race conditions
 - 65-byte UART buffer with overflow logging and null-termination safety
 - `#PAWU` whitelisted in sleep gate so a body-initiated wake is never blocked by dome sleep mode
+- Body-link UART now pumps the shared Marcduino command queue after each complete non-heartbeat frame. Dense body-origin panel choreographies still use the shared ingress path and echo suppression, but cannot fill the eight-entry queue in one serial read pass before dispatch catches up.
 
 ### Dome Layout Contract for Body Editor Integration
 

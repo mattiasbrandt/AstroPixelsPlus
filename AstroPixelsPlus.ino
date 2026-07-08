@@ -937,6 +937,10 @@ static void handleBodySerial()
                 {
                     bodyLinkMarkUartActivity(now);
                     marcduinoIngressAdmit(kMarcduinoIngressBodyLinkUart, sBuf);
+                    // UART bursts can contain many Marcduino frames before the
+                    // next mainLoop() pass. Pump after each complete frame so a
+                    // dense body choreography cannot fill the shared ingress queue.
+                    drainMarcduinoCommandQueue();
                 }
                 sBufLen = 0;
             }
@@ -1074,7 +1078,7 @@ void scan_i2c()
     Serial.println(F("Scanning I2C addresses 0x01-0x7E..."));
     Serial.println(F("Expected: 0x40 (Panels), 0x41 (Holos)"));
     Serial.println(F("==========================================="));
-    
+
     for (byte address = 1; address < 127; address++)
     {
         String name = "<unknown>";
