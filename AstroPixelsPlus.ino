@@ -1723,11 +1723,7 @@ static void loadPersistedPanelCalibration()
 
 static const char *domePanelSlotElementId(uint16_t slot)
 {
-    static const char *const ids[NUM_PANEL_SLOTS] = {
-        "P1", "P2", "P3", "P4", "P7", "P11", "P13",
-        "PP5", "PP1", "PP2", "PP4", "PP6", "PP3",
-    };
-    return (slot < NUM_PANEL_SLOTS) ? ids[slot] : nullptr;
+    return (slot < NUM_PANEL_SLOTS) ? kPanelSlotLabels[slot] : nullptr;
 }
 
 static bool domePanelSlotDisabled(uint16_t slot, bool statusOk,
