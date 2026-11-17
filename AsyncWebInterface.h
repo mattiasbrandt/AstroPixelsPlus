@@ -1790,6 +1790,12 @@ static void initAsyncWeb()
         broadcastState();
     });
 
+    // ---- REST API: gadget routes ----
+    // Registered only when the gadget is compiled in (AP_ENABLE_* build flags).
+    // The gadget commands (BM*, FS*, CB*, DP*) are ReelTwo CommandEvent
+    // commands, not MARCDUINO_ACTIONs, so they are sent with the "@AP" prefix,
+    // which MDDirectCommand forwards to CommandEvent::process.
+#if AP_ENABLE_BADMOTIVATOR
     // ---- REST API: Smoke control ----
     asyncServer.on("/api/smoke", HTTP_POST, [](AsyncWebServerRequest *request)
     {
@@ -1797,12 +1803,12 @@ static void initAsyncWeb()
         if (!parsePostParam(request, "state", state)) return;
         if (state == "on")
         {
-            marcduinoIngressAdmit(kMarcduinoIngressWebApi, "BMON");
+            marcduinoIngressAdmit(kMarcduinoIngressWebApi, "@APBMON");
             request->send(200, "application/json", "{\"ok\":true,\"state\":\"on\"}");
         }
         else if (state == "off")
         {
-            marcduinoIngressAdmit(kMarcduinoIngressWebApi, "BMOFF");
+            marcduinoIngressAdmit(kMarcduinoIngressWebApi, "@APBMOFF");
             request->send(200, "application/json", "{\"ok\":true,\"state\":\"off\"}");
         }
         else
@@ -1811,6 +1817,9 @@ static void initAsyncWeb()
         }
     });
 
+#endif // AP_ENABLE_BADMOTIVATOR
+
+#if AP_ENABLE_FIRESTRIP
     // ---- REST API: Fire effects control ----
     asyncServer.on("/api/fire", HTTP_POST, [](AsyncWebServerRequest *request)
     {
@@ -1818,12 +1827,12 @@ static void initAsyncWeb()
         if (!parsePostParam(request, "state", state)) return;
         if (state == "on")
         {
-            marcduinoIngressAdmit(kMarcduinoIngressWebApi, "FS11000");
+            marcduinoIngressAdmit(kMarcduinoIngressWebApi, "@APFS11000");
             request->send(200, "application/json", "{\"ok\":true,\"state\":\"on\"}");
         }
         else if (state == "off")
         {
-            marcduinoIngressAdmit(kMarcduinoIngressWebApi, "FSOFF");
+            marcduinoIngressAdmit(kMarcduinoIngressWebApi, "@APFSOFF");
             request->send(200, "application/json", "{\"ok\":true,\"state\":\"off\"}");
         }
         else
@@ -1832,6 +1841,9 @@ static void initAsyncWeb()
         }
     });
 
+#endif // AP_ENABLE_FIRESTRIP
+
+#if AP_ENABLE_CBI
     // ---- REST API: CBI (Charge Bay Indicator) control ----
     asyncServer.on("/api/cbi", HTTP_GET, [](AsyncWebServerRequest *request)
     {
@@ -1854,7 +1866,7 @@ static void initAsyncWeb()
             }
             char duration[3];
             snprintf(duration, sizeof(duration), "%02u", durationSec);
-            String cmd = "CB2" + String(duration) + "006";
+            String cmd = "@APCB2" + String(duration) + "006";
             marcduinoIngressAdmit(kMarcduinoIngressWebApi, cmd.c_str());
             request->send(200, "application/json", "{\"ok\":true,\"action\":\"flicker\",\"duration\":" + String(durationSec) + "}");
         }
@@ -1869,7 +1881,7 @@ static void initAsyncWeb()
             }
             char duration[3];
             snprintf(duration, sizeof(duration), "%02u", durationSec);
-            String cmd = "CB1" + String(duration) + "008";
+            String cmd = "@APCB1" + String(duration) + "008";
             marcduinoIngressAdmit(kMarcduinoIngressWebApi, cmd.c_str());
             request->send(200, "application/json", "{\"ok\":true,\"action\":\"disable\",\"duration\":" + String(durationSec) + "}");
         }
@@ -1879,6 +1891,9 @@ static void initAsyncWeb()
         }
     });
 
+#endif // AP_ENABLE_CBI
+
+#if AP_ENABLE_DATAPANEL
     // ---- REST API: DataPanel control ----
     asyncServer.on("/api/datapanel", HTTP_GET, [](AsyncWebServerRequest *request)
     {
@@ -1901,7 +1916,7 @@ static void initAsyncWeb()
             }
             char duration[3];
             snprintf(duration, sizeof(duration), "%02u", durationSec);
-            String cmd = "DP2" + String(duration) + "006";
+            String cmd = "@APDP2" + String(duration) + "006";
             marcduinoIngressAdmit(kMarcduinoIngressWebApi, cmd.c_str());
             request->send(200, "application/json", "{\"ok\":true,\"action\":\"flicker\",\"duration\":" + String(durationSec) + "}");
         }
@@ -1916,7 +1931,7 @@ static void initAsyncWeb()
             }
             char duration[3];
             snprintf(duration, sizeof(duration), "%02u", durationSec);
-            String cmd = "DP1" + String(duration) + "008";
+            String cmd = "@APDP1" + String(duration) + "008";
             marcduinoIngressAdmit(kMarcduinoIngressWebApi, cmd.c_str());
             request->send(200, "application/json", "{\"ok\":true,\"action\":\"disable\",\"duration\":" + String(durationSec) + "}");
         }
@@ -1925,6 +1940,8 @@ static void initAsyncWeb()
             request->send(400, "application/json", "{\"error\":\"invalid action, use 'flicker' or 'disable'\"}");
         }
     });
+
+#endif // AP_ENABLE_DATAPANEL
 
     // ---- REST API: Panel calibration reset ----
     asyncServer.on("/api/panelcal/reset", HTTP_POST, [](AsyncWebServerRequest *request)

@@ -173,7 +173,7 @@
       <div class="gadget-item">
         <details class="gadget-details">
           <summary>BadMotivator (Smoke)</summary>
-          <div class="desc mt-4">Smoke output via BadMotivator module. Key: <code>badmot</code> | Commands: <code>#BMSMOKE</code>, <code>#BMSTOP</code>, <code>#BMPULSE&lt;sec&gt;</code></div>
+          <div class="desc mt-4">Smoke output via BadMotivator module. Key: <code>badmot</code> | Commands: <code>@APBMON</code>, <code>@APBMOFF</code></div>
           <div class="toggle-row mt-6">
             <label for="gadget-badmot">Enable Feature</label>
             <input type="checkbox" id="gadget-badmot" onchange="saveGadgetPref('badmot')">
@@ -184,7 +184,7 @@
       <div class="gadget-item">
         <details class="gadget-details">
           <summary>FireStrip (Fire LEDs)</summary>
-          <div class="desc mt-4">Auxiliary fire/spark LED strip. Key: <code>firest</code> | Commands: <code>#FIRESPARK&lt;ms&gt;</code>, <code>#FIREBURN&lt;ms&gt;</code>, <code>#FIRESTOP</code></div>
+          <div class="desc mt-4">Auxiliary fire/spark LED strip. Key: <code>firest</code> | Commands: <code>@APFS1&lt;ms&gt;</code>, <code>@APFS2&lt;ms&gt;</code>, <code>@APFSOFF</code></div>
           <div class="toggle-row mt-6">
             <label for="gadget-firest">Enable Feature</label>
             <input type="checkbox" id="gadget-firest" onchange="saveGadgetPref('firest')">
@@ -195,7 +195,7 @@
       <div class="gadget-item">
         <details class="gadget-details">
           <summary>Charge Bay Indicator (CBI)</summary>
-          <div class="desc mt-4">MAX7219 charge-bay panel animation. Key: <code>cbienb</code> | Commands: <code>#CBION</code>, <code>#CBIOFF</code>, <code>#CBISET&lt;n&gt;</code></div>
+          <div class="desc mt-4">MAX7219 charge-bay panel animation. Key: <code>cbienb</code> | Commands: <code>@APCB&lt;value&gt;</code></div>
           <div class="toggle-row mt-6">
             <label for="gadget-cbienb">Enable Feature</label>
             <input type="checkbox" id="gadget-cbienb" onchange="saveGadgetPref('cbienb')">
@@ -206,7 +206,7 @@
       <div class="gadget-item">
         <details class="gadget-details">
           <summary>DataPanel</summary>
-          <div class="desc mt-4">MAX7219 body datapanel animation. Key: <code>dpenab</code> | Commands: <code>#DPON</code>, <code>#DPOFF</code>, <code>#DPSET&lt;n&gt;</code></div>
+          <div class="desc mt-4">MAX7219 body datapanel animation. Key: <code>dpenab</code> | Commands: <code>@APDP&lt;value&gt;</code></div>
           <div class="toggle-row mt-6">
             <label for="gadget-dpenab">Enable Feature</label>
             <input type="checkbox" id="gadget-dpenab" onchange="saveGadgetPref('dpenab')">
