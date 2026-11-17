@@ -135,10 +135,10 @@ static bool swapPanelCalibrationInMask(uint32_t mask)
 
 // NOTE: :MV, #SO, #SC, #SW use getCommand() suffix parsing here.
 //
-// This works for stable ingress buffers such as MarcduinoSerial's internal
-// fBuffer. For async web ingress, command memory can be temporary; those paths
-// are handled synchronously in processMarcduinoCommandWithSource() before
-// reaching Marcduino::processCommand().
+// Queued ingress (REST, WebSocket, serial, body link, I2C) handles these
+// synchronously in marcduinoIngressHandlePanelCalibrationCommand()
+// (MarcduinoIngress.h) and never reaches these handlers. They serve the legacy
+// MarcduinoSerial path, which bypasses ingress and keeps its own line buffer.
 
 MARCDUINO_ACTION(MovePanelCalibration, :MV, ({
     const char *args = Marcduino::getCommand();
