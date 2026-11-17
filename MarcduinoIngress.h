@@ -287,6 +287,14 @@ static void drainMarcduinoCommandQueue()
         // the same one-command-per-tick behavior from its own buffer.)
         if (player.hasUnstartedAnimation())
             player.animate();
+
+        // A DM:* handler only records dome_pendingAnim. Start that dome
+        // sequence now, in queue order, and run its first step (which sets
+        // dome_seqRunning), so a later command in this drain (e.g. :SE00)
+        // pre-empts it rather than mainLoop() starting it afterwards.
+        dispatchPendingDomeAnimation();
+        if (player.hasUnstartedAnimation())
+            player.animate();
     }
 }
 
