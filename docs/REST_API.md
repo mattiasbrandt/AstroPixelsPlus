@@ -357,6 +357,95 @@ curl -X POST http://192.168.1.100/api/dome/element-status \
 
 ---
 
+## System, Preferences & Uploads
+
+### GET /api/logs
+
+Returns the in-memory log ring buffer, oldest line first.
+
+```json
+{"lines":["[WS] Client #1 connected from 192.168.4.2", "..."]}
+```
+
+### GET /api/pref?keys=k1,k2
+
+Reads stored preferences. Every key must be on the firmware allowlist
+(`isAllowedPrefKey` in `AsyncWebInterface.h`), otherwise the whole request
+fails with `400 {"error":"invalid key"}`. Boolean keys come back as JSON
+booleans, integer keys as numbers, everything else as strings.
+
+```bash
+curl 'http://192.168.4.1/api/pref?keys=wifi,ssid,mvolume'
+```
+
+### POST /api/pref
+
+Form fields: `key`, `val`, optional `reboot=1` (reboots 500 ms after the reply).
+
+- Key must be 1-16 characters and on the allowlist (`400 {"error":"key not allowed"}`).
+- Value length limit is 16 characters, except `ssid`/`rhost` (32), `pass`/`rsecret` (64), `dname` (24), `bodypeerip` (15).
+- Integer keys reject non-integer values (`400 {"error":"invalid integer value"}`).
+- `key=_clear` clears **all** preferences (factory reset of settings).
+
+```bash
+curl -X POST http://192.168.4.1/api/pref -d 'key=mvolume&val=20'
+```
+
+### POST /api/reboot
+
+Replies `{"ok":true,"msg":"rebooting"}` and restarts the controller.
+
+### POST /api/panelcal/reset
+
+Removes stored open/close calibration (`soNN`/`scNN` keys) for the panel
+servos in a panel target group, so they fall back to defaults.
+
+Form fields: `target` (two digits, `00`-`15`, same target numbering as the `:MV`/`#SO`/`#SC` calibration commands),
+optional `reboot` (`1`/`true` by default; send `0` to skip the reboot).
+
+```json
+{"ok":true,"target":"00","matched_servos":10,"removed_keys":20,"rebooting":true}
+```
+
+### POST /upload/firmware and POST /upload/filesystem
+
+Multipart HTTP OTA. The file field is named `firmware` or `filesystem`
+respectively. Use the Makefile wrappers, which build and run the gate first:
+
+```bash
+make ota OTA_IP=astropixelsplus.local
+make uploadfs OTA_IP=astropixelsplus.local
+```
+
+### WebSocket /ws
+
+- **Server → client:** JSON messages `{"type":"state","data":{...}}` (sent on
+  connect and on change), `{"type":"health","data":{...}}`,
+  `{"type":"log","line":"..."}`, `{"type":"ota","progress":0.42}`.
+- **Client → server:** a single text frame holding one Marcduino command
+  (printable ASCII, max 63 characters). It goes through the same ingress as
+  `/api/cmd`.
+
+---
+
+## Optional Gadget Endpoints
+
+These routes exist **only** in builds where the matching gadget is compiled in
+(`platformio.ini` build flag set to 1). The default build disables all four,
+so they return 404. The commands are ReelTwo `CommandEvent` commands and are
+sent internally with the `@AP` prefix.
+
+| Route | Build flag | Form fields | Command sent |
+|-------|-----------|-------------|--------------|
+| `POST /api/smoke` | `AP_ENABLE_BADMOTIVATOR` | `state=on\|off` | `BMON` / `BMOFF` |
+| `POST /api/fire` | `AP_ENABLE_FIRESTRIP` | `state=on\|off` | `FS11000` / `FSOFF` |
+| `GET /api/cbi` | `AP_ENABLE_CBI` | — | none; always `{"ok":true,"state":"unknown"}` |
+| `POST /api/cbi` | `AP_ENABLE_CBI` | `action=flicker\|disable`, optional `duration` (1-99 s; default 6 / 8) | `CB2<dd>006` / `CB1<dd>008` |
+| `GET /api/datapanel` | `AP_ENABLE_DATAPANEL` | — | none; always `{"ok":true,"state":"unknown"}` |
+| `POST /api/datapanel` | `AP_ENABLE_DATAPANEL` | `action=flicker\|disable`, optional `duration` (1-99 s; default 6 / 8) | `DP2<dd>006` / `DP1<dd>008` |
+
+---
+
 ## Sequence & Effect Control
 
 ### Triggering Sequences

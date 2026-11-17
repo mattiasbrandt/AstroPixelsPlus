@@ -10,10 +10,7 @@ including core commands and extended features.
 | **Logics** | `@*T*`, `@*M`, `@*P` | `MarcduinoLogics.h` |
 | **Holos** | `*ON*`, `*OF*`, `*ST*`, `*HP*`, `*RD*`, `*HD*`, `*HW*`, `*HN*`, `*CO`, `*CH`, `*RC`, `*TE` | `MarcduinoHolo.h` |
 | **Sound** | `$*` | `MarcduinoSound.h` |
-| **Smoke** | `#BM*` | `MarcduinoEffects.h` |
-| **Fire** | `#FIRE*` | `MarcduinoEffects.h` |
-| **CBI** | `#CBI*` | `MarcduinoEffects.h` |
-| **DataPanel** | `#DP*` | `MarcduinoEffects.h` |
+| **Gadgets** (smoke, fire, CBI, DataPanel; build-flag gated) | `@APBM*`, `@APFS*`, `@APCB*`, `@APDP*` | ReelTwo gadget classes via `CommandEvent` |
 
 ---
 ## Table of Contents
@@ -33,11 +30,8 @@ including core commands and extended features.
 13. [Holo Projector — Random Movement Commands](#holo-projector--random-movement-commands)
 14. [Extended Logic Effects](#extended-logic-effects)
 15. [Extended Holo Commands](#extended-holo-commands)
-16. [BadMotivator — Smoke Commands](#badmotivator--smoke-commands)
-17. [FireStrip — Fire Commands](#firestrip--fire-commands)
-18. [CBI — Charge Bay Indicator Commands](#cbi--charge-bay-indicator-commands)
-19. [DataPanel Commands](#datapanel-commands)
-20. [ReelTwo Command Structure Reference](#reeltwo-command-structure-reference)
+16. [Optional Gadgets — Smoke, Fire, CBI, DataPanel](#optional-gadgets--smoke-fire-cbi-datapanel)
+17. [ReelTwo Command Structure Reference](#reeltwo-command-structure-reference)
 
 
 
@@ -56,7 +50,7 @@ All commands follow the MarcDuino serial protocol and must be terminated with `\
 
 | Prefix | Domain        | File                  |
 |--------|---------------|-----------------------|
-| `#`    | Configuration / effects gadgets | `MarcduinoEffects.h`, `AstroPixelsPlus.ino` |
+| `#`    | Configuration, panel calibration | `AstroPixelsPlus.ino`, `MarcduinoPanel.h` |
 | `:`    | Panel servos  | `MarcduinoPanel.h`    |
 | `*`    | Holo projectors | `MarcduinoHolo.h`   |
 | `@`    | Logics / sequences | `MarcduinoLogics.h`, `MarcduinoSequence.h` |
@@ -872,373 +866,41 @@ Dispatches `HPT104` to the Reeltwo holo controller.
 - `*TE<params>\r` — Test mode
 
 ---
-## BadMotivator — Smoke Commands
+## Optional Gadgets — Smoke, Fire, CBI, DataPanel
 
-**Source:** `MarcduinoEffects.h` · **Enabled by:** `-DAP_ENABLE_BADMOTIVATOR=1`
+**Enabled by:** `-DAP_ENABLE_BADMOTIVATOR=1`, `-DAP_ENABLE_FIRESTRIP=1`,
+`-DAP_ENABLE_CBI=1`, `-DAP_ENABLE_DATAPANEL=1` in `platformio.ini` (all `0` by
+default). Objects are declared in `AstroPixelsPlus.ino`.
 
-The BadMotivator gadget drives a smoke/fog machine attached to the R2 bad-motivator
-dome port. Commands call into the `BadMotivator` class from the Reeltwo library
-(`dome/BadMotivator.h`).
+These gadgets are ReelTwo classes (`dome/BadMotivator.h`, `dome/FireStrip.h`,
+`body/ChargeBayIndicator.h`, `body/DataPanel.h`). They take ReelTwo
+`CommandEvent` tokens, **not** Marcduino `#` commands. From any Marcduino
+transport (serial, `/api/cmd`, `/ws`), send the token with the `@AP` prefix;
+`MDDirectCommand` forwards everything after `@AP` to `CommandEvent::process`.
+Built-in sequences in `MarcduinoSequence.h` send the bare tokens through
+`DO_COMMAND`, which already uses `CommandEvent`.
 
-### Safety constants (enforced in firmware)
-
-| Constant | Value | Meaning |
+| Gadget | Token | Effect (per ReelTwo 23.5.3 source) |
 |---|---|---|
-| `SMOKE_MAX_CONTINUOUS_MS` | 30 000 ms | Hard upper limit for a single smoke pulse |
-| `SMOKE_COOLDOWN_MS` | 5 000 ms | Minimum rest between activations |
+| BadMotivator | `BMON` | Smoke relay on; ReelTwo stops it after 6.5 s and enforces a 1-minute pause between activations |
+| BadMotivator | `BMOFF` | Smoke relay off |
+| FireStrip | `FS1<ms>` | Spark effect for `<ms>` milliseconds (e.g. `FS11000`) |
+| FireStrip | `FS2<ms>` | Burn effect for `<ms>` milliseconds |
+| FireStrip | `FS0`, `FSOFF` | Off |
+| ChargeBayIndicator | `CB<value>` | `selectEffect(<value>)`, ReelTwo's numeric effect code (e.g. `CB20006`) |
+| DataPanel | `DP<value>` | `selectEffect(<value>)`, same encoding (e.g. `DP20006`) |
+
+Examples: `@APBMON`, `@APFS11000`, `@APCB20006`.
+
+The REST wrappers (`/api/smoke`, `/api/fire`, `/api/cbi`, `/api/datapanel`) are
+registered only when the matching flag is on; see [REST_API.md](./REST_API.md).
+
+> Earlier revisions of this file documented `#BMSMOKE`, `#FIRESPARK`, `#CBION`,
+> `#DPSET` and similar commands from `MarcduinoEffects.h`. That header was never
+> included in any build and has been removed; those commands never existed.
 
 ---
 
-### `#BMSMOKE` — Start Smoke
-
-**Syntax:** `#BMSMOKE\r`
-
-**Parameters:** None
-
-**Description:**  
-Activates the smoke machine immediately and runs continuously until `#BMSTOP` is
-received or the safety timeout expires.
-
-**Example:**
-```
-#BMSMOKE\r
-```
-
-**Safety notes:**
-- Do not run for extended periods without adequate ventilation.
-- Sustained use without cooldown can overheat some fog-machine elements.
-- Always pair with a `#BMSTOP` or use `#BMPULSE` for time-bounded activation.
-
----
-
-### `#BMSTOP` — Stop Smoke
-
-**Syntax:** `#BMSTOP\r`
-
-**Parameters:** None
-
-**Description:**  
-Immediately deactivates the smoke machine, halting any continuous or pulsed operation.
-
-**Example:**
-```
-#BMSTOP\r
-```
-
-**Safety notes:**
-- Safe to call at any time, including when the smoke machine is already off.
-- Use as an emergency cutoff during automation sequences.
-
----
-
-### `#BMPULSE` — Timed Smoke Pulse
-
-**Syntax:** `#BMPULSE<seconds>\r`
-
-**Parameters:**
-
-| Parameter | Type | Range | Description |
-|---|---|---|---|
-| `<seconds>` | Integer | 1–30 | Duration of smoke burst in whole seconds |
-
-**Description:**  
-Activates the smoke machine for a fixed number of seconds, then automatically
-stops. The duration is converted internally to milliseconds before being passed to
-`badMotivator.pulseSmoke()`.
-
-**Examples:**
-```
-#BMPULSE5\r     → Smoke for 5 seconds
-#BMPULSE15\r    → Smoke for 15 seconds
-#BMPULSE30\r    → Smoke for 30 seconds (maximum)
-```
-
-**Safety notes:**
-- Maximum allowed value is **30** seconds; values outside 1–30 are rejected with
-  a debug log message and no action taken.
-- Prefer `#BMPULSE` over `#BMSMOKE`/`#BMSTOP` pairs for automation sequences to
-  guarantee the smoke machine does not stay on indefinitely if a stop command is lost.
-
----
-
-### `#BMAUTO` — Automatic Random Smoke Mode
-
-**Syntax:** `#BMAUTO,<min>,<max>\r`
-
-**Parameters:**
-
-| Parameter | Type | Range | Description |
-|---|---|---|---|
-| `<min>` | Integer | 1–60 | Minimum interval between activations (seconds) |
-| `<max>` | Integer | `min`–60 | Maximum interval between activations (seconds) |
-
-**Description:**  
-Enables automatic, randomly-timed smoke bursts. The BadMotivator library picks a
-random interval between `<min>` and `<max>` seconds and triggers smoke puffs
-autonomously. Both values are converted to milliseconds before passing to
-`badMotivator.setAutoMode()`.
-
-**Examples:**
-```
-#BMAUTO,5,15\r    → Random smoke every 5–15 seconds
-#BMAUTO,30,60\r   → Gentle background puffing every 30–60 seconds
-#BMAUTO,1,5\r     → Rapid, frequent smoke bursts (use with caution)
-```
-
-**Safety notes:**
-- `<min>` must be ≥ 1 and ≤ 60. `<max>` must be ≥ `<min>` and ≤ 60.
-- Parameters outside these bounds are rejected (no action, debug log only).
-- Send `#BMSTOP` to exit auto mode before sending other smoke commands.
-- The comma separator between parameters is **required**; omitting it causes the
-  command to be rejected.
-
----
-## FireStrip — Fire Commands
-
-**Source:** `MarcduinoEffects.h` · **Enabled by:** `-DAP_ENABLE_FIRESTRIP=1`
-
-FireStrip drives a WS2812B LED strip configured to simulate fire effects using the
-Reeltwo `FireStrip` class (`dome/FireStrip.h`). Brightness is internally capped at
-`FIRE_MAX_BRIGHTNESS = 200` to protect LED longevity.
-
-### Safety constants (enforced in firmware)
-
-| Constant | Value | Meaning |
-|---|---|---|
-| `FIRE_MAX_BRIGHTNESS` | 200 | Hard brightness cap applied to all fire effects |
-
----
-
-### `#FIRESPARK` — Brief Fire Spark
-
-**Syntax:** `#FIRESPARK<ms>\r`
-
-**Parameters:**
-
-| Parameter | Type | Range | Description |
-|---|---|---|---|
-| `<ms>` | Integer | 1–5000 | Duration of spark effect in milliseconds |
-
-**Description:**  
-Triggers a short, single flame/spark animation for the specified number of
-milliseconds, then the strip returns to its idle state. Calls `fireStrip.spark()`.
-
-**Examples:**
-```
-#FIRESPARK100\r    → Quick 100 ms spark flash
-#FIRESPARK500\r    → Half-second flicker
-#FIRESPARK5000\r   → 5-second spark (maximum)
-```
-
-**Safety notes:**
-- Maximum is **5000 ms** (5 seconds). Values outside 1–5000 are rejected.
-- Spark is a transient effect; `#FIRESTOP` is not needed after it completes.
-
----
-
-### `#FIREBURN` — Sustained Fire Effect
-
-**Syntax:** `#FIREBURN<ms>\r`
-
-**Parameters:**
-
-| Parameter | Type | Range | Description |
-|---|---|---|---|
-| `<ms>` | Integer | 1–10000 | Duration of burn animation in milliseconds |
-
-**Description:**  
-Runs the full fire-simulation animation (heat-map color cycling, rising flame
-patterns) for the specified duration at capped brightness. Calls
-`fireStrip.burn(milliseconds, FIRE_MAX_BRIGHTNESS)`.
-
-**Examples:**
-```
-#FIREBURN2000\r     → 2-second fire display
-#FIREBURN10000\r    → 10-second fire display (maximum)
-```
-
-**Safety notes:**
-- Maximum is **10 000 ms** (10 seconds). Values outside 1–10 000 are rejected.
-- The brightness cap (`FIRE_MAX_BRIGHTNESS = 200`) is enforced in the firmware call;
-  even if the library supports higher values, the cap cannot be exceeded via this
-  command path.
-- Do not use near flammable materials or place fire-strip LED arrays in enclosed
-  spaces without adequate heat management.
-
----
-
-### `#FIRESTOP` — Stop Fire Effect
-
-**Syntax:** `#FIRESTOP\r`
-
-**Parameters:** None
-
-**Description:**  
-Immediately halts any active fire or spark animation and sets the strip to off.
-Calls `fireStrip.stop()`.
-
-**Example:**
-```
-#FIRESTOP\r
-```
-
-**Safety notes:**
-- Safe to call at any time, including when no fire effect is running.
-- Use as the last command in any fire-effects sequence to guarantee a clean off state.
-
----
-## CBI — Charge Bay Indicator Commands
-
-**Source:** `MarcduinoEffects.h` · **Enabled by:** `-DAP_ENABLE_CBI=1`
-
-CBI commands control the R2-D2 Charge Bay Indicator light board. The Reeltwo
-`ChargeBayIndicator` class (`body/ChargeBayIndicator.h`) manages the LED patterns.
-
----
-
-### `#CBION` — Charge Bay On
-
-**Syntax:** `#CBION\r`
-
-**Parameters:** None
-
-**Description:**  
-Enables the charge bay indicator, activating its default display pattern.
-Calls `chargeBayIndicator.enable()`.
-
-**Example:**
-```
-#CBION\r
-```
-
----
-
-### `#CBIOFF` — Charge Bay Off
-
-**Syntax:** `#CBIOFF\r`
-
-**Parameters:** None
-
-**Description:**  
-Disables the charge bay indicator, turning off all its LEDs.
-Calls `chargeBayIndicator.disable()`.
-
-**Example:**
-```
-#CBIOFF\r
-```
-
----
-
-### `#CBISET` — Charge Bay Set Pattern
-
-**Syntax:** `#CBISET<pattern>\r`
-
-**Parameters:**
-
-| Parameter | Type | Range | Description |
-|---|---|---|---|
-| `<pattern>` | Integer | 0–9 | Pattern index to activate |
-
-**Description:**  
-Sets the charge bay indicator to a specific display pattern. Pattern semantics are
-defined by the Reeltwo `ChargeBayIndicator` class; refer to the Reeltwo library
-documentation for the full pattern list. Calls `chargeBayIndicator.setPattern()`.
-
-**Examples:**
-```
-#CBISET0\r    → Pattern 0 (typically default/idle)
-#CBISET5\r    → Pattern 5
-#CBISET9\r    → Pattern 9 (maximum index)
-```
-
-**Safety notes:**
-- Values outside 0–9 are rejected with a debug log message.
-- The indicator must be enabled (`#CBION`) before `#CBISET` has a visible effect
-  on some pattern implementations.
-
-**Feature toggle note:** If `-DAP_ENABLE_CBI=0` (default), this command is compiled
-out. Sending it has no effect and produces no error response.
-
----
-## DataPanel Commands
-
-**Source:** `MarcduinoEffects.h` · **Enabled by:** `-DAP_ENABLE_DATAPANEL=1`
-
-DataPanel commands control the R2-D2 data panel display board. The Reeltwo
-`DataPanel` class (`body/DataPanel.h`) manages the LED patterns.
-
-> **REST API alternative:** The web interface also exposes `POST /api/datapanel`
-> with `action=flicker` or `action=disable` for web-based control. These REST calls
-> translate internally to Reeltwo `DP*` commands; they are separate from and
-> complementary to the Marcduino `#DP*` command path.
-
----
-
-### `#DPON` — Data Panel On
-
-**Syntax:** `#DPON\r`
-
-**Parameters:** None
-
-**Description:**  
-Enables the data panel, activating its default display pattern.
-Calls `dataPanel.enable()`.
-
-**Example:**
-```
-#DPON\r
-```
-
----
-
-### `#DPOFF` — Data Panel Off
-
-**Syntax:** `#DPOFF\r`
-
-**Parameters:** None
-
-**Description:**  
-Disables the data panel, turning off all its LEDs.
-Calls `dataPanel.disable()`.
-
-**Example:**
-```
-#DPOFF\r
-```
-
----
-
-### `#DPSET` — Data Panel Set Pattern
-
-**Syntax:** `#DPSET<pattern>\r`
-
-**Parameters:**
-
-| Parameter | Type | Range | Description |
-|---|---|---|---|
-| `<pattern>` | Integer | 0–9 | Pattern index to activate |
-
-**Description:**  
-Sets the data panel to a specific display pattern. Pattern semantics are defined by
-the Reeltwo `DataPanel` class; refer to the Reeltwo library documentation for the
-full pattern list. Calls `dataPanel.setPattern()`.
-
-**Examples:**
-```
-#DPSET0\r    → Pattern 0 (typically default/idle)
-#DPSET3\r    → Pattern 3
-#DPSET9\r    → Pattern 9 (maximum index)
-```
-
-**Safety notes:**
-- Values outside 0–9 are rejected with a debug log message.
-- The panel should be enabled (`#DPON`) before `#DPSET` for patterns to be visible.
-
-**Feature toggle note:** If `-DAP_ENABLE_DATAPANEL=0` (default), this command is
-compiled out. Sending it has no effect and produces no error response.
-
----
 ## Dome Visual Presets (`DV:`)
 
 ### `DV:<NAME>` — Apply Dome-Native Visual Preset
@@ -1417,31 +1079,16 @@ MARCDUINO_ACTION(HandlerName, <prefix>COMMAND, ({
 
 The macro binds a command string to an inline handler. `Marcduino::getCommand()`
 inside the handler returns everything after the command token (i.e., the parameter
-string). This is the pattern used for all `#BM*`, `#FIRE*`, `#CBI*`, `#DP*`,
-`*RD0n`, and `*HP` commands in this firmware.
+string). This is the pattern used for the `*RD0n` and `*HP` commands in this firmware.
 
 ### Feature-gated compilation
 
-Commands for optional hardware gadgets are wrapped in conditional compilation:
-
-```cpp
-// In MarcduinoEffects.h — extern declarations
-#if AP_ENABLE_BADMOTIVATOR
-extern BadMotivator badMotivator;
-#endif
-
-// In AsyncWebInterface.h — include gating
-#if AP_ENABLE_FIRESTRIP
-#include "dome/FireStrip.h"
-#endif
-```
-
-If a feature flag is `0`, the corresponding `MARCDUINO_ACTION` handlers are not
-compiled and the gadget objects are not declared. The command string is never
-registered in the parser dispatch table, so the firmware simply ignores any
-matching command received at runtime — no error, no crash.
+Optional gadget objects are declared in `AstroPixelsPlus.ino` and their REST
+routes registered in `AsyncWebInterface.h` only inside `#if AP_ENABLE_*` blocks.
+With a flag at `0` the object does not exist, nothing handles the token, and
+`@AP<token>` is silently ignored: no error, no crash.
 
 ---
 
-*Source files: `MarcduinoEffects.h`, `MarcduinoHolo.h`, `AsyncWebInterface.h`  
+*Source files: `AstroPixelsPlus.ino`, `MarcduinoHolo.h`, `AsyncWebInterface.h`  
 Reeltwo library: https://github.com/reeltwo/Reeltwo*

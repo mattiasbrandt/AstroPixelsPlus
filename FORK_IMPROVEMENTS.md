@@ -294,16 +294,17 @@ Optional hardware add-ons that extend the static display experience beyond the c
 
 ### Overview
 
-| Gadget | ReelTwo class | Wiring (default) | Build flag | Runtime pref key | Primary commands |
+| Gadget | ReelTwo class | Wiring (default) | Build flag | Runtime pref key | Commands (send with `@AP` prefix) |
 |---|---|---|---|---|---|
-| BadMotivator (Smoke) | `BadMotivator` | `PIN_AUX5` (GPIO 19) | `AP_ENABLE_BADMOTIVATOR` | `badmot` | `#BMSMOKE`, `#BMSTOP`, `#BMPULSE<sec>`, `#BMAUTO,<min>,<max>` |
-| FireStrip (Fire) | `FireStrip` | `PIN_AUX4` (GPIO 18) | `AP_ENABLE_FIRESTRIP` | `firest` | `#FIRESPARK<ms>`, `#FIREBURN<ms>`, `#FIRESTOP` |
-| ChargeBayIndicator | `ChargeBayIndicator` | AUX bus `PIN_AUX1/2/3` (GPIO 2/4/5) | `AP_ENABLE_CBI` | `cbienb` | `#CBION`, `#CBIOFF`, `#CBISET<n>` |
-| DataPanel | `DataPanel` | AUX bus `PIN_AUX1/2/3` (GPIO 2/4/5) | `AP_ENABLE_DATAPANEL` | `dpenab` | `#DPON`, `#DPOFF`, `#DPSET<n>` |
+| BadMotivator (Smoke) | `BadMotivator` | `PIN_AUX5` (GPIO 19) | `AP_ENABLE_BADMOTIVATOR` | `badmot` | `BMON`, `BMOFF` |
+| FireStrip (Fire) | `FireStrip` | `PIN_AUX4` (GPIO 18) | `AP_ENABLE_FIRESTRIP` | `firest` | `FS1<ms>`, `FS2<ms>`, `FSOFF` |
+| ChargeBayIndicator | `ChargeBayIndicator` | AUX bus `PIN_AUX1/2/3` (GPIO 2/4/5) | `AP_ENABLE_CBI` | `cbienb` | `CB<value>` |
+| DataPanel | `DataPanel` | AUX bus `PIN_AUX1/2/3` (GPIO 2/4/5) | `AP_ENABLE_DATAPANEL` | `dpenab` | `DP<value>` |
 
 Notes:
 - All four gadget build flags default to `0` (disabled) in `platformio.ini`.
-- In addition to the `#...` Marcduino commands, the ReelTwo gadget classes also accept raw `CommandEvent` tokens used by built-in sequences and REST helpers.
+- The gadgets take ReelTwo `CommandEvent` tokens. Send them over any Marcduino transport as `@AP<token>` (e.g. `@APBMON`); built-in sequences send the bare token via `DO_COMMAND`.
+- Correction (2026-11-17): earlier revisions listed `#BMSMOKE`, `#FIRESPARK`, `#CBION`, `#DPSET` and similar `#` commands from `MarcduinoEffects.h`. That header was never included in any build and has been deleted; those commands never existed. The REST wrappers also used to send bare tokens through the Marcduino dispatcher, which ignores them; they now send `@AP<token>` and are registered only when the gadget is compiled in.
 
 ---
 
@@ -321,24 +322,15 @@ Notes:
 | Runtime pref key | `badmot` (bool) |
 | ReelTwo source | [`src/dome/BadMotivator.h`](https://github.com/reeltwo/Reeltwo/tree/master/src/dome/BadMotivator.h) |
 
-**Commands** (Marcduino `#` domain; see `docs/COMMANDS.md` for full details):
-
-| Command | Action |
-|---|---|
-| `#BMSMOKE` | Start smoke (continuous until stopped) |
-| `#BMSTOP` | Stop smoke immediately |
-| `#BMPULSE<sec>` | Timed smoke pulse (validated range `1–30`) |
-| `#BMAUTO,<min>,<max>` | Automatic random smoke bursts (validated range `1–60` seconds) |
-
-**Internal tokens** (raw ReelTwo `CommandEvent` strings used by built-in sequences/REST):
+**Commands** (ReelTwo `CommandEvent` tokens; send as `@AP<token>`):
 
 | Token | Used by | Meaning |
 |---|---|---|
-| `BMON` | `/api/smoke` and sequences | Smoke on |
+| `BMON` | `/api/smoke` and sequences | Smoke on; ReelTwo stops it after 6.5 s and enforces a 1-minute pause between activations |
 | `BMOFF` | `/api/smoke` and sequences | Smoke off |
 
 **Safety notes**:
-- Prefer `#BMPULSE...` over continuous smoke for automation so the effect ends even if a stop command is lost.
+- ReelTwo's 6.5 s auto-stop ends the effect even if `BMOFF` is lost.
 - Provide adequate ventilation and keep the smoke outlet/tubing away from wiring looms and servo linkages.
 - Add a fuse on the smoke element power line sized to your module (1A is a common starting point, but match the device spec).
 
@@ -348,7 +340,7 @@ Notes:
 
 **Purpose**: WS2812B fire/spark strip animation to visually complement smoke sequences and add ambient motion during static display.
 
-**Hardware**: WS2812B (NeoPixel-compatible) strip powered from a dedicated 5V supply. Data is a single GPIO. A firmware-side brightness cap is applied on the `#FIREBURN` command path.
+**Hardware**: WS2812B (NeoPixel-compatible) strip powered from a dedicated 5V supply. Data is a single GPIO.
 
 | Parameter | Value |
 |---|---|
@@ -356,18 +348,9 @@ Notes:
 | Pin override | `-DPIN_AUX4=<gpio>` build flag |
 | Build flag | `-DAP_ENABLE_FIRESTRIP=1` |
 | Runtime pref key | `firest` (bool) |
-| Brightness cap | `FIRE_MAX_BRIGHTNESS = 200` (firmware wrapper) |
 | ReelTwo source | [`src/dome/FireStrip.h`](https://github.com/reeltwo/Reeltwo/tree/master/src/dome/FireStrip.h) |
 
-**Commands** (Marcduino `#` domain):
-
-| Command | Action |
-|---|---|
-| `#FIRESPARK<ms>` | Spark effect for `1–5000` ms |
-| `#FIREBURN<ms>` | Fire/burn effect for `1–10000` ms (brightness capped) |
-| `#FIRESTOP` | Stop effect immediately and turn strip off |
-
-**Internal tokens** (raw ReelTwo `CommandEvent` strings used by built-in sequences/REST):
+**Commands** (ReelTwo `CommandEvent` tokens; send as `@AP<token>`):
 
 | Token | Meaning |
 |---|---|
@@ -390,13 +373,11 @@ Notes:
 | Runtime pref key | `cbienb` (bool) |
 | ReelTwo source | [`src/body/ChargeBayIndicator.h`](https://github.com/reeltwo/Reeltwo/tree/master/src/body/ChargeBayIndicator.h) |
 
-**Commands** (Marcduino `#` domain):
+**Commands** (ReelTwo `CommandEvent` tokens; send as `@AP<token>`):
 
-| Command | Action |
+| Token | Action |
 |---|---|
-| `#CBION` | Enable (default pattern) |
-| `#CBIOFF` | Disable (all LEDs off) |
-| `#CBISET<n>` | Set pattern index (`0–9`) |
+| `CB<value>` | ReelTwo `selectEffect(<value>)` numeric effect code, e.g. `CB20006` (used by `/api/cbi` and sequences) |
 
 ---
 
@@ -413,13 +394,11 @@ Notes:
 | Runtime pref key | `dpenab` (bool) |
 | ReelTwo source | [`src/body/DataPanel.h`](https://github.com/reeltwo/Reeltwo/tree/master/src/body/DataPanel.h) |
 
-**Commands** (Marcduino `#` domain):
+**Commands** (ReelTwo `CommandEvent` tokens; send as `@AP<token>`):
 
-| Command | Action |
+| Token | Action |
 |---|---|
-| `#DPON` | Enable (default pattern) |
-| `#DPOFF` | Disable (all LEDs off) |
-| `#DPSET<n>` | Set pattern index (`0–9`) |
+| `DP<value>` | ReelTwo `selectEffect(<value>)` numeric effect code, e.g. `DP20006` (used by `/api/datapanel` and sequences) |
 
 ---
 
@@ -427,7 +406,7 @@ Notes:
 
 Gadgets are controlled at two levels:
 
-**Build-time flags** (`platformio.ini`) — when a flag is `0`, the gadget and its command handlers are compiled out.
+**Build-time flags** (`platformio.ini`) — when a flag is `0`, the gadget object and its REST routes are compiled out.
 
 ```ini
 build_flags =
@@ -477,7 +456,7 @@ This fork operates R2 primarily as a **static display piece**. For live-performa
 | Document | Content |
 |---|---|
 | `docs/HARDWARE_WIRING.md` | Gadget wiring, pin assignments, AUX bus layout, and power notes |
-| `docs/COMMANDS.md` | Full gadget command reference (`#BM*`, `#FIRE*`, `#CBI*`, `#DP*`) with examples |
+| `docs/COMMANDS.md` | Gadget token reference (`@APBM*`, `@APFS*`, `@APCB*`, `@APDP*`) |
 | `docs/SETUP.md` | Build flag enablement, runtime toggles, and first-time verification steps |
 
 ## Marcduino Protocol Extensions
@@ -1082,6 +1061,52 @@ Added typed visual commands for the body sequence editor so operators can create
 These commands are visual-only: they do not move panels, play audio, forward `DM:*`, or start dome-owned sequence state. Invalid combinations are logged and ignored safely. `/api/health` reports the last applied logic/text/holo authoring command plus apply/reject counters, giving the body/editor a machine-readable way to confirm what the dome accepted.
 
 Hardware verification: a body-authored test sequence successfully drove red MARCH logics, a two-line FLD text message, and red holo flashes over the normal body-to-dome link, then restored normal visuals with `DV:RESET_VISUALS`. The dome stayed healthy with no command queue overflow or rejected visual commands.
+
+---
+
+## Dead-Code and Silent-Failure Cleanup (2026-11-17)
+
+An audit found UI controls and API routes that looked like they worked but did
+nothing, plus dead files that misled contributors.
+
+Fixed (behavior changes):
+
+- **Web UI toasts now appear.** `uiToast` was private to `data/app.js`, so all
+  21 success/error toasts across the pages were silent no-ops. It is now
+  exported as `window.uiToast`. Wiring-config errors therefore show as a toast
+  instead of a browser `alert()`.
+- **Sound settings save reports failures.** `data/sound.html` showed "saved"
+  even when a preference POST returned an error.
+- **Holo LED effect buttons work.** The Static/Cycle buttons on the Holos page
+  sent `*HPF005`, `*HPF0040` (and the `R`/`T` variants), which match no
+  Marcduino handler. They now send `@HPF005` etc., which the existing `@HP`
+  handler forwards to the holo `CommandEvent` path.
+- **Removed the logic scroll-speed sliders.** They sent `@1G`/`@2G`/`@3G`, which
+  nothing handles (not in this repo, not in ReelTwo 23.5.3). ReelTwo sets scroll
+  speed per effect, not globally.
+- **Gadget REST routes.** `/api/smoke`, `/api/fire`, `/api/cbi` and
+  `/api/datapanel` are now registered only when the matching `AP_ENABLE_*`
+  flag is on (404 in the default build, where they used to answer
+  `{"ok":true}` and do nothing). They now send `@AP<token>`, so the token
+  reaches the ReelTwo gadget via `CommandEvent`; before, the bare token went to
+  the Marcduino dispatcher, which ignores it.
+
+Removed or simplified (no behavior change; firmware binary identical apart
+from the JSON-helper merge):
+
+- Deleted never-compiled `WebPages.h`, `web-images.h`, `logic-sequences.h` and
+  `MarcduinoEffects.h`. The `#BMSMOKE`-style gadget commands documented from
+  `MarcduinoEffects.h` never existed in any build; the docs now describe the
+  real `@AP<token>` path.
+- `DomeElementStatus.h` includes `GeneratedDomeLayout.h` unconditionally; the
+  stale fallback allowlist (with a different element order) is gone.
+- JSON `ExpectChar`/`ParseLiteral`/`ParseBool` live once in `DomeJsonParsing.h`.
+- Removed the `-DMARC_SOUND_LOCAL_ENABLED=false` build flag. The `.ino`
+  redefined it to `true` unconditionally, so the flag never took effect.
+- `make test` (and therefore `make gate`/`ota`) now fails if
+  `GeneratedDomeLayout.h` has drifted from its template.
+- `platformio.ini` pins ESPAsyncWebServer by git tag `v3.5.1`: that version was
+  removed from the PlatformIO registry, which broke clean builds.
 
 ---
 
