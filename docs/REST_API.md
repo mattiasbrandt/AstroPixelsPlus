@@ -435,14 +435,16 @@ These routes exist **only** in builds where the matching gadget is compiled in
 so they return 404. The commands are ReelTwo `CommandEvent` commands and are
 sent internally with the `@AP` prefix.
 
+CB/DP values use ReelTwo's `selectEffect` encoding, sequence × 10000 + speed × 100 + seconds: flicker is sequence 2, disable is sequence 1, speed 0, so a 6-second flicker is `CB20006`.
+
 | Route | Build flag | Form fields | Command sent |
 |-------|-----------|-------------|--------------|
 | `POST /api/smoke` | `AP_ENABLE_BADMOTIVATOR` | `state=on\|off` | `BMON` / `BMOFF` |
 | `POST /api/fire` | `AP_ENABLE_FIRESTRIP` | `state=on\|off` | `FS11000` / `FSOFF` |
 | `GET /api/cbi` | `AP_ENABLE_CBI` | — | none; always `{"ok":true,"state":"unknown"}` |
-| `POST /api/cbi` | `AP_ENABLE_CBI` | `action=flicker\|disable`, optional `duration` (1-99 s; default 6 / 8) | `CB2<dd>006` / `CB1<dd>008` |
+| `POST /api/cbi` | `AP_ENABLE_CBI` | `action=flicker\|disable`, optional `duration` (1-99 s; default 6 / 8) | `CB200<dd>` / `CB100<dd>` |
 | `GET /api/datapanel` | `AP_ENABLE_DATAPANEL` | — | none; always `{"ok":true,"state":"unknown"}` |
-| `POST /api/datapanel` | `AP_ENABLE_DATAPANEL` | `action=flicker\|disable`, optional `duration` (1-99 s; default 6 / 8) | `DP2<dd>006` / `DP1<dd>008` |
+| `POST /api/datapanel` | `AP_ENABLE_DATAPANEL` | `action=flicker\|disable`, optional `duration` (1-99 s; default 6 / 8) | `DP200<dd>` / `DP100<dd>` |
 
 ---
 

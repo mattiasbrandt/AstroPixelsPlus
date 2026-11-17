@@ -30,7 +30,7 @@ while unifying Marcduino command ingress.
 | Queue admission | Enqueues after immediate handlers | Same | Same | Queue depth is 8 entries. Commands are copied with `strlcpy` into `CONSOLE_BUFFER_SIZE`. Long commands truncate silently at the queue buffer boundary. |
 | Queue-full behavior | Drops command, increments `sMarcduinoQueueFullCount`, logs `[queue-full]` | Same | Same | Caller does not get a failure response today. |
 | Mood reset dedupe (`:SE10`, `:SE11`, `:SE13`, `:SE14`) | Applied before queueing | Same | Same | Duplicate is dropped when the same mood command repeats within 2500 ms. |
-| Body-link echo suppression | Not applied | Not applied | Queue item sets `suppressBodyLinkEgress` | Suppression is computed from source metadata. While dispatching a suppressed queue item, `sendBodyCommand()` logs and does not forward back to the active body-link transport. |
+| Body-link echo suppression | Not applied | Not applied | Queue item sets `suppressBodyLinkEgress` | Suppression is computed from source metadata and is set only around `Marcduino::processCommand()`. That call only schedules the handler; the handler body (where `sendBodyCommand()` is called) runs after the flag is restored, so in practice handler egress is **not** suppressed. See *Open Question* below. |
 | Body-link heartbeat handling | N/A | N/A | Transport-local | `#PAHB` is not a Marcduino command. Dome heartbeat `#APHB` is emitted from heartbeat handling, not command admission. |
 
 ## UART Burst Backpressure
@@ -42,14 +42,53 @@ but prevents dense choreographies from filling the eight-entry queue during one
 `handleBodySerial()` pass. Heartbeat frames remain transport-local and do not
 pump command dispatch.
 
+## Queue Dispatch
+
+`Marcduino::processCommand()` does not run a handler. It stores a pointer to
+the command suffix (read later through `Marcduino::getCommand()`) and calls
+`player.animateOnce()`, which only schedules the handler; the body runs on the
+player's next `animate()` tick. ReelTwo's player holds one animation, and a
+second `animateOnce()` before that tick discards the first without running it.
+
+Before 2026-11-17 the drain dispatched every queued command and returned, so:
+
+- handlers read `getCommand()` from the drain's local buffer after the drain had
+  returned (dangling stack memory), and
+- when more than one command was dispatched in one drain (any burst, including
+  the per-frame UART pump), only the last command's handler ran.
+
+`drainMarcduinoCommandQueue()` now calls `player.animate()` right after
+`processCommand()` whenever a newly scheduled animation has not started
+(`IngressAnimationPlayer::hasUnstartedAnimation()`), so each handler's first step
+runs while its command text is valid and before the next command is
+dispatched. Multi-step animations continue on later ticks, and a new command
+still pre-empts a running animation, as before. The legacy `MarcduinoSerial`
+path already behaved this way (one line per tick, own buffer).
+
+`tools/test_marcduino_dispatch_host.py` compiles the real drain and ReelTwo's
+real dispatch code on the host and checks queued single commands, queued
+bursts, and the legacy serial path.
+
+## Open Question: Echo Suppression Scope
+
+The intent recorded below is that body-link-origin commands suppress body-link
+egress *while their handlers run*. The handler body runs outside the
+suppression window (see the matrix above), so egress from handlers such as the
+`:SE` sequences' `sendBodyCommand("$…")` sound requests still reaches the body
+today, and that is the behavior the deployed firmware has. The dispatch fix above
+deliberately keeps the handler step outside the window to avoid changing that.
+Moving it inside would make suppression effective and would also stop those
+body sound requests for body-triggered sequences; decide that separately.
+
 ## Intentional Differences
 
 - `/api/cmd` returning HTTP 423 while sleeping is intentional. WebSocket and
   transport callers only get log output because they do not have the same
   request/response contract.
-- Body-link-origin commands intentionally suppress body-link egress while their
-  Marcduino handlers run. This prevents command echo loops between body and
-  dome.
+- Body-link-origin commands are intended to suppress body-link egress while
+  their Marcduino handlers run, to prevent command echo loops between body and
+  dome. As implemented, suppression only covers `processCommand()` scheduling,
+  not the handler body; see *Open Question: Echo Suppression Scope*.
 - Body-link heartbeat frames intentionally stay in the transport adapter and do
   not enter Marcduino command admission.
 - WiFi Marcduino serial pass-through intentionally remains a transport option

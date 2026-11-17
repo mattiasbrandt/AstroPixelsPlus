@@ -1089,7 +1089,19 @@ Fixed (behavior changes):
   flag is on (404 in the default build, where they used to answer
   `{"ok":true}` and do nothing). They now send `@AP<token>`, so the token
   reaches the ReelTwo gadget via `CommandEvent`; before, the bare token went to
-  the Marcduino dispatcher, which ignores it.
+  the Marcduino dispatcher, which ignores it. CBI/DataPanel values now use
+  ReelTwo's `selectEffect` encoding (`CB200<dd>`, e.g. `CB20006`); the old
+  `CB2<dd>006` form decoded as an unsupported sequence 20.
+- **Queued Marcduino commands run reliably.** `processCommand()` only schedules
+  a handler, so the queue drain left handlers reading `getCommand()` from a
+  stack buffer that was already gone, and in any burst (including the per-frame
+  body UART pump) only the last command ran. The drain now runs each newly
+  scheduled handler's first step immediately. Affects every queued transport
+  (REST, WebSocket, USB serial, WiFi Marcduino, body link, I2C); the legacy
+  `MarcduinoSerial` path was already correct. Covered by
+  `tools/test_marcduino_dispatch_host.py` (host-compiled against ReelTwo's real
+  dispatch code). Echo-suppression scope is unchanged and documented as an open
+  question in `docs/MARCDUINO_INGRESS.md`.
 
 Removed or simplified (no behavior change; firmware binary identical apart
 from the JSON-helper merge):
