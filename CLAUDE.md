@@ -113,68 +113,18 @@ Rules:
 
 ## Architecture
 
-### Command Flow
-
-All control paths converge on the same Marcduino command dispatcher:
-
-```
-Serial2 (2400 baud, Marcduino hardware)  ─┐
-WiFi socket (port 2000)                   ├─→ MARCDUINO_ACTION macros → hardware drivers
-Web UI button press                       ─┘
-```
-
-Commands are parsed from a **64-byte buffer** (hardcoded in ReelTwo). Commands longer than 63 chars are silently truncated — this is a known architectural constraint.
-
-### Why Async Web Layer Replaced ReelTwo WebPages
-
-The old ReelTwo web UI (`WebPages.h` + `WifiWebServer` + `WButton`, since deleted) allocated heap during static initialization. On ESP32 this created a hard practical limit (~44 WButtons + a handful of String arrays) and caused boot crashes when the UI grew.
-
-The migration to `AsyncWebInterface.h` solves that by moving UI structure to SPIFFS files (`data/*.html`, `data/app.js`, `data/style.css`) and keeping firmware-side web code minimal.
-
-Important: this migration changed the **transport layer**, not the robot control core.
-
-- Web requests now call async handlers (`/api/cmd`, `/api/pref`, `/api/reboot`, `/upload/firmware`, `/ws`) in `AsyncWebInterface.h`
-- Robot actions still flow through the same core dispatcher: `Marcduino::processCommand(player, cmd)`
-- Existing ReelTwo command handlers (`MarcduinoPanel.h`, `MarcduinoHolo.h`, `MarcduinoLogics.h`, etc.) remain the source of behavior
-- Preferences, OTA, and reboot still use existing runtime objects/functions (`Preferences`, `Update`, `reboot()`)
-
-In short: the REST/WebSocket API is a new wrapper built on top of existing ReelTwo-era control paths, so behavior stays consistent while UI scalability improves.
-
-### Subsystem Files
-
-| File | Responsibility |
-|------|---------------|
-| `AstroPixelsPlus.ino` | Setup, event loop, hardware pin/object initialization |
-| `AsyncWebInterface.h` | Async web server routes (REST/WS), SPIFFS serving, OTA upload handler |
-| `MarcduinoLogics.h` | `@1T`, `@2T`, `@0T` commands → LogicEngineRenderer sequences |
-| `MarcduinoHolo.h` | `*ON`, `*OF`, `*HP`, `*RD`, `*HN` → holo projector servo/LED |
-| `MarcduinoPanel.h` | `:OP`, `:CL`, `:OF` → PCA9685 servo panel choreography |
-| `MarcduinoSound.h` | `@4Sn` → DFPlayer Mini MP3 playback |
-| `MarcduinoSequence.h` | Compound choreography (panels + holos + LEDs coordinated) |
-| `effects/*.h` | Custom LED rendering effects (Plasma, Fractal, MetaBalls, FadeAndScroll, Bitmap) |
-| `menus/*.h` | Optional TFT LCD screen layouts (physical display, if connected) |
-
-### Marcduino Command Prefix Reference
-
-| Prefix | Domain |
-|--------|--------|
-| `@1T`, `@2T`, `@0T` | Logic sequences (Front / Rear / All) |
-| `@APLE` | AstroPixel direct LED effect |
-| `:OP`, `:CL`, `:OF` | Panel open / close / off |
-| `*ON`, `*OF` | Holo LED on / off |
-| `*HP` | Holo position (3-digit: projector + position) |
-| `*RD`, `*HN` | Holo random move / nod |
-| `@4Sn` | Sound playback (bank/track) |
-| `D###` | Device settings (e.g., D198 = disable auto-twitch) |
-| `#AP...` | Configuration persistence (e.g., `#APWIFI1`) |
+- **One translation unit.** `AstroPixelsPlus.ino` includes the root headers mid-file, after the macros, globals and ReelTwo types they use; a header is not valid on its own.
+- **Web UI** is static files in `data/` (SPIFFS), served with REST/WebSocket routes by `AsyncWebInterface.h`. The old ReelTwo `WebPages.h`/`WButton` UI is gone: it allocated heap during static init and crashed boot past ~44 buttons.
+- **Command dispatch:** every transport calls `marcduinoIngressAdmit()` (`MarcduinoIngress.h`), which queues for `Marcduino::processCommand()` and the `MARCDUINO_ACTION` handlers in `Marcduino*.h` / `DomeSequences.h`. The legacy `MarcduinoSerial` path bypasses ingress. Read `docs/MARCDUINO_INGRESS.md` before changing dispatch: `processCommand()` only schedules a handler, the shared `player` holds one animation, `DM:*` sequences are handed off via `dome_pendingAnim`.
+- **ReelTwo source** is at `.pio/libdeps/astropixelsplus/Reeltwo/src` after `make build`. Read it for library behavior (dispatch, `CommandEvent`, gadget command formats).
+- Commands over 63 characters are silently truncated on the legacy serial, WebSocket and body-link WiFi paths (64-byte buffers).
+- References: commands `docs/COMMANDS.md`, REST/WS `docs/REST_API.md`, pins and wiring `docs/HARDWARE_WIRING.md`, decisions `docs/adr/`, review rules `CODING_STANDARDS.md`.
 
 ### Adding a New Marcduino Command
 
-1. Choose the correct `Marcduino*.h` file by prefix domain.
-2. Add a `MARCDUINO_ACTION(Name, "prefix", ({ /* body */ }))` block.
-3. Call the appropriate hardware driver (LogicEngineRenderer, ServoDispatch, DFPlayerMini, etc.).
-4. If exposing via web UI, add the control to the relevant `data/*.html` page and send the command with `sendCmd()` from `data/app.js` (it goes through `/api/cmd`).
-5. Check the exact command string matches the registered prefix. `Marcduino::processCommand` silently drops a command that matches no `MARCDUINO_ACTION` (unless it starts with `@` and a Jawa commander exists, which this build does not create).
+1. Add a `MARCDUINO_ACTION(Name, PREFIX, ({ /* body */ }))` block in the `Marcduino*.h` file for that prefix domain, calling the hardware driver (LogicEngineRenderer, ServoDispatch, DFPlayerMini, ...).
+2. For a web control, add it to the relevant `data/*.html` page and send it with `sendCmd()` from `data/app.js` (goes through `/api/cmd`).
+3. `make test` runs `tools/test_ui_command_routing.py`, which fails on any UI or REST command string that matches no handler: `Marcduino::processCommand()` drops those silently.
 
 ## Hardware
 
