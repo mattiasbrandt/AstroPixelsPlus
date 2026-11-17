@@ -17,6 +17,7 @@ smoke:
 	python3 tools/command_compat_matrix.py --dry-run
 
 test:
+	python3 tools/check_dome_layout_generated.py
 	python3 tools/test_dome_layout_validation.py
 	python3 tools/test_dome_layout_preview.py
 	python3 tools/test_operator_disabled_interlock.py
