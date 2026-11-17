@@ -470,7 +470,23 @@ ServoDispatchDirect<SizeOfArray(servoSettings)> servoDispatch(servoSettings);
 ServoDispatchPCA9685<SizeOfArray(servoSettings)> servoDispatch(servoSettings);
 #endif
 ServoSequencer servoSequencer(servoDispatch);
-AnimationPlayer player(servoSequencer);
+// The ingress queue drain (MarcduinoIngress.h) must tell whether
+// Marcduino::processCommand() just scheduled a handler that has not run yet.
+// That state is protected in ReelTwo's AnimationPlayer.
+class IngressAnimationPlayer : public AnimationPlayer
+{
+public:
+    explicit IngressAnimationPlayer(ServoSequencer &sequencer) :
+        AnimationPlayer(sequencer)
+    {
+    }
+
+    bool hasUnstartedAnimation() const
+    {
+        return fAnimation != NULL && fFlags == kWaiting;
+    }
+};
+IngressAnimationPlayer player(servoSequencer);
 
 // Dynamic wiring config — apply per-slot PCA9685 channel assignments and
 // active/inactive state from NVS, overriding the PROGMEM defaults eagerly copied

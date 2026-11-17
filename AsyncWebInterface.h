@@ -38,7 +38,7 @@ extern void reboot();
 extern void unmountFileSystems();
 
 // Globals defined in .ino that we need access to
-extern AnimationPlayer player;
+extern IngressAnimationPlayer player;
 extern Preferences preferences;
 extern bool wifiEnabled;
 extern bool remoteEnabled;
