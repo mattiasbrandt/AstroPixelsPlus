@@ -62,12 +62,23 @@ Before 2026-11-17 the drain dispatched every queued command and returned, so:
 (`IngressAnimationPlayer::hasUnstartedAnimation()`), so each handler's first step
 runs while its command text is valid and before the next command is
 dispatched. Multi-step animations continue on later ticks, and a new command
-still pre-empts a running animation, as before. The legacy `MarcduinoSerial`
+still pre-empts a running animation, as before.
+
+`DM:*` handlers do not start their dome sequence; they only record
+`dome_pendingAnim`, which `dispatchPendingDomeAnimation()` hands to the player
+outside `player.animate()`. The drain calls it after each command (and runs the
+sequence's first step, which sets `dome_seqRunning`), so dome sequences keep
+queue order: `DM:SCREAM` then `:SE00` in one burst starts the scream and the
+stop pre-empts it. Without this, the scream would be handed off by `mainLoop()`
+after the drain and override the later `:SE00` or a later multi-step sequence.
+`mainLoop()` still calls the same function for requests from the legacy
+`MarcduinoSerial` path. The legacy `MarcduinoSerial`
 path already behaved this way (one line per tick, own buffer).
 
 `tools/test_marcduino_dispatch_host.py` compiles the real drain and ReelTwo's
 real dispatch code on the host and checks queued single commands, queued
-bursts, and the legacy serial path.
+bursts, `DM:*` ordering against a later `:SE00` or multi-step sequence, and the
+legacy serial path.
 
 ## Open Question: Echo Suppression Scope
 

@@ -1096,7 +1096,9 @@ Fixed (behavior changes):
   a handler, so the queue drain left handlers reading `getCommand()` from a
   stack buffer that was already gone, and in any burst (including the per-frame
   body UART pump) only the last command ran. The drain now runs each newly
-  scheduled handler's first step immediately. Affects every queued transport
+  scheduled handler's first step immediately, and starts any `DM:*` dome
+  sequence it requested before the next queued command, so `DM:SCREAM` then
+  `:SE00` in one burst ends stopped rather than screaming. Affects every queued transport
   (REST, WebSocket, USB serial, WiFi Marcduino, body link, I2C); the legacy
   `MarcduinoSerial` path was already correct. Covered by
   `tools/test_marcduino_dispatch_host.py` (host-compiled against ReelTwo's real
