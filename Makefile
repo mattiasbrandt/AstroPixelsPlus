@@ -5,10 +5,14 @@ SPIFFS_BIN ?= .pio/build/$(BUILD_ENV)/spiffs.bin
 
 -include user.mk
 
-.PHONY: build buildfs gate ota uploadfs smoke test
+.PHONY: build buildfs compiledb gate ota uploadfs smoke test
 
 build:
 	pio run -e $(BUILD_ENV)
+
+# Regenerate compile_commands.json for clangd after toolchain or flag changes.
+compiledb:
+	pio run -e $(BUILD_ENV) -t compiledb
 
 buildfs:
 	pio run -e $(BUILD_ENV) -t buildfs
