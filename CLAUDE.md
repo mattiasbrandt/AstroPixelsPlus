@@ -60,7 +60,7 @@ python3 tools/command_compat_matrix.py --host 10.0.0.21 --group holos --group lo
 
 The runner sends commands through `/api/cmd` and verifies `/api/state` + `/api/health` after each step. Treat failures as regressions that must be investigated before release/upload sign-off.
 
-The Makefile wraps PlatformIO for local builds and uses `tools/http_ota_upload.py` for OTA through the controller's HTTP upload endpoints. `make gate` runs the firmware build plus compatibility dry-run, `make ota` posts `.pio/build/astropixelsplus/firmware.bin` to `/upload/firmware`, and `make uploadfs` builds/posts `.pio/build/astropixelsplus/spiffs.bin` to `/upload/filesystem`. Firmware and SPIFFS uploads remain separate.
+The Makefile wraps PlatformIO for local builds and uses `tools/http_ota_upload.py` for OTA through the controller's HTTP upload endpoints. `make gate` runs the firmware build, the source-level tests in `tools/test_*.py` (`make test`), and the compatibility dry-run, `make ota` posts `.pio/build/astropixelsplus/firmware.bin` to `/upload/firmware`, and `make uploadfs` builds/posts `.pio/build/astropixelsplus/spiffs.bin` to `/upload/filesystem`. Firmware and SPIFFS uploads remain separate.
 
 Use these verification labels when recording validation status: `software-verified`, `controller-upload-verified`, `full-hardware-verified`, `partial`, `full-hardware-required`.
 
@@ -127,7 +127,7 @@ Commands are parsed from a **64-byte buffer** (hardcoded in ReelTwo). Commands l
 
 ### Why Async Web Layer Replaced ReelTwo WebPages
 
-The old ReelTwo web UI (`WebPages.h` + `WifiWebServer` + `WButton`) allocated heap during static initialization. On ESP32 this created a hard practical limit (~44 WButtons + a handful of String arrays) and caused boot crashes when the UI grew.
+The old ReelTwo web UI (`WebPages.h` + `WifiWebServer` + `WButton`, since deleted) allocated heap during static initialization. On ESP32 this created a hard practical limit (~44 WButtons + a handful of String arrays) and caused boot crashes when the UI grew.
 
 The migration to `AsyncWebInterface.h` solves that by moving UI structure to SPIFFS files (`data/*.html`, `data/app.js`, `data/style.css`) and keeping firmware-side web code minimal.
 
@@ -151,8 +151,6 @@ In short: the REST/WebSocket API is a new wrapper built on top of existing ReelT
 | `MarcduinoPanel.h` | `:OP`, `:CL`, `:OF` → PCA9685 servo panel choreography |
 | `MarcduinoSound.h` | `@4Sn` → DFPlayer Mini MP3 playback |
 | `MarcduinoSequence.h` | Compound choreography (panels + holos + LEDs coordinated) |
-| `WebPages.h` | Legacy web UI layout (archived as `.bak` after async migration) |
-| `logic-sequences.h` | 26 named LogicEngine animation sequences (LOGICENGINE_SEQ macros) |
 | `effects/*.h` | Custom LED rendering effects (Plasma, Fractal, MetaBalls, FadeAndScroll, Bitmap) |
 | `menus/*.h` | Optional TFT LCD screen layouts (physical display, if connected) |
 
@@ -175,18 +173,8 @@ In short: the REST/WebSocket API is a new wrapper built on top of existing ReelT
 1. Choose the correct `Marcduino*.h` file by prefix domain.
 2. Add a `MARCDUINO_ACTION(Name, "prefix", ({ /* body */ }))` block.
 3. Call the appropriate hardware driver (LogicEngineRenderer, ServoDispatch, DFPlayerMini, etc.).
-4. If exposing via web UI, add the corresponding widget to `WebPages.h` (see memory constraint below).
-
-## Critical Constraints
-
-### ESP32 Static Initialization Memory Limit
-
-`WButton` in ReelTwo calls `malloc()` during global object construction (before `setup()`). The ESP32 heap is not fully available at this point. **Exceeding ~44 WButton instances + 7 String arrays causes a boot crash** with no useful error message.
-
-Rules for `WebPages.h`:
-- Use `WSelect` (dropdown) for grouped options instead of multiple `WButton`s.
-- Use `const char*` arrays, not `String` arrays, for option lists.
-- Do not increase WButton count without testing boot stability.
+4. If exposing via web UI, add the control to the relevant `data/*.html` page and send the command with `sendCmd()` from `data/app.js` (it goes through `/api/cmd`).
+5. Check the exact command string matches the registered prefix. `Marcduino::processCommand` silently drops a command that matches no `MARCDUINO_ACTION` (unless it starts with `@` and a Jawa commander exists, which this build does not create).
 
 ## Hardware
 

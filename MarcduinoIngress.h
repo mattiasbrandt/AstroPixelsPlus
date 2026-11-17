@@ -277,6 +277,24 @@ static void drainMarcduinoCommandQueue()
             sSuppressBodyLinkEgress = true;
         Marcduino::processCommand(player, cmd);
         sSuppressBodyLinkEgress = previousSuppressBodyLinkEgress;
+
+        // processCommand() only schedules the matching handler on `player`; ReelTwo
+        // runs its body on the next animate() tick, and the body reads its
+        // arguments through Marcduino::getCommand(), which points into `cmd`.
+        // Run that first step now, while `cmd` still holds this command, and
+        // before the next queued command's animateOnce() discards an
+        // animation that never started. (The legacy MarcduinoSerial path gets
+        // the same one-command-per-tick behavior from its own buffer.)
+        if (player.hasUnstartedAnimation())
+            player.animate();
+
+        // A DM:* handler only records dome_pendingAnim. Start that dome
+        // sequence now, in queue order, and run its first step (which sets
+        // dome_seqRunning), so a later command in this drain (e.g. :SE00)
+        // pre-empts it rather than mainLoop() starting it afterwards.
+        dispatchPendingDomeAnimation();
+        if (player.hasUnstartedAnimation())
+            player.animate();
     }
 }
 

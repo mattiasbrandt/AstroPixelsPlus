@@ -124,10 +124,18 @@
       var chain = Promise.resolve();
       prefs.forEach(function(p) {
         chain = chain.then(function() {
-          return apiPostForm('/api/pref', 'key=' + encodeURIComponent(p.key) + '&val=' + encodeURIComponent(p.val));
+          return apiPostForm('/api/pref', 'key=' + encodeURIComponent(p.key) + '&val=' + encodeURIComponent(p.val))
+            .then(function(resp) {
+              if (!resp.ok) throw {prefKey: p.key};
+            });
         });
       });
-      chain.then(function(){ if (typeof window.uiToast === 'function') window.uiToast('Sound settings saved.'); });
+      chain.then(function(){
+        if (typeof window.uiToast === 'function') window.uiToast('Sound settings saved.');
+      }).catch(function(err){
+        var what = (err && err.prefKey) ? err.prefKey : 'sound settings (network error)';
+        if (typeof window.uiToast === 'function') window.uiToast('Failed to save ' + what, 'error');
+      });
     }
   </script>
 </body>

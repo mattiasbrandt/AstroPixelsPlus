@@ -68,7 +68,7 @@
 
 // Replace with your network credentials
 #ifdef USE_WIFI
-#define REMOTE_ENABLED true // default disabled
+#define REMOTE_ENABLED true // default for the "remote" pref; only read when built with AP_ENABLE_DROID_REMOTE=1
 #define WIFI_ENABLED true   // default enabled
 // Set these to your desired WiFi credentials.
 #define WIFI_AP_NAME "AstroPixels"
@@ -138,7 +138,6 @@
 #define PREFERENCE_MARCSOUND_RANDOM_MIN "mrandommin"
 #define PREFERENCE_MARCSOUND_RANDOM_MAX "mrandommax"
 #define PREFERENCE_MARCSOUND_LOCAL_ENABLED "msoundlocal"
-#define PREFERENCE_DROID_NAME "dname"
 #define PREFERENCE_DROID_NAME "dname"
 
 #define PREFERENCE_BADMOTIVATOR_ENABLED "badmot"
@@ -471,7 +470,23 @@ ServoDispatchDirect<SizeOfArray(servoSettings)> servoDispatch(servoSettings);
 ServoDispatchPCA9685<SizeOfArray(servoSettings)> servoDispatch(servoSettings);
 #endif
 ServoSequencer servoSequencer(servoDispatch);
-AnimationPlayer player(servoSequencer);
+// The ingress queue drain (MarcduinoIngress.h) must tell whether
+// Marcduino::processCommand() just scheduled a handler that has not run yet.
+// That state is protected in ReelTwo's AnimationPlayer.
+class IngressAnimationPlayer : public AnimationPlayer
+{
+public:
+    explicit IngressAnimationPlayer(ServoSequencer &sequencer) :
+        AnimationPlayer(sequencer)
+    {
+    }
+
+    bool hasUnstartedAnimation() const
+    {
+        return fAnimation != NULL && fFlags == kWaiting;
+    }
+};
+IngressAnimationPlayer player(servoSequencer);
 
 // Dynamic wiring config — apply per-slot PCA9685 channel assignments and
 // active/inactive state from NVS, overriding the PROGMEM defaults eagerly copied
@@ -880,6 +895,22 @@ static const char *currentMoodName()
     if (strcmp(sCurrentMoodCmd, ":SE13") == 0) return "Mid-Awake";
     if (strcmp(sCurrentMoodCmd, ":SE14") == 0) return "Awake+";
     return "";
+}
+
+// Hand a pending dome sequence (recorded by a DM:* handler) to `player` so it
+// runs as DO_* steps on later animate() ticks. Must be called outside
+// player.animate() so animateOnce() is never re-entrant: from mainLoop(), and
+// from drainMarcduinoCommandQueue() between queued commands so a later command
+// in the same drain pre-empts the dome sequence instead of being overridden by it.
+static void dispatchPendingDomeAnimation()
+{
+    if (dome_pendingAnim != nullptr && !dome_seqRunning)
+    {
+        logCapture.printf("[DOME] dispatching pendingAnim\n");
+        AnimationStep anim = dome_pendingAnim;
+        dome_pendingAnim = nullptr;
+        player.animateOnce(anim);
+    }
 }
 
 #define MARCDUINO_INGRESS_IMPLEMENTATION
@@ -1946,16 +1977,10 @@ void mainLoop()
     drainMarcduinoCommandQueue();
     AnimatedEvent::process();
 
-    // Hand a pending dome sequence to `player` here, outside player.animate(),
-    // so it runs as DO_* steps driven by future AnimatedEvent::process() calls
-    // without blocking mainLoop (and without re-entrant animateOnce()).
-    if (dome_pendingAnim != nullptr && !dome_seqRunning)
-    {
-        logCapture.printf("[DOME] dispatching pendingAnim\n");
-        AnimationStep anim = dome_pendingAnim;
-        dome_pendingAnim = nullptr;
-        player.animateOnce(anim);
-    }
+    // DM:* requests made inside AnimatedEvent::process() (the legacy
+    // MarcduinoSerial path, or any handler dispatching directly) are handed off
+    // here, outside player.animate(). Queued ones are handed off by the drain.
+    dispatchPendingDomeAnimation();
 
     handleBodySerial();
     bodyLinkWiFiRx();

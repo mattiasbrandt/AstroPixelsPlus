@@ -11,12 +11,7 @@
 
 #include "DomeJsonParsing.h"
 
-#if __has_include("GeneratedDomeLayout.h")
 #include "GeneratedDomeLayout.h"
-#define DOME_ELEMENT_STATUS_HAS_GENERATED_LAYOUT 1
-#else
-#define DOME_ELEMENT_STATUS_HAS_GENERATED_LAYOUT 0
-#endif
 
 #define DOME_ELEMENT_STATUS_NS "dome_status"
 #define DOME_ELEMENT_STATUS_DISABLED_FMT "es_d%d"
@@ -28,10 +23,8 @@
 #define DOME_ELEMENT_STATUS_MAX_REASON_LEN 96
 #define DOME_ELEMENT_STATUS_MAX_ELEMENTS 64
 
-#if DOME_ELEMENT_STATUS_HAS_GENERATED_LAYOUT
 static_assert(DomeLayout::kElementCount <= DOME_ELEMENT_STATUS_MAX_ELEMENTS,
               "Dome layout known identity count exceeds element status storage");
-#endif
 
 typedef String (*DomeElementStatusEscapeFn)(const String &);
 
@@ -48,10 +41,9 @@ struct DomeElementStatusSnapshot
     String reason;
 };
 
-#if DOME_ELEMENT_STATUS_HAS_GENERATED_LAYOUT
-// The generated layout table is the canonical allowlist once available. The
-// generator should keep kDomeLayoutElements in stable template order so NVS
-// index keys do not drift between firmware builds for the same template.
+// The generated layout table is the canonical allowlist. The generator should
+// keep kDomeLayoutElements in stable template order so NVS index keys do not
+// drift between firmware builds for the same template.
 static inline int domeElementStatusElementCount()
 {
     return (int)DomeLayout::kElementCount;
@@ -78,47 +70,6 @@ static inline int domeElementStatusTemplateRevision()
 {
     return DomeLayout::kTemplateRevision;
 }
-#else
-// Temporary MK4 allowlist used until GeneratedDomeLayout.h lands. Keep this
-// limited to stable canonical element IDs, not aliases, command targets, or
-// wiring slots.
-static const char *kDomeElementStatusFallbackIds[] = {
-    "P1", "P2", "P3", "P4", "P5", "P6", "P7",
-    "P8", "P9", "P10", "P11", "P12", "P13", "P14",
-    "PP1", "PP2", "PP3", "PP4", "PP5", "PP6",
-    "MP",
-    "HP1", "HP2", "HP3",
-    "FLD", "RLD", "FPSI", "RPSI",
-};
-
-static inline int domeElementStatusElementCount()
-{
-    return (int)(sizeof(kDomeElementStatusFallbackIds) /
-                 sizeof(kDomeElementStatusFallbackIds[0]));
-}
-
-static inline const char *domeElementStatusElementId(int index)
-{
-    return (index >= 0 && index < domeElementStatusElementCount())
-        ? kDomeElementStatusFallbackIds[index]
-        : nullptr;
-}
-
-static inline const char *domeElementStatusTemplateId()
-{
-    return "mr-baddeley-complex-dome-mk4";
-}
-
-static inline int domeElementStatusSchemaRevision()
-{
-    return 1;
-}
-
-static inline int domeElementStatusTemplateRevision()
-{
-    return 1;
-}
-#endif
 
 static int domeElementStatusIndexOf(const String &id)
 {
@@ -187,39 +138,18 @@ static bool domeElementStatusParseJsonString(const char *&p, String &out,
 
 static bool domeElementStatusParseLiteral(const char *&p, const char *literal)
 {
-    domeElementStatusSkipWs(p);
-    size_t len = strlen(literal);
-    if (strncmp(p, literal, len) != 0) return false;
-    p += len;
-    return true;
+    return domeJsonParseLiteral(p, literal);
 }
 
 static bool domeElementStatusParseBool(const char *&p, bool &out)
 {
-    if (domeElementStatusParseLiteral(p, "true"))
-    {
-        out = true;
-        return true;
-    }
-    if (domeElementStatusParseLiteral(p, "false"))
-    {
-        out = false;
-        return true;
-    }
-    return false;
+    return domeJsonParseBool(p, out);
 }
 
 static bool domeElementStatusExpectChar(const char *&p, char expected,
                                         String &errMsg)
 {
-    domeElementStatusSkipWs(p);
-    if (*p != expected)
-    {
-        errMsg = String("expected '") + expected + "'";
-        return false;
-    }
-    p++;
-    return true;
+    return domeJsonExpectChar(p, expected, errMsg);
 }
 
 static bool domeElementStatusParseOneElement(const char *&p,

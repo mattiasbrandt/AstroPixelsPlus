@@ -50,14 +50,7 @@ static bool domeLayoutTemplateParseJsonString(const char *&p, String &out,
 static bool domeLayoutTemplateExpectChar(const char *&p, char expected,
                                          String &errMsg)
 {
-    domeLayoutTemplateSkipWs(p);
-    if (*p != expected)
-    {
-        errMsg = String("expected '") + expected + "'";
-        return false;
-    }
-    p++;
-    return true;
+    return domeJsonExpectChar(p, expected, errMsg);
 }
 
 static bool domeLayoutTemplateParseInt(const char *&p, int &out)
@@ -83,26 +76,12 @@ static bool domeLayoutTemplateParseInt(const char *&p, int &out)
 
 static bool domeLayoutTemplateParseLiteral(const char *&p, const char *literal)
 {
-    domeLayoutTemplateSkipWs(p);
-    size_t len = strlen(literal);
-    if (strncmp(p, literal, len) != 0) return false;
-    p += len;
-    return true;
+    return domeJsonParseLiteral(p, literal);
 }
 
 static bool domeLayoutTemplateParseBool(const char *&p, bool &out)
 {
-    if (domeLayoutTemplateParseLiteral(p, "true"))
-    {
-        out = true;
-        return true;
-    }
-    if (domeLayoutTemplateParseLiteral(p, "false"))
-    {
-        out = false;
-        return true;
-    }
-    return false;
+    return domeJsonParseBool(p, out);
 }
 
 static int domeLayoutTemplateFindKnownId(const String &id)

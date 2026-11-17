@@ -38,7 +38,9 @@ pip install platformio
 # 3. Build the firmware
 pio run -e astropixelsplus
 
-# 4. Upload firmware (connect board via USB first)
+# 4. Upload firmware over USB: bench mode only. The dome board must be
+#    isolated with the USB cable plugged directly into it. In an assembled
+#    droid, skip steps 4-5 and use the OTA commands below.
 pio run -e astropixelsplus -t upload
 
 # 5. Upload web UI assets to SPIFFS filesystem
@@ -1090,5 +1092,4 @@ If the board is in an unknown state and the web UI is inaccessible:
 ---
 
 *For firmware change history, see [`FORK_IMPROVEMENTS.md`](../FORK_IMPROVEMENTS.md).*  
-*For known issues and code-level findings, see [`CRITICAL_FINDINGS.md`](../CRITICAL_FINDINGS.md).*  
-*For API endpoint reference, see [`REST_API_ENDPOINTS_SUMMARY.md`](../REST_API_ENDPOINTS_SUMMARY.md).*
+*For API endpoint reference, see [`REST_API.md`](REST_API.md).*

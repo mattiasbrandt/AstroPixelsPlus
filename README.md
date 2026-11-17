@@ -63,6 +63,10 @@ https://github.com/reeltwo/AstroPixelsPlus/wiki
 
 # REQUIREMENTS
 
+> **This fork builds with PlatformIO, not the Arduino IDE.** Library versions are
+> pinned in `platformio.ini`; see [`docs/SETUP.md`](docs/SETUP.md) for the build and
+> HTTP OTA workflow. The list below is the original upstream requirement.
+
 Arduino IDE: https://www.arduino.cc/en/Main/Software  (1.8.13 or higher)
 NeoPixels: https://github.com/adafruit/Adafruit_NeoPixel/releases (1.10.5 or higher)
 Reeltwo: https://github.com/reeltwo/Reeltwo/releases  (1.1 or higher)

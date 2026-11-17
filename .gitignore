@@ -37,3 +37,7 @@ user.mk
 # Screenshot artefacts from iterative SVG / UI work
 panels-*.png
 holos-*.png
+
+# Generated / tool caches
+compile_commands.json
+__pycache__/

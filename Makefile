@@ -17,12 +17,14 @@ smoke:
 	python3 tools/command_compat_matrix.py --dry-run
 
 test:
+	python3 tools/check_dome_layout_generated.py
 	python3 tools/test_dome_layout_validation.py
 	python3 tools/test_dome_layout_preview.py
 	python3 tools/test_operator_disabled_interlock.py
 	python3 tools/test_wiring_commissioning_seam.py
 	python3 tools/test_marcduino_ingress_echo_policy.py
 	python3 tools/test_marcduino_ingress_seam.py
+	python3 tools/test_marcduino_dispatch_host.py
 
 gate: build test smoke
 
