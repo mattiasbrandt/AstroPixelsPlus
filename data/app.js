@@ -115,6 +115,9 @@
       el.className = 'ui-toast';
     }, 1800);
   }
+  // Page scripts call window.uiToast (or bare uiToast); without this export
+  // every one of those calls was a silent no-op.
+  window.uiToast = uiToast;
 
   window.apiPostForm = function(path, body) {
     return fetch(path, {
