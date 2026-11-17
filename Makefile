@@ -5,10 +5,14 @@ SPIFFS_BIN ?= .pio/build/$(BUILD_ENV)/spiffs.bin
 
 -include user.mk
 
-.PHONY: build buildfs gate ota uploadfs smoke test
+.PHONY: build buildfs compiledb gate ota uploadfs smoke test
 
 build:
 	pio run -e $(BUILD_ENV)
+
+# Regenerate compile_commands.json for clangd after toolchain or flag changes.
+compiledb:
+	pio run -e $(BUILD_ENV) -t compiledb
 
 buildfs:
 	pio run -e $(BUILD_ENV) -t buildfs
@@ -25,6 +29,7 @@ test:
 	python3 tools/test_marcduino_ingress_echo_policy.py
 	python3 tools/test_marcduino_ingress_seam.py
 	python3 tools/test_marcduino_dispatch_host.py
+	python3 tools/test_ui_command_routing.py
 
 gate: build test smoke
 

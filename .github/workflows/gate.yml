@@ -1,0 +1,33 @@
+name: gate
+
+# Runs the same checks as `make gate`: firmware build, source and host tests
+# (including the generated-layout drift check), and the compat dry-run.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Cache PlatformIO packages and libraries
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.platformio
+            .pio/libdeps
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+
+      - name: Install PlatformIO
+        # Same version as the maintainer's local toolchain.
+        run: pip install platformio==6.1.19
+
+      - name: make gate
+        run: make gate

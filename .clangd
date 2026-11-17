@@ -1,0 +1,12 @@
+# The firmware is one translation unit: AstroPixelsPlus.ino includes the root
+# headers mid-file, after the macros, globals and ReelTwo types they depend on.
+# Parsed on their own, those headers produce dozens of false errors per edit, so
+# their diagnostics are silenced; navigation and completion still work.
+# Real errors come from `make build` (regenerate compile_commands.json with
+# `make compiledb`). tools/host/*.cpp keeps full diagnostics.
+If:
+  PathMatch: '[^/]*\.h|effects/.*\.h|menus/.*\.h'
+Diagnostics:
+  Suppress: '*'
+  UnusedIncludes: None
+  MissingIncludes: None

@@ -889,11 +889,19 @@ Changes to build configuration, development workflow, and validation tools.
 ### Makefile Documentation
 Replaced the old Arduino.mk-relative workflow with PlatformIO/HTTP targets: `make build`, `make buildfs`, `make gate`, `make ota`, and `make uploadfs`. `BUILD_ENV`, `OTA_IP`, `FIRMWARE_BIN`, and `SPIFFS_BIN` are overridable, and user-specific overrides can live in gitignored `user.mk`.
 
+### Continuous Integration and Checks (2026-11-17)
+- `.github/workflows/gate.yml` runs `make gate` (firmware build, `make test`, compat dry-run) on every pull request and on pushes to `main`, with PlatformIO pinned to the maintainer's version.
+- `make test` includes:
+  - `tools/check_dome_layout_generated.py`: `GeneratedDomeLayout.h` matches its template.
+  - `tools/test_marcduino_dispatch_host.py`: host-compiles the real queue drain against ReelTwo's dispatch code (needs `make build` first).
+  - `tools/test_ui_command_routing.py`: every command string the web UI and REST routes send matches a handler prefix, and every `window.*` global the pages call is defined. Run against the code before the 2026-11-17 cleanup, it flags all four silent no-op controls that cleanup fixed.
+- `make compiledb` regenerates `compile_commands.json`; `.clangd` silences diagnostics for headers that are only valid inside `AstroPixelsPlus.ino`.
+
 ### Verification Labels
 Use `software-verified`, `controller-upload-verified`, `full-hardware-verified`, `partial`, and `full-hardware-required` when recording implementation validation status.
 
 ### Command Compatibility Matrix Smoke Runner
-Added `tools/command_compat_matrix.py` to validate core Marcduino command families over HTTP API. Runner sends command matrix entries through `/api/cmd` and checks `/api/state` + `/api/health` after each command. Supports grouped runs (`--group panels|holos|logics|sequences|sound`), target host override, optional API token, and dry-run listing. Bench validation completed on this fork: matrix runner executes successfully and reports expected PASS behavior.
+Added `tools/command_compat_matrix.py` to validate core Marcduino command families over HTTP API. Runner sends command matrix entries through `/api/cmd` and checks `/api/state` + `/api/health` after each command. Supports grouped runs (`--group panels|holos|logics|sequences|sound`), target host override, an `--token` header option (the firmware does not check it; ADR 0005), and dry-run listing. Bench validation completed on this fork: matrix runner executes successfully and reports expected PASS behavior.
 
 ---
 
