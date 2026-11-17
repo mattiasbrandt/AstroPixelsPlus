@@ -53,3 +53,39 @@ static bool domeJsonParseString(const char *&p, String &out, String &errMsg,
     errMsg = "unterminated string";
     return false;
 }
+
+static bool domeJsonExpectChar(const char *&p, char expected, String &errMsg)
+{
+    domeJsonSkipWs(p);
+    if (*p != expected)
+    {
+        errMsg = String("expected '") + expected + "'";
+        return false;
+    }
+    p++;
+    return true;
+}
+
+static bool domeJsonParseLiteral(const char *&p, const char *literal)
+{
+    domeJsonSkipWs(p);
+    size_t len = strlen(literal);
+    if (strncmp(p, literal, len) != 0) return false;
+    p += len;
+    return true;
+}
+
+static bool domeJsonParseBool(const char *&p, bool &out)
+{
+    if (domeJsonParseLiteral(p, "true"))
+    {
+        out = true;
+        return true;
+    }
+    if (domeJsonParseLiteral(p, "false"))
+    {
+        out = false;
+        return true;
+    }
+    return false;
+}

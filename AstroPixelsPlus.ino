@@ -68,7 +68,7 @@
 
 // Replace with your network credentials
 #ifdef USE_WIFI
-#define REMOTE_ENABLED true // default disabled
+#define REMOTE_ENABLED true // default for the "remote" pref; only read when built with AP_ENABLE_DROID_REMOTE=1
 #define WIFI_ENABLED true   // default enabled
 // Set these to your desired WiFi credentials.
 #define WIFI_AP_NAME "AstroPixels"
@@ -138,7 +138,6 @@
 #define PREFERENCE_MARCSOUND_RANDOM_MIN "mrandommin"
 #define PREFERENCE_MARCSOUND_RANDOM_MAX "mrandommax"
 #define PREFERENCE_MARCSOUND_LOCAL_ENABLED "msoundlocal"
-#define PREFERENCE_DROID_NAME "dname"
 #define PREFERENCE_DROID_NAME "dname"
 
 #define PREFERENCE_BADMOTIVATOR_ENABLED "badmot"

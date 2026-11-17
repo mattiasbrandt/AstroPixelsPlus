@@ -2237,12 +2237,4 @@ static void broadcastOtaProgress(float progress)
     }
 }
 
-// ---------------------------------------------------------------
-// Get the LogCapture instance — used in .ino to redirect Serial
-// ---------------------------------------------------------------
-static LogCapture &getLogCapture()
-{
-    return logCapture;
-}
-
 #endif // ASYNC_WEB_INTERFACE_H
