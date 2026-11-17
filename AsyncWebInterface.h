@@ -1866,7 +1866,7 @@ static void initAsyncWeb()
             }
             char duration[3];
             snprintf(duration, sizeof(duration), "%02u", durationSec);
-            String cmd = "@APCB2" + String(duration) + "006";
+            String cmd = "@APCB200" + String(duration); // seq*10000 + speed(0)*100 + seconds
             marcduinoIngressAdmit(kMarcduinoIngressWebApi, cmd.c_str());
             request->send(200, "application/json", "{\"ok\":true,\"action\":\"flicker\",\"duration\":" + String(durationSec) + "}");
         }
@@ -1881,7 +1881,7 @@ static void initAsyncWeb()
             }
             char duration[3];
             snprintf(duration, sizeof(duration), "%02u", durationSec);
-            String cmd = "@APCB1" + String(duration) + "008";
+            String cmd = "@APCB100" + String(duration); // seq*10000 + speed(0)*100 + seconds
             marcduinoIngressAdmit(kMarcduinoIngressWebApi, cmd.c_str());
             request->send(200, "application/json", "{\"ok\":true,\"action\":\"disable\",\"duration\":" + String(durationSec) + "}");
         }
@@ -1916,7 +1916,7 @@ static void initAsyncWeb()
             }
             char duration[3];
             snprintf(duration, sizeof(duration), "%02u", durationSec);
-            String cmd = "@APDP2" + String(duration) + "006";
+            String cmd = "@APDP200" + String(duration); // seq*10000 + speed(0)*100 + seconds
             marcduinoIngressAdmit(kMarcduinoIngressWebApi, cmd.c_str());
             request->send(200, "application/json", "{\"ok\":true,\"action\":\"flicker\",\"duration\":" + String(durationSec) + "}");
         }
@@ -1931,7 +1931,7 @@ static void initAsyncWeb()
             }
             char duration[3];
             snprintf(duration, sizeof(duration), "%02u", durationSec);
-            String cmd = "@APDP1" + String(duration) + "008";
+            String cmd = "@APDP100" + String(duration); // seq*10000 + speed(0)*100 + seconds
             marcduinoIngressAdmit(kMarcduinoIngressWebApi, cmd.c_str());
             request->send(200, "application/json", "{\"ok\":true,\"action\":\"disable\",\"duration\":" + String(durationSec) + "}");
         }
