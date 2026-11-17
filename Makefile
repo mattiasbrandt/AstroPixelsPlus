@@ -25,6 +25,7 @@ test:
 	python3 tools/test_marcduino_ingress_echo_policy.py
 	python3 tools/test_marcduino_ingress_seam.py
 	python3 tools/test_marcduino_dispatch_host.py
+	python3 tools/test_ui_command_routing.py
 
 gate: build test smoke
 
