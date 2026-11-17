@@ -6,9 +6,10 @@ core/Animation.h and core/Marcduino.h from .pio/libdeps (run `make build`
 first) and the firmware's real IngressAnimationPlayer class and
 drainMarcduinoCommandQueue() body, then runs it.
 
-Guards two failure modes of queued dispatch: a handler reading its
-Marcduino::getCommand() arguments after the drain buffer is gone, and a burst
-of queued commands where only the last one runs.
+Guards queued dispatch against: a handler reading its Marcduino::getCommand()
+arguments after the drain buffer is gone; a burst where only the last command
+runs; and a DM:* dome sequence requested earlier in a burst starting after (and
+overriding) a later command such as :SE00.
 """
 
 from __future__ import annotations
@@ -49,11 +50,13 @@ class MarcduinoDispatchHostTest(unittest.TestCase):
         ingress = (ROOT / "MarcduinoIngress.h").read_text(encoding="utf-8")
         player_class = extract(ino, "class IngressAnimationPlayer : public AnimationPlayer", "\n};\n")
         drain = extract(ingress, "static void drainMarcduinoCommandQueue()\n{", "\n}\n")
+        dome_dispatch = extract(ino, "static void dispatchPendingDomeAnimation()\n{", "\n}\n")
 
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             (tmp_path / "firmware_player_class.inc").write_text(player_class, encoding="utf-8")
             (tmp_path / "firmware_drain.inc").write_text(drain, encoding="utf-8")
+            (tmp_path / "firmware_dome_dispatch.inc").write_text(dome_dispatch, encoding="utf-8")
             binary = tmp_path / "harness"
             build = subprocess.run(
                 [
